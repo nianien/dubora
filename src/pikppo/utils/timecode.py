@@ -14,16 +14,6 @@ def srt_timestamp(seconds: float) -> str:
     return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
 
 
-def ass_timestamp(seconds: float) -> str:
-    """Convert seconds to ASS timestamp (H:MM:SS.cc)."""
-    centiseconds = int(round(max(0.0, seconds) * 100))
-    hh = centiseconds // 360_000
-    mm = (centiseconds % 360_000) // 6_000
-    ss = (centiseconds % 6_000) // 100
-    cs = centiseconds % 100
-    return f"{hh}:{mm:02d}:{ss:02d}.{cs:02d}"
-
-
 def write_srt_from_segments(
     segments: Iterable[Mapping],
     out_path: str,

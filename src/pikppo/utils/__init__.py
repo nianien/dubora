@@ -4,6 +4,7 @@
 提供纯函数工具和日志功能。
 """
 from .logger import info, success, warning, error, debug, get_logger
+from .text import normalize_text
 
 __all__ = [
     "info",
@@ -12,4 +13,5 @@ __all__ = [
     "error",
     "debug",
     "get_logger",
+    "normalize_text",
 ]

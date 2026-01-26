@@ -1,5 +1,24 @@
 """
-ASR Phase: 语音识别（只编排与IO，调用 pipeline.processors.asr.transcribe 和 pipeline.processors.subtitle.generate_subtitles）
+ASR Phase: 语音识别（只做识别，不负责字幕后处理）
+
+职责：
+- 读取音频文件
+- 上传到 TOS（如果需要）
+- 调用 ASR API
+- 产出 IR（中间表示）：Utterance[] / Word[]
+- 保存原始 ASR 响应（asr.raw_response，可选，用于调试/复现）
+
+产出设计：
+- asr.result：IR（Utterance[]，稳定、可替换、可复用）
+- asr.raw_response：raw（可选，用于调试/复现）
+
+不负责：
+- 字幕后处理（由 Subtitle Phase 负责）
+- 切句策略（由 Subtitle Phase 负责）
+
+架构原则：
+- raw 是日志/证据，不是接口契约
+- pipeline 默认走 IR（稳定、可替换、可复用）
 """
 import json
 import os
@@ -9,14 +28,13 @@ from typing import Dict
 from pikppo.pipeline.core.phase import Phase
 from pikppo.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext
 from pikppo.pipeline.processors.asr import transcribe
-from pikppo.pipeline.processors.subtitle import generate_subtitles
+from pikppo.models.doubao import parse_utterances
 from pikppo.infra.storage.tos import TosStorage
-from pikppo.models.doubao import POSTPROFILES, speaker_aware_postprocess
 from pikppo.utils.logger import info
 
 
 class ASRPhase(Phase):
-    """语音识别 Phase。"""
+    """语音识别 Phase（只做识别，不负责字幕后处理）。"""
     
     name = "asr"
     version = "1.0.0"
@@ -26,8 +44,8 @@ class ASRPhase(Phase):
         return ["demux.audio"]
     
     def provides(self) -> list[str]:
-        """生成 subs.zh_segments, subs.zh_srt, subs.asr_raw_response。"""
-        return ["subs.zh_segments", "subs.zh_srt", "subs.asr_raw_response"]
+        """生成 asr.result（IR：Utterance[]）和 asr.raw_response（可选，用于调试）。"""
+        return ["asr.result", "asr.raw_response"]
     
     def run(self, ctx: RunContext, inputs: Dict[str, Artifact]) -> PhaseResult:
         """
@@ -36,8 +54,9 @@ class ASRPhase(Phase):
         流程：
         1. 读取音频文件
         2. 上传到 TOS（如果需要）
-        3. 调用 ASR
-        4. 生成字幕
+        3. 调用 ASR API
+        4. 解析为 IR（Utterance[]）
+        5. 保存 IR 和 raw response
         """
         # 获取输入
         audio_artifact = inputs["demux.audio"]
@@ -68,10 +87,9 @@ class ASRPhase(Phase):
         # 获取配置
         phase_config = ctx.config.get("phases", {}).get("asr", {})
         preset = phase_config.get("preset", ctx.config.get("doubao_asr_preset", "asr_vad_spk"))
-        postprofile = phase_config.get("postprofile", ctx.config.get("doubao_postprofile", "axis"))
         hotwords = phase_config.get("hotwords", ctx.config.get("doubao_hotwords"))
         
-        info(f"ASR strategy: preset={preset}, postprofile={postprofile}")
+        info(f"ASR strategy: preset={preset}")
         info(f"Audio file: {audio_path.name} (size: {audio_path.stat().st_size / 1024 / 1024:.2f} MB)")
         
         try:
@@ -116,29 +134,40 @@ class ASRPhase(Phase):
             
             info(f"ASR succeeded ({len(utterances)} utterances)")
             
-            # 3. 生成字幕
-            result = generate_subtitles(
-                utterances=utterances,
-                postprocess_fn=speaker_aware_postprocess,
-                postprofiles=POSTPROFILES,
-                postprofile=postprofile,
-                output_dir=workspace_path,
-                video_stem=episode_stem,
-                use_cache=False,  # Phase runner 会处理缓存
-            )
+            # 3. 保存 IR（中间表示）
+            asr_dir = workspace_path / "asr"
+            asr_dir.mkdir(parents=True, exist_ok=True)
             
-            # 读取生成的 segments
-            segments_path = Path(result["segments"])
-            with open(segments_path, "r", encoding="utf-8") as f:
-                segments = json.load(f)
+            # 保存 IR：将 Utterance[] 序列化为 JSON
+            result_path = asr_dir / "result.json"
+            result_data = {
+                "utterances": [
+                    {
+                        "speaker": utt.speaker,
+                        "start_ms": utt.start_ms,
+                        "end_ms": utt.end_ms,
+                        "text": utt.text,
+                        "words": [
+                            {
+                                "start_ms": w.start_ms,
+                                "end_ms": w.end_ms,
+                                "text": w.text,
+                                "speaker": w.speaker,
+                            }
+                            for w in (utt.words or [])
+                        ] if utt.words else None,
+                    }
+                    for utt in utterances
+                ],
+            }
             
-            info(f"Generated subtitles ({len(segments)} segments)")
+            with open(result_path, "w", encoding="utf-8") as f:
+                json.dump(result_data, f, indent=2, ensure_ascii=False)
             
-            # 4. 保存原始 ASR 响应
-            subs_dir = workspace_path / "subs"
-            subs_dir.mkdir(parents=True, exist_ok=True)
-            raw_response_path = subs_dir / "asr-raw-response.json"
+            info(f"Saved ASR IR to: {result_path}")
             
+            # 4. 保存 raw response（可选，用于调试/复现）
+            raw_response_path = asr_dir / "raw-response.json"
             with open(raw_response_path, "w", encoding="utf-8") as f:
                 json.dump(raw_response, f, indent=2, ensure_ascii=False)
             
@@ -148,28 +177,21 @@ class ASRPhase(Phase):
             return PhaseResult(
                 status="succeeded",
                 artifacts={
-                    "subs.zh_segments": Artifact(
-                        key="subs.zh_segments",
-                        path="subs/zh-segments.json",
+                    "asr.result": Artifact(
+                        key="asr.result",
+                        path="asr/result.json",
                         kind="json",
                         fingerprint="",  # runner 会计算
                     ),
-                    "subs.zh_srt": Artifact(
-                        key="subs.zh_srt",
-                        path="subs/zh.srt",
-                        kind="srt",
-                        fingerprint="",  # runner 会计算
-                    ),
-                    "subs.asr_raw_response": Artifact(
-                        key="subs.asr_raw_response",
-                        path="subs/asr-raw-response.json",
+                    "asr.raw_response": Artifact(
+                        key="asr.raw_response",
+                        path="asr/raw-response.json",
                         kind="json",
                         fingerprint="",  # runner 会计算
                     ),
                 },
                 metrics={
                     "utterances_count": len(utterances),
-                    "segments_count": len(segments),
                 },
             )
             

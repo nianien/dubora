@@ -15,7 +15,7 @@ from pikppo.models.doubao import (
     get_preset,
     parse_utterances,
 )
-from pikppo.models.doubao.types import Utterance
+from pikppo.schema import Utterance
 from pikppo.models.doubao.request_types import DoubaoASRRequest, AudioConfig, UserInfo
 from pikppo.utils.logger import info
 

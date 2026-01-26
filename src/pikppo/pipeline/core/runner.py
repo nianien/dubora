@@ -74,8 +74,9 @@ class PhaseRunner:
         # 6. provides 的输出 artifact 不存在或 fingerprint 不匹配
         provides_keys = phase.provides()
         for key in provides_keys:
-            artifact = self.manifest.get_artifact(key)
-            if artifact is None:
+            try:
+                artifact = self.manifest.get_artifact(key)
+            except ValueError:
                 return True, f"output artifact '{key}' not found"
             
             # 检查文件是否存在
@@ -105,9 +106,7 @@ class PhaseRunner:
         artifacts = {}
         
         for key in required_keys:
-            artifact = self.manifest.get_artifact(key)
-            if artifact is None:
-                raise ValueError(f"Required artifact '{key}' not found in manifest")
+            artifact = self.manifest.get_artifact(key, required_by=phase.name)
             artifacts[key] = artifact
         
         return artifacts
@@ -179,11 +178,18 @@ class PhaseRunner:
         
         if not should_run:
             info(f"Phase '{phase.name}' skipped: {reason}")
+            # 如果 phase 已经是 succeeded，保持 succeeded 状态，不要改成 skipped
+            # 否则下次检查时会因为 status != "succeeded" 而重新执行
+            phase_data = self.manifest.get_phase_data(phase.name)
+            current_status = phase_data.get("status") if phase_data else None
+            skip_status = "skipped" if current_status != "succeeded" else "succeeded"
+            
             self.manifest.update_phase(
                 phase.name,
                 version=phase.version,
-                status="skipped",
+                status=skip_status,
                 finished_at=now_iso(),
+                skipped=True,  # 标记为跳过
             )
             self.manifest.save()
             return True
@@ -226,6 +232,7 @@ class PhaseRunner:
             provides=phase.provides(),
             inputs_fingerprint=inputs_fp,
             config_fingerprint=config_fp,
+            skipped=False,  # 标记为执行（非跳过）
         )
         self.manifest.save()
         
@@ -235,8 +242,8 @@ class PhaseRunner:
             result = phase.run(ctx, inputs)
             
             if result.status == "succeeded":
-                # 发布 artifacts
-                published_artifacts = self.publish_artifacts(result.artifacts)
+                # 发布 artifacts（使用 manifest 的 publish_artifacts）
+                published_artifacts = self.manifest.publish_artifacts(result.artifacts, self.workspace)
                 
                 # 更新 manifest
                 self.manifest.update_phase(
@@ -283,3 +290,78 @@ class PhaseRunner:
             )
             self.manifest.save()
             return False
+    
+    def run_pipeline(
+        self,
+        phases: List[Phase],
+        ctx: RunContext,
+        *,
+        to_phase: Optional[str] = None,
+        from_phase: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """
+        运行 pipeline 到指定 phase。
+        
+        Args:
+            phases: 所有 phases（按顺序）
+            ctx: RunContext
+            to_phase: 目标 phase 名称（如果为 None，运行所有）
+            from_phase: 起始 phase 名称（如果指定，从该 phase 开始强制刷新）
+        
+        Returns:
+            最终输出的 artifact 路径字典
+        """
+        # 找到目标 phase 索引
+        phase_dict = {p.name: i for i, p in enumerate(phases)}
+        
+        if to_phase and to_phase not in phase_dict:
+            raise ValueError(f"Unknown phase: {to_phase}")
+        
+        if from_phase and from_phase not in phase_dict:
+            raise ValueError(f"Unknown phase: {from_phase}")
+        
+        # 确定需要运行的 phases
+        if to_phase:
+            to_idx = phase_dict[to_phase]
+            phases_to_run = phases[:to_idx + 1]
+        else:
+            phases_to_run = phases
+        
+        # 确定强制刷新的起始索引
+        force_from_idx = None
+        if from_phase:
+            force_from_idx = phase_dict[from_phase]
+            if force_from_idx > len(phases_to_run) - 1:
+                raise ValueError(f"from_phase ({from_phase}) must be before to_phase ({to_phase})")
+        
+        # 运行 phases
+        for idx, phase in enumerate(phases_to_run):
+            force = force_from_idx is not None and idx >= force_from_idx
+            
+            info(f"\n{'=' * 60}")
+            info(f"Phase: {phase.name}")
+            info(f"{'=' * 60}")
+            
+            success = self.run_phase(phase, ctx, force=force)
+            
+            if not success:
+                raise RuntimeError(f"Phase '{phase.name}' failed")
+        
+        # 返回最终输出
+        if to_phase:
+            final_phase = phases[phase_dict[to_phase]]
+            provides = final_phase.provides()
+            outputs = {}
+            for key in provides:
+                artifact = self.manifest.get_artifact(key)
+                outputs[key] = str(self.workspace / artifact.path)
+            return outputs
+        else:
+            # 返回最后一个 phase 的输出
+            final_phase = phases_to_run[-1]
+            provides = final_phase.provides()
+            outputs = {}
+            for key in provides:
+                artifact = self.manifest.get_artifact(key)
+                outputs[key] = str(self.workspace / artifact.path)
+            return outputs

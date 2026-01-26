@@ -3,11 +3,63 @@ CLI entry point for pikppo pipeline (Pipeline Framework v1)
 """
 import argparse
 import sys
+import uuid
 from pathlib import Path
+from typing import Optional
 
 from pikppo.config.settings import PipelineConfig, load_env_file
 from pikppo.pipeline.phases import ALL_PHASES
-from pikppo.utils.logger import info, error
+from pikppo.pipeline.core.runner import PhaseRunner
+from pikppo.pipeline.core.manifest import Manifest
+from pikppo.pipeline.core.types import RunContext
+from pikppo.utils.logger import info, error, success
+
+
+def get_workdir(video_path: Path, output_dir: Optional[Path] = None) -> Path:
+    """
+    根据 video_path 确定 workdir。
+    
+    规则：
+    - 如果视频在 {任意路径}/abc/{file}.mp4，则输出在 {相同路径}/abc/dub/{file_stem}/
+    - 例如：videos/dbqsfy/1.mp4 → videos/dbqsfy/dub/1/
+    - 例如：some/path/abc/video.mp4 → some/path/abc/dub/video/
+    """
+    video_path = Path(video_path).resolve()
+    
+    # 获取视频文件的父目录和文件名
+    parent_dir = video_path.parent  # 例如：videos/dbqsfy 或 some/path/abc
+    video_stem = video_path.stem    # 例如：1 或 video
+    
+    # workdir = {parent_dir}/dub/{video_stem}/
+    workdir = parent_dir / "dub" / video_stem
+    
+    workdir.mkdir(parents=True, exist_ok=True)
+    return workdir
+
+
+def config_to_dict(config: PipelineConfig) -> dict:
+    """
+    将 PipelineConfig 转换为 dict，用于 RunContext。
+    """
+    # 基本配置
+    config_dict = {
+        "video_path": None,  # 会在 CLI 中设置
+        "doubao_asr_preset": config.doubao_asr_preset,
+        "doubao_postprofile": config.doubao_postprofile,
+        "doubao_hotwords": config.doubao_hotwords,
+        "openai_model": config.openai_model,
+        "openai_temperature": config.openai_temperature,
+        "azure_tts_key": config.azure_tts_key,
+        "azure_tts_region": config.azure_tts_region,
+        "azure_tts_language": config.azure_tts_language,
+        "tts_max_workers": config.tts_max_workers,
+        "voice_pool_path": config.voice_pool_path,
+        "dub_target_lufs": config.dub_target_lufs,
+        "dub_true_peak": config.dub_true_peak,
+        "phases": {},  # Phase-specific configs can go here
+    }
+    
+    return config_dict
 
 
 def main():
@@ -47,6 +99,12 @@ Examples:
         help="Force refresh from this phase (inclusive)"
     )
     run_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="runs",
+        help="Output directory (default: runs)"
+    )
+    run_parser.add_argument(
         "--config",
         type=str,
         help="Path to config file (optional)"
@@ -83,23 +141,47 @@ Examples:
             pass
 
         try:
-            # TODO: Use new PhaseRunner from pipeline.core.runner
-            # For now, show a message that the new framework is ready
-            error("New Pipeline Framework v1 is ready, but CLI integration is pending.")
-            error("Please use the PhaseRunner API directly for now.")
-            info("\nNew framework structure:")
-            info("  - pipeline/core/     : Framework layer (Phase, Manifest, Runner)")
-            info("  - pipeline/phases/   : Phase implementations")
-            info("  - pipeline/_shared/ : Shared utilities")
-            sys.exit(1)
+            # 确定 workdir
+            workdir = get_workdir(video_path, Path(args.output_dir))
             
-            # Future implementation:
-            # from pikppo.pipeline.core.runner import PhaseRunner
-            # from pikppo.pipeline.core.manifest import Manifest
-            # runner = PhaseRunner(manifest, workspace)
-            # runner.run_pipeline(...)
+            # 创建 manifest
+            manifest_path = workdir / "manifest.json"
+            manifest = Manifest(manifest_path)
+            
+            # 设置 job 信息
+            job_id = str(uuid.uuid4())
+            manifest.set_job(job_id, str(workdir))
+            manifest.save()
+            
+            # 构建 RunContext
+            config_dict = config_to_dict(config)
+            config_dict["video_path"] = str(video_path.absolute())
+            
+            ctx = RunContext(
+                job_id=job_id,
+                workspace=str(workdir),
+                config=config_dict,
+            )
+            
+            # 创建 runner
+            runner = PhaseRunner(manifest, workdir)
+            
+            # 运行 pipeline
+            outputs = runner.run_pipeline(
+                phases=ALL_PHASES,
+                ctx=ctx,
+                to_phase=args.to,
+                from_phase=args.from_phase,
+            )
+            
+            success("Pipeline completed successfully")
+            for key, path in outputs.items():
+                info(f"{key}: {path}")
+                
         except Exception as e:
             error(f"Pipeline failed: {e}")
+            import traceback
+            traceback.print_exc()
             sys.exit(1)
 
 

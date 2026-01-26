@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from pikppo.config.settings import PipelineConfig, get_openai_key
-from pikppo.utils.srt_parser import parse_srt
+from pikppo.pipeline.processors.subtitle import parse_srt
+from pikppo.schema import SrtCue
 
 
 def synthesize_subtitle_to_audio(
@@ -46,8 +47,8 @@ def synthesize_subtitle_to_audio(
         raise FileNotFoundError(f"Subtitle file not found: {subtitle}")
     
     # 解析字幕
-    segments = parse_srt(str(subtitle))
-    if not segments:
+    cues = parse_srt(subtitle)  # 返回 List[SrtCue]
+    if not cues:
         raise RuntimeError(f"No segments found in subtitle file: {subtitle}")
     
     # 输出路径：确保与输入文件在同一目录
@@ -67,7 +68,7 @@ def synthesize_subtitle_to_audio(
     print(f"字幕文件: {subtitle}")
     print(f"输出音频: {output_audio}")
     print(f"语音: {voice}, 速度: {speed}x")
-    print(f"字幕片段数: {len(segments)}")
+    print(f"字幕片段数: {len(cues)}")
     print("=" * 60)
     print()
     
@@ -92,15 +93,16 @@ def synthesize_subtitle_to_audio(
         
         # 准备需要合成的任务
         tasks = []
-        for i, seg in enumerate(segments):
-            # 优先使用 text（英文 SRT 直接就是 text），如果没有则尝试 text_en
-            text = seg.get("text", "") or seg.get("text_en", "")
-            text = text.strip()
+        for i, cue in enumerate(cues):
+            # SrtCue 对象有 text 属性
+            text = cue.text.strip()
             if not text:
                 continue
             
-            start_time = seg["start"]
-            duration = seg["end"] - seg["start"]
+            # SrtCue 使用毫秒，转换为秒
+            start_time = cue.start_ms / 1000.0
+            end_time = cue.end_ms / 1000.0
+            duration = end_time - start_time
             
             # 检查 TTS 缓存
             cache_key = hashlib.md5(f"{text}_{voice}_{speed}".encode()).hexdigest()

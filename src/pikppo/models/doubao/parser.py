@@ -2,7 +2,7 @@
 Doubao ASR 数据解析器
 
 职责：
-- raw JSON → 结构化数据
+- raw JSON → 结构化数据（返回通用的 Utterance/Word）
 - speaker 字段识别
 - 时间统一为 ms
 
@@ -10,20 +10,15 @@ Doubao ASR 数据解析器
 - ❌ 合并句子
 - ❌ speaker 策略
 - ❌ 任何业务规则
+
+注意：返回的 Utterance/Word 使用通用的类型定义（pipeline/processors/subtitle/types），
+不绑定到 doubao 特定的类型，以便支持多 provider。
 """
 from typing import Any, Dict, List, Optional
 
-from .types import Utterance, Word
-
-
-def normalize_text(t: str) -> str:
-    """文本规范化：处理空格和标点"""
-    # Keep punctuation; just normalize whitespace.
-    t = t.replace("\u3000", " ").strip()
-    # collapse multiple spaces
-    while "  " in t:
-        t = t.replace("  ", " ")
-    return t
+# 使用通用的类型定义（不绑定到 doubao）
+from pikppo.schema import Utterance, Word
+from pikppo.utils.text import normalize_text
 
 
 def parse_words(word_list: List[Dict[str, Any]], default_speaker: str = "") -> List[Word]:

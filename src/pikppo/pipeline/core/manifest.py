@@ -117,6 +117,7 @@ class Manifest:
         metrics: Optional[Dict[str, Any]] = None,
         warnings: Optional[List[str]] = None,
         error: Optional[ErrorInfo] = None,
+        skipped: Optional[bool] = None,
     ) -> None:
         """更新 phase 记录。"""
         if phase_name not in self.data["phases"]:
@@ -163,6 +164,8 @@ class Manifest:
                 "message": error.message,
                 "traceback": error.traceback,
             }
+        if skipped is not None:
+            phase_data["skipped"] = skipped
     
     def get_phase_data(self, phase_name: str) -> Optional[Dict[str, Any]]:
         """获取 phase 数据。"""
@@ -266,10 +269,13 @@ class Manifest:
             "demux": {
                 "audio": "audio/{episode_stem}.wav",
             },
+            "asr": {
+                "result": "asr/result.json",
+                "raw_response": "asr/raw-response.json",
+            },
             "subs": {
                 "zh_segments": "subs/zh-segments.json",
                 "zh_srt": "subs/zh.srt",
-                "asr_raw_response": "subs/asr-raw-response.json",
                 "en_segments": "subs/en-segments.json",
                 "en_srt": "subs/en.srt",
             },

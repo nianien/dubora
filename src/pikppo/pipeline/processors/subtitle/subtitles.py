@@ -14,12 +14,12 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from pikppo.models.doubao.types import Utterance, Segment
+from pikppo.schema import Utterance, Segment
 from pikppo.utils.logger import info, warning
-from pikppo.utils.timecode import write_srt_from_segments
+from .srt import segments_to_srt_cues, write_srt
 
 
-def get_segments_path(output_dir: Path, video_stem: str = None) -> Path:
+def segments_path(output_dir: Path, video_stem: str = None) -> Path:
     """
     获取 segments 文件路径（符合 pipeline 规范）。
     
@@ -55,7 +55,7 @@ def get_segments_path(output_dir: Path, video_stem: str = None) -> Path:
             return output_dir / "segments.json"
 
 
-def get_srt_path(output_dir: Path, video_stem: str = None) -> Path:
+def srt_path(output_dir: Path, video_stem: str = None) -> Path:
     """
     获取 SRT 文件路径（符合 pipeline 规范）。
     
@@ -91,12 +91,12 @@ def get_srt_path(output_dir: Path, video_stem: str = None) -> Path:
             return output_dir / "subtitle.srt"
 
 
-def check_cached_subtitles(
+def resolve_cached_subtitles(
     output_dir: Path,
     video_stem: str = None,
 ) -> Optional[Dict[str, Path]]:
     """
-    检查是否存在缓存的字幕文件。
+    解析缓存的字幕文件路径（如果存在）。
     
     Args:
         output_dir: 输出目录
@@ -105,15 +105,15 @@ def check_cached_subtitles(
     Returns:
         如果存在缓存，返回 {"segments": segments_path, "srt": srt_path}，否则返回 None
     """
-    segments_path = get_segments_path(output_dir, video_stem)
-    srt_path = get_srt_path(output_dir, video_stem)
+    segments_path_val = segments_path(output_dir, video_stem)
+    srt_path_val = srt_path(output_dir, video_stem)
     
-    if segments_path.exists() and srt_path.exists():
+    if segments_path_val.exists() and srt_path_val.exists():
         # 检查文件是否非空
-        if segments_path.stat().st_size > 0 and srt_path.stat().st_size > 0:
+        if segments_path_val.stat().st_size > 0 and srt_path_val.stat().st_size > 0:
             return {
-                "segments": segments_path,
-                "srt": srt_path,
+                "segments": segments_path_val,
+                "srt": srt_path_val,
             }
     
     return None
@@ -154,7 +154,7 @@ def generate_subtitles(
     """
     # 检查缓存
     if use_cache:
-        cached = check_cached_subtitles(output_dir, video_stem)
+        cached = resolve_cached_subtitles(output_dir, video_stem)
         if cached is not None:
             return cached
     
@@ -181,43 +181,35 @@ def generate_subtitles(
         segments = []
     
     # 生成文件路径
-    segments_path = get_segments_path(output_dir, video_stem)
-    srt_path = get_srt_path(output_dir, video_stem)
+    segments_path_val = segments_path(output_dir, video_stem)
+    srt_path_val = srt_path(output_dir, video_stem)
     
-    # 保存 segments JSON
+    # 保存 segments JSON（segments 已经在 asr_post.py 中清理过标点）
     output_dir.mkdir(parents=True, exist_ok=True)
     segments_dict = [
         {
             "start": seg.start_ms / 1000.0,  # 毫秒转秒
             "end": seg.end_ms / 1000.0,
-            "text": seg.text,
+            "text": seg.text,  # 已经在 asr_post.py 中清理过标点
             "speaker": seg.speaker if hasattr(seg, "speaker") else None,
         }
         for seg in segments
     ]
     
-    with open(segments_path, "w", encoding="utf-8") as f:
+    with open(segments_path_val, "w", encoding="utf-8") as f:
         json.dump(segments_dict, f, indent=2, ensure_ascii=False)
     
-    info(f"Saved segments to: {segments_path}")
+    info(f"Saved segments to: {segments_path_val}")
     
-    # 生成 SRT 文件
-    # 转换为字典格式（供 write_srt_from_segments 使用）
-    srt_segments = [
-        {
-            "start": seg.start_ms / 1000.0,  # 毫秒转秒
-            "end": seg.end_ms / 1000.0,
-            "text": seg.text,  # SRT 不包含 speaker 标签
-        }
-        for seg in segments
-    ]
-    
-    write_srt_from_segments(srt_segments, str(srt_path), text_key="text")
-    info(f"Saved SRT to: {srt_path}")
+    # 生成 SRT 文件（使用 srt.py 的函数）
+    # segments 已经在 asr_post.py 中清理过标点，直接使用即可
+    srt_cues = segments_to_srt_cues(segments)  # Segment[] → SrtCue[]
+    write_srt(srt_path_val, srt_cues)  # SrtCue[] → SRT 文件
+    info(f"Saved SRT to: {srt_path_val}")
     
     return {
-        "segments": segments_path,
-        "srt": srt_path,
+        "segments": segments_path_val,
+        "srt": srt_path_val,
     }
 
 
@@ -261,7 +253,8 @@ def generate_subtitles_from_preset(
     from pikppo.pipeline.processors.asr.transcribe import transcribe
     
     # 导入后处理函数和配置（从外部传入，pipeline 不直接依赖）
-    from pikppo.models.doubao import POSTPROFILES, speaker_aware_postprocess
+    from .profiles import POSTPROFILES
+    from .asr_post import speaker_aware_postprocess
     
     # 1. 调用 ASR 服务
     _, utterances = transcribe(

@@ -98,7 +98,7 @@ def compute_config_fingerprint(
     config: Dict[str, Any],
 ) -> str:
     """
-    计算 config fingerprint（只 hash 该 phase 的有效参数）。
+    计算 config fingerprint（hash 该 phase 的有效参数，包括全局配置中 phase 需要的部分）。
     
     Args:
         phase_name: Phase 名称
@@ -110,5 +110,18 @@ def compute_config_fingerprint(
     # 提取该 phase 的配置
     phase_config = config.get("phases", {}).get(phase_name, {})
     
+    # 提取 phase 需要的全局配置
+    # 目前已知：demux, mix, burn 需要 video_path
+    global_config_keys = []
+    if phase_name in ("demux", "mix", "burn"):
+        if "video_path" in config:
+            global_config_keys.append("video_path")
+    
+    # 构建完整的配置字典（phase-specific + 需要的全局配置）
+    full_config = dict(phase_config)
+    for key in global_config_keys:
+        if key in config:
+            full_config[key] = config[key]
+    
     # 规范化并 hash
-    return hash_json(phase_config)
+    return hash_json(full_config)
