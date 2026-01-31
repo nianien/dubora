@@ -58,29 +58,27 @@ def run(
         postprofile=postprofile,
     )
     
-    # Step 2: 构建 Subtitle Model v1.1 (SSOT)
+    # Step 2: 构建 Subtitle Model v1.2 (SSOT)
     subtitle_model = build_subtitle_model(
         segments=segments,
-        raw_response=raw_response,  # 传递原始响应以提取完整的 emotion 信息（包含 score/intensity）
+        raw_response=raw_response,  # 传递原始响应以提取完整的 emotion 信息和 words（用于计算语速）
         source_lang="zh",  # 默认源语言为中文
         audio_duration_ms=audio_duration_ms,
     )
     
-    # 从 raw_response 提取 utterances 数量（用于 metrics）
-    result = raw_response.get("result") or {}
-    utterances_count = len(result.get("utterances") or [])
+    # 计算总 cues 数（v1.2: 从 utterances 中统计）
+    total_cues = sum(len(utt.cues) for utt in subtitle_model.utterances)
     
     return ProcessorResult(
         outputs=[],  # 由 Phase 声明 outputs，processor 只负责业务处理
         data={
-            "subtitle_model": subtitle_model,  # Subtitle Model (SSOT)
+            "subtitle_model": subtitle_model,  # Subtitle Model v1.2 (SSOT)
             "segments": segments,  # 向后兼容（可选）
         },
         metrics={
-            "utterances_count": utterances_count,
+            "utterances_count": len(subtitle_model.utterances),
             "segments_count": len(segments),
-            "cues_count": len(subtitle_model.cues),
-            "speakers_count": len(subtitle_model.speakers),
+            "cues_count": total_cues,
             "postprofile": postprofile,
         },
     )

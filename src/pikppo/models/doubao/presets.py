@@ -34,7 +34,7 @@ def _base_request_cfg(*, hotwords: Optional[List[str]] = None) -> RequestConfig:
     """
     return RequestConfig(
         model_name="bigmodel",  # 固定使用豆包 ASR 大模型
-        enable_itn=True,  # 数字/金额规范化（不影响切分）
+        enable_itn=False,  # 数字/金额规范化（不影响切分）
         enable_punc=True,  # 自动标点（只影响文本）
         enable_ddc=False,  # 语义顺滑会吞短句，必须关
         enable_speaker_info=True,  # 启用说话人分离

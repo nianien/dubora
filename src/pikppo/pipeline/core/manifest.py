@@ -211,7 +211,7 @@ class Manifest:
                 "audio": "audio/{episode_stem}.wav",
             },
             "asr": {
-                "raw_response": "asr/raw-response.json",  # SSOT：原始响应，包含完整语义信息
+                "asr_result": "asr/asr-result.json",  # SSOT：原始响应，包含完整语义信息
             },
             "subs": {
                 "subtitle_model": "subs/subtitle.model.json",  # SSOT

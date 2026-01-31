@@ -80,11 +80,16 @@ class TTSPhase(Phase):
             )
         
         try:
-            # 读取 Subtitle Model
+            # 读取 Subtitle Model v1.2
             with open(subtitle_model_path, "r", encoding="utf-8") as f:
                 model_data = json.load(f)
             
-            cues = model_data.get("cues", [])
+            # v1.2: 从 utterances 中提取所有 cues
+            utterances = model_data.get("utterances", [])
+            cues = []
+            for utt in utterances:
+                cues.extend(utt.get("cues", []))
+            
             if not cues:
                 return PhaseResult(
                     status="failed",
@@ -94,19 +99,30 @@ class TTSPhase(Phase):
                     ),
                 )
             
-            # 从 cues 提取 segments（用于 TTS）
-            # 只使用有 target 的 cues（已翻译的）
+            # v1.2: 从 translate.context.json 读取翻译结果（不写回 SSOT）
+            translate_context_path = workspace_path / "translate.context.json"
+            translations_map = {}
+            if translate_context_path.exists():
+                with open(translate_context_path, "r", encoding="utf-8") as f:
+                    context_data = json.load(f)
+                    for trans in context_data.get("translations", []):
+                        translations_map[trans.get("cue_id", "")] = trans
+            
+            # 从 cues 和 translations 提取 segments（用于 TTS）
+            # 只使用有翻译的 cues
             segments = []
             for cue in cues:
-                target = cue.get("target")
-                if not target or not target.get("text"):
+                cue_id = cue.get("cue_id", "")
+                translation = translations_map.get(cue_id)
+                
+                if not translation or not translation.get("text"):
                     continue  # 跳过未翻译的 cue
                 
                 segments.append({
-                    "id": cue.get("cue_id", ""),
+                    "id": cue_id,
                     "start": cue.get("start_ms", 0) / 1000.0,  # 毫秒转秒
                     "end": cue.get("end_ms", 0) / 1000.0,
-                    "text": target.get("text", ""),  # 使用 target.text（英文翻译）
+                    "text": translation.get("text", ""),  # 使用翻译文本（英文）
                     "speaker": cue.get("speaker", ""),
                     "emotion": cue.get("emotion", {}).get("label") if cue.get("emotion") else None,
                 })

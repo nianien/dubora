@@ -5,10 +5,10 @@ ASR Phase: 语音识别（只做识别，不负责字幕后处理）
 - 读取音频文件
 - 上传到 TOS（如果需要）
 - 调用 ASR API
-- 保存原始 ASR 响应（asr.raw_response，SSOT）
+- 保存原始 ASR 响应（asr.asr_result，SSOT）
 
 产出设计：
-- asr.raw_response：SSOT（原始响应，包含完整语义信息，emotion/gender/score/degree）
+- asr.asr_result：SSOT（原始响应，包含完整语义信息，emotion/gender/score/degree）
 
 不负责：
 - 字幕后处理（由 Subtitle Phase 负责）
@@ -40,8 +40,8 @@ class ASRPhase(Phase):
         return ["demux.audio"]
     
     def provides(self) -> list[str]:
-        """生成 asr.raw_response（SSOT：原始响应，包含完整语义信息）。"""
-        return ["asr.raw_response"]
+        """生成 asr.asr_result（SSOT：原始响应，包含完整语义信息）。"""
+        return ["asr.asr_result"]
     
     def run(
         self,
@@ -137,7 +137,7 @@ class ASRPhase(Phase):
             
             # 3. Phase 层负责文件 IO：写入到 runner 预分配的 outputs.paths
             # 只保存 raw response（SSOT，包含完整语义信息）
-            raw_response_path = outputs.get("asr.raw_response")
+            raw_response_path = outputs.get("asr.asr_result")
             raw_response_path.parent.mkdir(parents=True, exist_ok=True)
             with open(raw_response_path, "w", encoding="utf-8") as f:
                 json.dump(raw_response, f, indent=2, ensure_ascii=False)
@@ -148,7 +148,7 @@ class ASRPhase(Phase):
             return PhaseResult(
                 status="succeeded",
                 outputs=[
-                    "asr.raw_response",  # 只生成 raw_response
+                    "asr.asr_result",  # 只生成 asr-result.json
                 ],
                 metrics={
                     "utterances_count": len(utterances),

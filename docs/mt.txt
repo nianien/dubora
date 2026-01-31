@@ -1,0 +1,210 @@
+1）按照SSOT中utterance粒度进行翻译，保证utterance的时间窗口不变
+2）翻译时，根据utterance的语速*系数k，控制翻译长度，若语速过快，则k=1,若语速正常，则k=1.15, 若语速偏慢则k=1.2
+3）如果英文长度超限，则可以扩展移utterance的end_time时间轴，不超过120–250ms，且不能与下一utterance的start_time时间重叠 
+4）如果不满足长度限制条件，则重新翻译，保证长度符合要求。 
+5）翻译完成后，在保证不跨 utterance 边界的前提下，允许在一个 utterance 时间窗口内自由做语义重断句
+
+下面给你一份可直接落地的 MT 方案，严格按你 1~5 条思路展开（不发散），把“怎么计算长度 / 怎么判定语速快慢 / 怎么重试 / 怎么重断句”都写成工程可实现的规则。
+
+⸻
+
+MT 方案（基于 SSOT utterance，带语速预算、end 微延长、可重断句）
+
+0) 输入/输出边界
+
+输入
+	•	SSOT：utterances[]
+	•	utt_id, speaker, start_ms, end_ms
+	•	speech_rate.zh_tps（你已在 SSOT v1.2 里计算好）
+	•	cues[]（原始中文骨架：start/end + text）
+
+输出（翻译产物单独存储，不回写 SSOT）
+	•	TranslationSet.en.by_utt[utt_id]：
+	•	end_ms_final（= end_ms 或延长后）
+	•	segments[]（英文字幕段：start/end/text；不跨 utterance 边界）
+
+⸻
+
+1) 按 SSOT utterance 粒度翻译，时间窗口不变
+
+1.1 翻译单元
+	•	每个 utterance 作为一个翻译单元：
+	•	zh_merged = concat(cues[i].source.text)（仅用于翻译输入）
+	•	window_ms = end_ms - start_ms
+
+1.2 硬约束
+	•	不跨 utterance：英文产物只允许落在 [start_ms, end_ms_final]，且 end_ms_final 只允许微调（见第 3 条）
+
+⸻
+
+2) 用语速 * k 控制翻译长度（k 随语速档位变化）
+
+你给的规则是：
+	•	语速过快：k = 1.0
+	•	正常：k = 1.15
+	•	偏慢：k = 1.2
+
+关键是要把“过快/正常/偏慢”变成可计算阈值（工程上必须量化）。
+
+2.1 语速指标：zh_tps
+	•	来自 SSOT：speech_rate.zh_tps
+	•	单位：tokens/sec（你的 ASR token≈汉字，够用）
+
+2.2 语速分档（建议默认阈值，可后续用数据校准）
+
+给一个直接可用的初始阈值（你上线后可从数据回归再调）：
+	•	fast：zh_tps >= 5.5 → k = 1.0
+	•	normal：4.0 <= zh_tps < 5.5 → k = 1.15
+	•	slow：zh_tps < 4.0 → k = 1.2
+
+解释：中文 4~5.5 tps 大体是“正常到偏快”的口语区间；>5.5 进入“很赶”的区间；<4 往往语速慢、拖音多。原型先这么定，后面用样本标注回归即可。
+
+⸻
+
+3) 英文长度超限时，允许扩展 utterance end_time（120–250ms，且不重叠）
+
+这里要把“英文长度”变成“预计 TTS/阅读耗时”，否则没法比较窗口。
+
+3.1 英文时长估计
+
+按字符速 CPS 估计（避免分词差异）
+	•	en_chars = count_letters_digits(en_text)（不含空格）
+	•	en_cps = 12 ~ 16（默认 14）
+	•	en_est_ms = (en_chars / en_cps) * 1000
+
+
+3.2 长度预算（基于 utterance 语速 + k）
+
+你想要的是“根据语速预算控制英文长度”，可以这样落地：
+
+预算思想
+	•	中文 utterance 的“承载能力”来自它的时间窗和语速档位（k）
+	•	定义一个“基准英语可读/可配音速度”，把中文时间窗映射到英文可用时间
+
+实现（最简单可落地）
+	•	budget_ms = window_ms * k
+	•	其中 k 由语速档位决定（1.0 / 1.15 / 1.2）
+
+然后比较：
+	•	若 en_est_ms <= budget_ms → 通过
+	•	否则进入 end 扩展与重翻译流程
+
+注意：这里的 k 直接作用于时间预算最直观；你也可以把 k 理解为“允许英文比中文窗口长多少”，完全符合你描述。
+
+3.3 end_time 扩展规则（严格按你要求）
+
+当 en_est_ms > budget_ms：
+	•	需要额外时间：need_ms = en_est_ms - budget_ms
+	•	允许扩展上限：extend_cap_ms ∈ [120, 250]
+	•	原型建议：固定 extend_cap_ms = 200（别搞动态，先跑通）
+	•	还必须满足不与下一句重叠：
+	•	no_overlap_cap_ms = next_utt.start_ms - end_ms - safety_gap_ms
+	•	safety_gap_ms 建议 60ms（防抖）
+
+最终可扩展：
+	•	extend_ms = min(need_ms, extend_cap_ms, max(0, no_overlap_cap_ms))
+	•	end_ms_final = end_ms + extend_ms
+
+若 extend_ms > 0，再用 budget_ms2 = budget_ms + extend_ms 重新判定：
+	•	若 en_est_ms <= budget_ms2 → 通过
+	•	否则 → 进入第 4 条重翻译
+
+⸻
+
+4) 不满足长度限制则重新翻译，保证长度符合要求
+
+这一步落地的关键是：把“长度约束”变成明确的模型指令 + 自动验证循环。
+
+4.1 重翻译触发条件
+	•	在 end 扩展后仍超限：en_est_ms > budget_ms2
+
+4.2 重翻译策略（建议最多 2~3 次，避免死循环）
+	•	Retry 1：压缩表达（保留信息不冗余）
+	•	Retry 2：更强压缩（允许省略语气词/重复信息）
+	•	Retry 3（可选）：改为更短句式（主动语、去从句）
+
+4.3 给模型的硬约束提示（可落地写进 prompt）
+
+你给模型一段明确的约束，不要“尽量”，要“必须”：
+	•	必须保持原意
+	•	必须更短
+	•	目标英文预计时长 ≤ X ms
+	•	禁止添加新信息
+	•	尽量用短句、去掉填充词
+
+其中 X = budget_ms2（最终预算）
+
+你不用让模型输出“词数”，你只要让它“更短且必须满足时长预算”，再由你这边验证失败就重试。
+
+4.4 验证函数（统一判定）
+
+每次模型输出后统一走：
+	•	en_est_ms = estimate(en_text)
+	•	pass iff en_est_ms <= budget_ms2
+
+⸻
+
+5) 翻译完成后：不跨 utterance 边界，允许窗口内自由语义重断句
+
+这里你要的是：utterance 为硬边界，内部可重排断句。
+
+5.1 重断句输入
+	•	en_text（最终通过预算的英文整句/整段）
+	•	cues[]（提供窗口骨架：每个 cue 的 start/end）
+
+5.2 重断句输出
+	•	segments[]（英文字幕段），必须满足：
+	•	所有 segments 的 start_ms/end_ms 落在 [utt.start_ms, end_ms_final]
+	•	不跨 utterance
+	•	segments 可与 cues 一一对应，也可 1 对多/多对 1（只要不跨边界）
+
+5.3 最稳的工程落地（推荐 v0 做法：按 cues 窗口分配）
+
+因为你已经有 cue 后处理逻辑，我给一个最通用的“分配器”：
+	1.	先把 en_text 语义断句（英文标点/连词规则）得到 sentences[]
+	2.	然后按 cues 的时间窗，做“长度比例分配”：
+	•	total_ms = end_ms_final - start_ms
+	•	每个 cue 的窗口 cue_ms = cue.end - cue.start
+	•	给每个 cue 分配大致字符/词配额：quota = total_len * (cue_ms / total_ms)
+	3.	按 quota 把 sentences/短语切片填进各 cue 段，生成：
+	•	segment[i].start_ms = cue[i].start_ms
+	•	segment[i].end_ms = cue[i].end_ms（最后一个可用 end_ms_final）
+
+这样你就实现了：
+	•	start 完全对齐 cue（视觉稳定）
+	•	end 可吃到延长
+	•	不跨 utterance
+	•	语义断句可以在 cue 内或 cue 间调整（按 quota）
+
+如果你后处理已经有“断句/分配器”，那你只要把输入从“中文 cue”换成“英文整段 + cues 窗口”即可。
+
+⸻
+
+关键参数（原型建议默认值，别纠结）
+	•	语速分档阈值：
+	•	fast ≥ 5.5 tps；normal 4.0~5.5；slow < 4.0
+	•	safety_gap_ms = 60
+	•	extend_cap_ms = 200（落在你说的 120–250ms 中间）
+	•	英文时长估计：
+	•	词速 en_wps = 3.0（或字符速 en_cps = 14）
+
+⸻
+
+端到端流程（可直接实现）
+
+对每个 utterance：
+	1.	zh_merged = concat(cues.text)
+	2.	k = pick_k(zh_tps)
+	3.	budget_ms = window_ms * k
+	4.	en_text = translate(zh_merged, target_budget_ms=budget_ms)（第一次）
+	5.	en_est_ms = estimate(en_text)
+	6.	若 en_est_ms > budget_ms：
+	•	计算 extend_ms，得 end_ms_final
+	•	budget_ms2 = budget_ms + extend_ms
+	7.	若仍超：en_est_ms > budget_ms2：
+	•	retry translate（更短），直到 pass 或达到重试上限
+	8.	pass 后：
+	•	segments = resegment(en_text, cues, end_ms_final)（不跨边界）
+	9.	写入 TranslationSet：
+	•	utt_id -> {end_ms_final, segments}
+

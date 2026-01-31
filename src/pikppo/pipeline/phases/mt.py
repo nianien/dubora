@@ -56,11 +56,16 @@ class MTPhase(Phase):
                 ),
             )
         
-        # 读取 Subtitle Model
+        # 读取 Subtitle Model v1.2
         with open(subtitle_model_path, "r", encoding="utf-8") as f:
             model_data = json.load(f)
         
-        cues = model_data.get("cues", [])
+        # v1.2: 从 utterances 中提取所有 cues
+        utterances = model_data.get("utterances", [])
+        cues = []
+        for utt in utterances:
+            cues.extend(utt.get("cues", []))
+        
         if not cues:
             return PhaseResult(
                 status="failed",
@@ -69,17 +74,6 @@ class MTPhase(Phase):
                     message="No cues found in Subtitle Model",
                 ),
             )
-        
-        # 从 cues 提取 segments（用于翻译）
-        segments = []
-        for cue in cues:
-            segments.append({
-                "id": cue.get("cue_id", ""),
-                "start": cue.get("start_ms", 0) / 1000.0,  # 毫秒转秒
-                "end": cue.get("end_ms", 0) / 1000.0,
-                "text": cue.get("source", {}).get("text", ""),
-                "speaker": cue.get("speaker", ""),
-            })
         
         # 获取 API key
         api_key = get_openai_api_key()
@@ -96,24 +90,20 @@ class MTPhase(Phase):
         phase_config = ctx.config.get("phases", {}).get("mt", {})
         model = phase_config.get("model", ctx.config.get("openai_model", "gpt-4o-mini"))
         temperature = phase_config.get("temperature", ctx.config.get("openai_temperature", 0.3))
-        max_chars_per_line = phase_config.get("max_chars_per_line", 42)
-        max_lines = phase_config.get("max_lines", 2)
-        target_cps = phase_config.get("target_cps", "12-17")
-        avoid_formal = phase_config.get("avoid_formal", True)
-        profanity_policy = phase_config.get("profanity_policy", "soften")
+        cps_limit = float(phase_config.get("cps_limit", ctx.config.get("mt_cps_limit", 15.0)))
+        max_retries = int(phase_config.get("max_retries", ctx.config.get("mt_max_retries", 2)))
+        use_time_aware = phase_config.get("use_time_aware", ctx.config.get("mt_use_time_aware", True))
         
-        # 调用 Processor 层进行翻译（Stage 1 + Stage 2）
+        # 调用 Processor 层进行时间感知翻译（cue-level）
         try:
             result = mt_run(
-                segments=segments,
+                cues=cues,  # 直接传递 cues（来自 Subtitle Model）
                 api_key=api_key,
                 model=model,
                 temperature=temperature,
-                max_chars_per_line=max_chars_per_line,
-                max_lines=max_lines,
-                target_cps=target_cps,
-                avoid_formal=avoid_formal,
-                profanity_policy=profanity_policy,
+                cps_limit=cps_limit,
+                max_retries=max_retries,
+                use_time_aware=use_time_aware,
             )
         except Exception as e:
             return PhaseResult(
@@ -124,42 +114,57 @@ class MTPhase(Phase):
                 ),
             )
         
-        # 从 ProcessorResult 提取数据
-        context = result.data["context"]
-        en_texts = result.data["en_texts"]
+        # 从 ProcessorResult 提取翻译结果
+        translations = result.data["translations"]
         
-        # 更新 Subtitle Model 的 target 字段
-        for i, cue in enumerate(cues):
-            if i < len(en_texts) and en_texts[i]:
-                if "target" not in cue:
-                    cue["target"] = {}
-                cue["target"]["lang"] = "en"
-                cue["target"]["text"] = en_texts[i]
+        # 构建 cue_id -> translation 映射
+        translation_map = {t["cue_id"]: t for t in translations}
         
-        # 保存更新后的 Subtitle Model（回写 target）
-        with open(subtitle_model_path, "w", encoding="utf-8") as f:
-            json.dump(model_data, f, indent=2, ensure_ascii=False)
-        info(f"Updated Subtitle Model with translations: {subtitle_model_path}")
+        # v1.2: 翻译结果不写回 SSOT，单独保存到 translate.context.json
+        # 构建翻译上下文（包含翻译结果和 metrics）
+        context = {
+            "translations": [],
+        }
         
         # 生成英文 segments（用于 SRT）
         en_segments = []
-        for i, cue in enumerate(cues):
-            en_seg = {
-                "id": cue.get("cue_id", f"cue_{i+1:04d}"),
-                "start": cue.get("start_ms", 0) / 1000.0,  # 毫秒转秒
-                "end": cue.get("end_ms", 0) / 1000.0,
-                "text": cue.get("source", {}).get("text", ""),  # 保留中文原文
-                "en_text": en_texts[i] if i < len(en_texts) else "",
-                "speaker": cue.get("speaker", ""),
-            }
-            en_segments.append(en_seg)
+        for cue in cues:
+            cue_id = cue.get("cue_id", "")
+            translation = translation_map.get(cue_id)
+            
+            if translation and translation.get("text"):
+                # 保存翻译结果到 context（不写回 SSOT）
+                context["translations"].append({
+                    "cue_id": cue_id,
+                    "lang": "en",
+                    "text": translation["text"],
+                    "metrics": {
+                        "max_chars": translation["max_chars"],
+                        "actual_chars": translation["actual_chars"],
+                        "cps": round(translation["cps"], 2),
+                    },
+                    "provider": "mt_v1",
+                    "status": translation["status"],
+                })
+                
+                # 生成英文 segments（用于 SRT）
+                en_seg = {
+                    "id": cue_id,
+                    "start": cue.get("start_ms", 0) / 1000.0,  # 毫秒转秒
+                    "end": cue.get("end_ms", 0) / 1000.0,
+                    "text": cue.get("source", {}).get("text", ""),  # 保留中文原文
+                    "en_text": translation["text"],
+                    "speaker": cue.get("speaker", ""),
+                }
+                en_segments.append(en_seg)
         
         # Phase 层负责文件 IO：写入到 runner 预分配的 outputs.paths
-        # translate.context.json
+        # translate.context.json（翻译结果单独保存，不写回 SSOT）
         context_path = outputs.get("translate.context")
         context_path.parent.mkdir(parents=True, exist_ok=True)
         with open(context_path, "w", encoding="utf-8") as f:
             json.dump(context, f, indent=2, ensure_ascii=False)
+        info(f"Saved translation context to: {context_path}")
         
         # subs.en.srt
         en_srt_path = outputs.get("subs.en_srt")
@@ -173,7 +178,11 @@ class MTPhase(Phase):
                 "subs.en_srt",
             ],
             metrics={
-                "segments_count": len(segments),
-                "translated_count": len([t for t in en_texts if t]),
+                "cues_count": len(cues),
+                "translated_count": len(context["translations"]),
+                "ok_count": result.metrics.get("ok_count", 0),
+                "compressed_count": result.metrics.get("compressed_count", 0),
+                "failed_count": result.metrics.get("failed_count", 0),
+                "cps_limit": cps_limit,
             },
         )

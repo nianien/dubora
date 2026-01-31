@@ -2,7 +2,7 @@
 Sub Phase: 字幕后处理（从 ASR raw-response 生成字幕）
 
 职责：
-- 读取 ASR raw response（asr.raw_response，SSOT）
+- 读取 ASR raw response（asr.asr_result，SSOT）
 - 解析为 Utterance[]（使用 models/doubao/parser.py）
 - 应用后处理策略（切句、speaker 处理等）
 - 生成 Subtitle Model（subs.subtitle_model，SSOT）
@@ -33,8 +33,8 @@ class SubtitlePhase(Phase):
     version = "1.0.0"
     
     def requires(self) -> list[str]:
-        """需要 asr.raw_response（SSOT：原始响应，包含完整语义信息）。"""
-        return ["asr.raw_response"]
+        """需要 asr.asr_result（SSOT：原始响应，包含完整语义信息）。"""
+        return ["asr.asr_result"]
     
     def provides(self) -> list[str]:
         """生成 subs.subtitle_model (SSOT), subs.zh_srt (视图)。"""
@@ -50,13 +50,13 @@ class SubtitlePhase(Phase):
         执行 Subtitle Phase。
         
         流程：
-        1. 读取 ASR raw response（asr.raw_response，SSOT）
+        1. 读取 ASR raw response（asr.asr_result，SSOT）
         2. 解析为 Utterance[]（使用 models/doubao/parser.py）
         3. 应用后处理策略生成 Subtitle Model
         4. 生成 subtitle.model.json, zh.srt
         """
         # 获取输入（raw response，SSOT）
-        asr_raw_response_artifact = inputs["asr.raw_response"]
+        asr_raw_response_artifact = inputs["asr.asr_result"]
         raw_response_path = Path(ctx.workspace) / asr_raw_response_artifact.relpath
         
         if not raw_response_path.exists():
@@ -118,11 +118,13 @@ class SubtitlePhase(Phase):
             subtitle_model = result.data["subtitle_model"]
             segments = result.data.get("segments", [])  # 向后兼容
             
-            info(f"Generated Subtitle Model ({len(subtitle_model.cues)} cues, {len(subtitle_model.speakers)} speakers)")
+            # 计算总 cues 数
+            total_cues = sum(len(utt.cues) for utt in subtitle_model.utterances)
+            info(f"Generated Subtitle Model v1.2 ({len(subtitle_model.utterances)} utterances, {total_cues} cues)")
             
             # Phase 层负责文件 IO：写入到 runner 预分配的 outputs.paths
             
-            # 1. 保存 Subtitle Model JSON v1.1（SSOT）
+            # 1. 保存 Subtitle Model JSON v1.2（SSOT）
             model_path = outputs.get("subs.subtitle_model")
             model_dict = {
                 "schema": {
@@ -130,34 +132,35 @@ class SubtitlePhase(Phase):
                     "version": subtitle_model.schema.version,
                 },
                 "audio": subtitle_model.audio,
-                "speakers": {
-                    spk_id: {
-                        "speaker_id": info.speaker_id,
-                        "voice_id": info.voice_id,
-                    }
-                    for spk_id, info in subtitle_model.speakers.items()
-                },
-                "cues": [
+                "utterances": [
                     {
-                        "cue_id": cue.cue_id,
-                        "start_ms": cue.start_ms,
-                        "end_ms": cue.end_ms,
-                        "speaker": cue.speaker,
-                        "source": {
-                            "lang": cue.source.lang,
-                            "text": cue.source.text,
+                        "utt_id": utt.utt_id,
+                        "speaker": utt.speaker,
+                        "start_ms": utt.start_ms,
+                        "end_ms": utt.end_ms,
+                        "speech_rate": {
+                            "zh_tps": utt.speech_rate.zh_tps,
                         },
-                        "target": {
-                            "lang": cue.target.lang,
-                            "text": cue.target.text,
-                        } if cue.target else None,
-                        "emotion": {
-                            "label": cue.emotion.label,
-                            "confidence": cue.emotion.confidence,
-                            "intensity": cue.emotion.intensity,
-                        } if cue.emotion else None,
+                        "cues": [
+                            {
+                                "cue_id": cue.cue_id,
+                                "start_ms": cue.start_ms,
+                                "end_ms": cue.end_ms,
+                                "speaker": cue.speaker,
+                                "source": {
+                                    "lang": cue.source.lang,
+                                    "text": cue.source.text,
+                                },
+                                "emotion": {
+                                    "label": cue.emotion.label,
+                                    "confidence": cue.emotion.confidence,
+                                    "intensity": cue.emotion.intensity,
+                                } if cue.emotion else None,
+                            }
+                            for cue in utt.cues
+                        ],
                     }
-                    for cue in subtitle_model.cues
+                    for utt in subtitle_model.utterances
                 ],
             }
             model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -167,20 +170,20 @@ class SubtitlePhase(Phase):
             
             # 2. 渲染 SRT 文件（Subtitle Model 的派生视图）
             from pikppo.pipeline.processors.srt.render_srt import render_srt
-            # 从 Subtitle Model 的 cues 转换为 Segment[]（用于 render_srt）
+            # 从 Subtitle Model 的 utterances -> cues 转换为 Segment[]（用于 render_srt）
             # 使用 source.text（原文）作为 SRT 文本
             from pikppo.schema import Segment
-            segments_for_srt = [
-                Segment(
-                    speaker=cue.speaker,
-                    start_ms=cue.start_ms,
-                    end_ms=cue.end_ms,
-                    text=cue.source.text,  # 使用 source.text
-                    emotion=cue.emotion.label if cue.emotion else None,
-                    gender=None,  # v1.1 不再包含 gender
-                )
-                for cue in subtitle_model.cues
-            ]
+            segments_for_srt = []
+            for utt in subtitle_model.utterances:
+                for cue in utt.cues:
+                    segments_for_srt.append(Segment(
+                        speaker=cue.speaker,
+                        start_ms=cue.start_ms,
+                        end_ms=cue.end_ms,
+                        text=cue.source.text,  # 使用 source.text
+                        emotion=cue.emotion.label if cue.emotion else None,
+                        gender=None,  # v1.2 不再包含 gender
+                    ))
             srt_path = outputs.get("subs.zh_srt")
             render_srt(segments_for_srt, srt_path)
             info(f"Rendered SRT file to: {srt_path}")
@@ -193,8 +196,8 @@ class SubtitlePhase(Phase):
                     "subs.zh_srt",          # 视图
                 ],
                 metrics={
-                    "utterances_count": len(utterances),
-                    "segments_count": len(segments),
+                    "utterances_count": len(subtitle_model.utterances),
+                    "cues_count": total_cues,
                 },
             )
             

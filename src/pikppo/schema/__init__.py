@@ -28,16 +28,17 @@ from .types import (
 from .subtitle_model import (
     SubtitleModel,
     SubtitleCue,
+    SubtitleUtterance,
     SpeakerInfo,
     EmotionInfo,
     SourceText,
-    TargetText,
+    SpeechRate,
     SchemaInfo,
 )
 
 __all__ = [
     "Word",
-    "Utterance",
+    "Utterance",  # ASR 原始响应（schema/types.py）
     "Segment",
     "SrtCue",
     "SubtitleSegment",
@@ -45,12 +46,13 @@ __all__ = [
     "UtteranceList",
     "SegmentList",
     "SrtCueList",
-    # Subtitle Model v1.1
+    # Subtitle Model v1.2
     "SubtitleModel",
     "SubtitleCue",
+    "SubtitleUtterance",  # Subtitle Model 中的 Utterance（避免与 ASR Utterance 冲突）
     "SpeakerInfo",
     "EmotionInfo",
     "SourceText",
-    "TargetText",
+    "SpeechRate",
     "SchemaInfo",
 ]

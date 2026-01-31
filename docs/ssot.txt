@@ -1,0 +1,168 @@
+行，我给你一份“不发散、不重构、不讲故事”的完整版升级方案。
+只做你已经确认的三件事：
+	1.	cue 结构：仅移除 target，其余字段 100% 保持
+	2.	utterance 层：新增语速（speech_rate.zh_tps）
+	3.	SSOT 仍然只保存原始事实，不包含任何翻译或执行信息
+
+下面是可直接落地的 v1.2 定版方案。
+
+⸻
+
+SSOT v1.2 —— 完整升级方案（定版）
+
+一、升级目标（写死）
+	•	不改 cue 生成逻辑
+	•	不引入任何翻译 / MT / TTS 字段
+	•	只在 utterance 层增加语速
+	•	原型阶段，不考虑兼容旧版本
+
+⸻
+
+二、顶层结构（v1.2）
+
+{
+  "schema": "ssot.v1.2",
+  "audio": {
+    "duration_ms": 149884
+  },
+  "utterances": []
+}
+
+
+⸻
+
+三、utterance 结构（升级点在这里）
+
+{
+  "utt_id": "utt_0001",
+  "speaker": "spk_1",
+
+  "start_ms": 5280,
+  "end_ms": 11900,
+
+  "speech_rate": {
+    "zh_tps": 4.91
+  },
+
+  "cues": []
+}
+
+utterance 约束（硬规则）
+	•	start_ms == cues[0].start_ms
+	•	end_ms == cues[last].end_ms
+	•	speech_rate.zh_tps 必须存在
+	•	utterances 不允许时间重叠
+
+⸻
+
+四、cue 结构（v1.2 定版）
+
+这是你给定的结构，只做一件事：删除 target
+
+{
+  "cue_id": "cue_0001",
+  "start_ms": 5280,
+  "end_ms": 6580,
+  "speaker": "spk_1",
+
+  "source": {
+    "lang": "zh",
+    "text": "坐牢十年"
+  },
+
+  "emotion": {
+    "label": "sad",
+    "confidence": 0.8828018307685852,
+    "intensity": "weak"
+  }
+}
+
+明确不存在
+	•	❌ target
+	•	❌ 翻译字段
+	•	❌ 语速字段
+	•	❌ 任何派生结果
+
+⸻
+
+五、语速（speech_rate.zh_tps）定义（只给结论）
+
+zh_tps =
+  有效 ASR token 数
+  ─────────────────────
+  token 时间戳 union 后的发声秒数
+
+计算规则（实现层，不进 SSOT）
+	•	token 来源：ASR word / char timestamps
+	•	丢弃：
+	•	start_ms < 0 或 end_ms < 0
+	•	空白 token
+	•	合并 token 时间区间（union）
+	•	只把 最终 zh_tps 数值写入 SSOT
+
+⸻
+
+六、完整示例（v1.2 实体）
+
+{
+  "schema": "ssot.v1.2",
+  "audio": {
+    "duration_ms": 149884
+  },
+  "utterances": [
+    {
+      "utt_id": "utt_0001",
+      "speaker": "spk_1",
+      "start_ms": 5280,
+      "end_ms": 11900,
+      "speech_rate": {
+        "zh_tps": 4.91
+      },
+      "cues": [
+        {
+          "cue_id": "cue_0001",
+          "start_ms": 5280,
+          "end_ms": 6580,
+          "speaker": "spk_1",
+          "source": {
+            "lang": "zh",
+            "text": "坐牢十年"
+          },
+          "emotion": {
+            "label": "sad",
+            "confidence": 0.8828018307685852,
+            "intensity": "weak"
+          }
+        },
+        {
+          "cue_id": "cue_0002",
+          "start_ms": 6580,
+          "end_ms": 8200,
+          "speaker": "spk_1",
+          "source": {
+            "lang": "zh",
+            "text": "我被冤枉"
+          },
+          "emotion": null
+        }
+      ]
+    }
+  ]
+}
+
+
+⸻
+
+七、v1.1 → v1.2 升级动作（只有两步）
+	1.	从 cue 中删除 target 字段
+	2.	在每个 utterance 上补齐 speech_rate.zh_tps
+
+其他字段 一律不动
+
+⸻
+
+八、一句话定版说明（给自己 / 给别人）
+
+SSOT v1.2 = 原始字幕事实（cue） + 连续说话单元（utterance） + utterance 真实语速（zh_tps）
+不包含任何翻译、对齐或执行信息。
+
