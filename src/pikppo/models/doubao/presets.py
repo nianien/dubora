@@ -92,6 +92,7 @@ def asr_spk_semantic(*, hotwords: Optional[List[str]] = None) -> RequestConfig:
     return replace(
         base,
         vad_segment=False,
+        # vad_segment=False时，end_window_size必须为None
         end_window_size=None,
     )
 

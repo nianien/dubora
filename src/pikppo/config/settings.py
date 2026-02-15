@@ -128,11 +128,11 @@ def get_openai_api_key() -> str | None:
 class PipelineConfig:
     language: str = "zh"
     gemini_model: str = "gemini-2.0-flash"
-    
+
     # 音频处理
     enhance_audio_for_asr: bool = True  # 应用音频增强（推荐用于有背景音乐的短剧）
     audio_enhance_level: str = "light"  # 音频增强级别：none（无）、light（轻量，默认）、heavy（重度，BGM 特别大时用）
-    
+
     # 术语纠错
     term_corrections: dict[str, str] | None = None  # 术语纠错映射：{"天哥": "平安哥"}
     # 用于 ASS PlayRes 的视频分辨率；不改变实际视频
@@ -159,11 +159,26 @@ class PipelineConfig:
     doubao_asr_preset: str = "asr_spk_semantic"
     doubao_postprofile: str = "axis"  # 后处理策略："axis"（默认）、"axis_default"、"axis_soft"
     doubao_audio_url: str | None = None  # 音频文件的公开访问 URL（如果为 None，则自动上传到 TOS）
-    doubao_hotwords: list[str] = field(default_factory=lambda: ["平安", "平安哥"])  # ASR 热词列表（用于提高特定词汇识别准确率）
-    
+    doubao_hotwords: list[str] = field(default_factory=lambda: [
+        "平安",
+        "平安哥",
+        "二筒",
+        "二饼",
+        "四饼",
+        "六条",
+        "八条",
+        "九万",
+        "一万",
+        "截胡",
+        "放炮",
+        "地胡",
+        "屁胡",
+        "一炮双响"
+    ])  # ASR 热词列表（用于提高特定词汇识别准确率）
+
     # 强制重新运行（忽略缓存）
     force_asr: bool = False  # 强制重新运行 ASR（忽略缓存）
-    
+
     # 旧版 ASR 配置（仅用于 dub_pipeline，保留以兼容）
     asr_use_vocals: bool = False  # 默认使用 raw 识别（vocals 作为备选，避免伪影干扰）
     google_stt_credentials_path: str | None = None  # Google STT 凭证路径（仅用于 dub_pipeline）
