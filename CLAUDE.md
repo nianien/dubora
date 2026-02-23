@@ -68,14 +68,16 @@ demux → sep → asr → sub → [human review] → mt → align → tts → mi
 - **Fingerprints** (`fingerprints.py`): SHA256 hashing of files and canonicalized JSON for incremental execution. `vsd bless` refreshes fingerprints after manual edits.
 - **Atomic** (`atomic.py`): Write-to-temp-then-rename pattern for safe file operations.
 
-### Two-Layer Voice Mapping
+### Voice Mapping (Single File)
 
 ```
-speaker_to_role.json → role_cast.json → VolcEngine voice_id
-(spk_1 → "Character")  ("Character" → voice_type)
+role_cast.json
+speakers: { "pa": "PingAn", ... }     # speaker → role_id
+roles:    { "PingAn": "en_male_...", } # role_id → voice_type
+default_roles: { "male": "LrNan1" }   # fallback by gender
 ```
 
-Located at `{drama_dir}/dub/voices/`. Human-filled for role assignment.
+Located at `{drama_dir}/dub/voices/role_cast.json`. Human-filled for role assignment.
 
 ### Workspace Layout
 

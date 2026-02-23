@@ -23,6 +23,7 @@ from typing import Dict, Any, Optional, List
 from pikppo.pipeline.core.phase import Phase
 from pikppo.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from pikppo.pipeline.processors.srt import run as srt_run
+from pikppo.schema.asr_fix import AsrFix
 from pikppo.utils.logger import info
 
 
@@ -55,7 +56,11 @@ class SubtitlePhase(Phase):
     version = "1.0.0"
     
     def requires(self) -> list[str]:
-        """需要 asr.asr_result（SSOT：原始响应，包含完整语义信息）。"""
+        """需要 asr.asr_result（word 级时间轴）。
+
+        注意：asr.fix.json 从磁盘直接读取（不通过 manifest），
+        这样人工编辑 fix.json 不会触发 ASR 重跑。
+        """
         return ["asr.asr_result"]
     
     def provides(self) -> list[str]:
@@ -80,7 +85,7 @@ class SubtitlePhase(Phase):
         # 获取输入（raw response，SSOT）
         asr_raw_response_artifact = inputs["asr.asr_result"]
         raw_response_path = Path(ctx.workspace) / asr_raw_response_artifact.relpath
-        
+
         if not raw_response_path.exists():
             return PhaseResult(
                 status="failed",
@@ -89,10 +94,20 @@ class SubtitlePhase(Phase):
                     message=f"ASR raw response file not found: {raw_response_path}",
                 ),
             )
-        
+
         # 读取 ASR raw response（SSOT）
         with open(raw_response_path, "r", encoding="utf-8") as f:
             raw_response = json.load(f)
+
+        # 读取 ASR fix（人工校准层，从磁盘直接读取）
+        # asr.fix.json 不在 manifest 中，直接从约定路径读取
+        asr_fix: Optional[AsrFix] = None
+        asr_fix_path = Path(ctx.workspace) / "source" / "asr.fix.json"
+        if asr_fix_path.exists():
+            with open(asr_fix_path, "r", encoding="utf-8") as f:
+                asr_fix_data = json.load(f)
+            asr_fix = AsrFix.from_dict(asr_fix_data)
+            info(f"Loaded ASR fix (human-editable) with {len(asr_fix.utterances)} utterances")
         
         # 从 raw response 解析为 Utterance[]（使用 models/doubao/parser.py）
         try:
@@ -152,11 +167,19 @@ class SubtitlePhase(Phase):
              f"max_dur={utt_norm_config['max_utterance_duration_ms']}ms")
 
         try:
+            # 从 raw_response 中提取音频时长
+            audio_duration_ms = None
+            audio_info = raw_response.get("audio_info") or {}
+            if audio_info.get("duration"):
+                audio_duration_ms = int(audio_info["duration"])
+
             # 调用 Processor 层生成 Subtitle Model (SubtitleModel)
             # 使用 Utterance Normalization 重建视觉友好的 utterance 边界
             result = srt_run(
-                raw_response=raw_response,  # 主要输入：raw_response
+                raw_response=raw_response,  # 主要输入：raw_response（word 时间轴）
+                asr_fix=asr_fix,             # 人工校准层（speaker/text）
                 postprofile=postprofile,
+                audio_duration_ms=audio_duration_ms,
                 # Utterance Normalization 配置
                 **utt_norm_config,
             )
@@ -242,8 +265,7 @@ class SubtitlePhase(Phase):
             render_srt(segments_for_srt, srt_path)
             info(f"Rendered SRT file to: {srt_path}")
             
-            # Side-effect: 更新 speaker_to_role.json（剧级文件，按集分 key）
-            # 路径：{series}/dub/voices/speaker_to_role.json
+            # Side-effect: 追加新 speaker 到 role_cast.json（剧级文件）
             try:
                 unique_speakers = list(dict.fromkeys(
                     utt_dict["speaker"]["id"]
@@ -251,13 +273,13 @@ class SubtitlePhase(Phase):
                     if utt_dict.get("speaker", {}).get("id")
                 ))
                 if unique_speakers:
-                    from pikppo.pipeline.processors.voiceprint.speaker_to_role import update_speaker_to_role
+                    from pikppo.pipeline.processors.voiceprint.speaker_to_role import update_speakers
                     voices_dir = workspace_path.parent / "voices"
-                    str_path = str(voices_dir / "speaker_to_role.json")
+                    rc_path = str(voices_dir / "role_cast.json")
                     episode_id = workspace_path.name
-                    update_speaker_to_role(unique_speakers, str_path, episode_id)
+                    update_speakers(unique_speakers, rc_path, episode_id)
             except Exception as e:
-                info(f"Warning: failed to update speaker_to_role.json: {e}")
+                info(f"Warning: failed to update role_cast.json: {e}")
 
             # 返回 PhaseResult：只声明哪些 outputs 成功
             return PhaseResult(

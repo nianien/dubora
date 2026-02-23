@@ -22,32 +22,28 @@ from pikppo.schema.subtitle_model import (
     SchemaInfo,
     EmotionInfo,
 )
+from pikppo.schema.asr_fix import AsrFix
 from pikppo.schema.types import Word
+from .text_word_alignment import align_corrected_text_to_words, _compute_lcs_alignment
 from .utterance_normalization import (
     normalize_utterances,
     extract_all_words_from_raw_response,
     extract_utterance_metadata,
+    apply_asr_fix_speaker_override,
     NormalizationConfig,
     NormalizedUtterance,
 )
 
 
 def normalize_speaker_id(speaker: str) -> str:
-    """
-    规范化 speaker ID。
-    
-    规则：
-    - 如果已经是 "spk_" 开头，直接返回
-    - 否则添加 "spk_" 前缀
-    """
+    """规范化 speaker ID：去空白，空值返回 "0"。"""
     if not speaker:
-        return "spk_0"
-    
+        return "0"
     speaker = str(speaker).strip()
+    # 兼容旧数据：去掉历史遗留的 spk_ 前缀
     if speaker.startswith("spk_"):
-        return speaker
-    
-    return f"spk_{speaker}"
+        speaker = speaker[4:]
+    return speaker
 
 
 def build_emotion_info(
@@ -298,6 +294,7 @@ def _advance_word_idx(cue_text: str, words: List[Word], word_idx: int) -> int:
 def build_subtitle_model(
     raw_response: Dict[str, Any],
     *,
+    asr_fix: Optional[AsrFix] = None,
     source_lang: str = "zh",
     audio_duration_ms: Optional[int] = None,
     max_chars: int = 18,
@@ -312,15 +309,22 @@ def build_subtitle_model(
     keep_gap_as_field: bool = True,
 ) -> SubtitleModel:
     """
-    从 asr_result.json 构建 Subtitle Model v1.2（SSOT）。
+    从 asr_result.json 构建 Subtitle Model v1.3（SSOT）。
 
     核心理念：
     - ASR raw utterances 不是 SSOT（它们是模型导向的，不是视觉/听觉友好的）
     - 真正的 SSOT 应该基于 word-level timestamps + silence 重建
     - 使用 Utterance Normalization 重建视觉友好的 utterance 边界
 
+    双数据源模式（当 asr_fix 存在时）：
+    - word 级时间轴来自 raw_response（时间骨架）
+    - speaker/text 来自 asr_fix（人工校准层）
+    - 归一化用校准后的 speaker 做切分边界
+    - cue 切分用 LCS 对齐处理 text/word 不一致
+
     Args:
         raw_response: ASR 原始响应
+        asr_fix: 人工校准的 AsrFix（可选，None 时回退到纯 raw_response 逻辑）
         source_lang: 源语言代码（如 "zh", "en"），默认 "zh"
         audio_duration_ms: 音频时长（毫秒，可选）
         max_chars: cue 最大字数阈值（用于语义切分）
@@ -336,7 +340,7 @@ def build_subtitle_model(
         keep_gap_as_field: 是否保留 gap 为独立字段
 
     Returns:
-        SubtitleModel: 完整的字幕模型 v1.2（SSOT）
+        SubtitleModel: 完整的字幕模型 v1.3（SSOT）
     """
     # 1. 从 ASR response 中提取所有 word-level timestamps + speaker→gender 映射
     all_words, speaker_gender_map = extract_all_words_from_raw_response(raw_response)
@@ -347,6 +351,20 @@ def build_subtitle_model(
             audio={"duration_ms": audio_duration_ms} if audio_duration_ms else None,
             utterances=[],
         )
+
+    # 1.5. 如果有 asr_fix，用校准后的 speaker 覆盖 word 的 speaker
+    if asr_fix is not None:
+        all_words, speaker_gender_map, word_time_to_model_pos = (
+            apply_asr_fix_speaker_override(all_words, raw_response, asr_fix)
+        )
+        # 为每个 word 预算修正后的文本
+        # 通过 LCS 将 asr_fix 的字符级校准应用到每个 word
+        word_time_to_corrected = _build_word_corrections(
+            all_words, word_time_to_model_pos, asr_fix,
+        )
+    else:
+        word_time_to_model_pos = None
+        word_time_to_corrected = None
 
     # 2. 使用 Utterance Normalization 重建 utterance 边界
     #    speaker 变化是硬边界，gender 从 speaker_gender_map 继承
@@ -363,15 +381,30 @@ def build_subtitle_model(
     utterances: List[SubtitleUtterance] = []
 
     for idx, norm_utt in enumerate(normalized_utts, start=1):
-        utt_text = norm_utt.text
+        # 确定最终文本：有 asr_fix 时用修正后的 word 文本，否则用原始 word 拼接
+        if word_time_to_corrected is not None:
+            utt_text = "".join(
+                word_time_to_corrected.get((w.start_ms, w.end_ms), w.text)
+                for w in norm_utt.words
+            )
+        else:
+            utt_text = norm_utt.text
+
         if not utt_text:
             continue
 
         # 规范化 speaker ID
         normalized_speaker = normalize_speaker_id(norm_utt.speaker)
 
-        # 提取 emotion 元数据（通过时间范围匹配）
-        metadata = extract_utterance_metadata(raw_response, norm_utt)
+        # 提取 emotion 元数据
+        if asr_fix is not None:
+            # 优先从 asr_fix 获取 emotion（人工可能也修正了）
+            metadata = _extract_metadata_from_asr_fix(
+                norm_utt.words, word_time_to_model_pos, asr_fix,
+            )
+        else:
+            metadata = extract_utterance_metadata(raw_response, norm_utt)
+
         utterance_emotion: Optional[EmotionInfo] = None
         if metadata.get("emotion"):
             utterance_emotion = build_emotion_info(
@@ -380,18 +413,30 @@ def build_subtitle_model(
                 emotion_degree=metadata.get("emotion_degree"),
             )
 
-        # 计算语速
+        # 计算语速（始终用 word 级时间轴，它是真实声学测量值）
         zh_tps = calculate_speech_rate_zh_tps(norm_utt.words)
 
         # 按照语义切分 cues
-        cue_data_list = semantic_split_text(
-            text=utt_text,
-            words=norm_utt.words,
-            max_chars=max_chars,
-            max_dur_ms=max_dur_ms,
-            hard_punc=hard_punc,
-            soft_punc=soft_punc,
-        )
+        # 有 asr_fix 且文本被修改时，用 LCS 对齐生成 cue 时间
+        word_text = norm_utt.text  # word 拼接文本
+        if asr_fix is not None and utt_text != word_text:
+            cue_data_list = _semantic_split_with_alignment(
+                corrected_text=utt_text,
+                words=norm_utt.words,
+                max_chars=max_chars,
+                max_dur_ms=max_dur_ms,
+                hard_punc=hard_punc,
+                soft_punc=soft_punc,
+            )
+        else:
+            cue_data_list = semantic_split_text(
+                text=utt_text,
+                words=norm_utt.words,
+                max_chars=max_chars,
+                max_dur_ms=max_dur_ms,
+                hard_punc=hard_punc,
+                soft_punc=soft_punc,
+            )
 
         cues: List[SubtitleCue] = []
         for cue_text, cue_start_ms, cue_end_ms in cue_data_list:
@@ -439,3 +484,218 @@ def build_subtitle_model(
     )
 
     return model
+
+
+
+def _extract_metadata_from_asr_fix(
+    norm_words: List[Word],
+    word_time_to_model_pos: Optional[Dict[Tuple[int, int], int]],
+    asr_fix: AsrFix,
+) -> Dict[str, Any]:
+    """
+    从 asr_fix 中提取 normalized utterance 的元数据。
+
+    通过 word (start_ms, end_ms) → model array position 追溯，取覆盖最多 word 的那个作为来源。
+    """
+    metadata: Dict[str, Any] = {
+        "emotion": None,
+        "emotion_score": None,
+        "emotion_degree": None,
+        "gender": None,
+    }
+
+    if word_time_to_model_pos is None:
+        return metadata
+
+    pos_counts: Dict[int, int] = {}
+    for w in norm_words:
+        pos = word_time_to_model_pos.get((w.start_ms, w.end_ms))
+        if pos is not None:
+            pos_counts[pos] = pos_counts.get(pos, 0) + 1
+
+    if not pos_counts:
+        return metadata
+
+    best_pos = max(pos_counts, key=pos_counts.get)
+
+    if 0 <= best_pos < len(asr_fix.utterances):
+        mu = asr_fix.utterances[best_pos]
+        metadata["emotion"] = mu.emotion
+
+    return metadata
+
+
+def _semantic_split_with_alignment(
+    corrected_text: str,
+    words: List[Word],
+    max_chars: int = 18,
+    max_dur_ms: int = 2800,
+    hard_punc: str = "。！？；",
+    soft_punc: str = "，",
+) -> List[Tuple[str, int, int]]:
+    """
+    对校准后文本做语义切分，用 LCS 对齐为每个 cue 分配时间戳。
+
+    当 corrected_text 与 word 拼接文本不一致时调用。
+    先用 LCS 为每个字符分配时间，再按标点切分 cue，
+    每个 cue 的时间 = 首字符 start_ms ~ 末字符 end_ms。
+    """
+    if not corrected_text or not words:
+        if words:
+            return [(corrected_text, words[0].start_ms, words[-1].end_ms)]
+        return [(corrected_text, 0, 0)]
+
+    # 用 LCS 对齐为每个字符分配时间
+    char_times = align_corrected_text_to_words(corrected_text, words)
+
+    # 按标点切分（复用原有的切分逻辑，但用 char_times 提供时间）
+    cues: List[Tuple[str, int, int]] = []
+    text_pos = 0
+
+    while text_pos < len(corrected_text):
+        remaining = corrected_text[text_pos:]
+
+        if len(remaining) <= max_chars:
+            cue_start = char_times[text_pos][0]
+            cue_end = char_times[len(corrected_text) - 1][1]
+            cues.append((remaining, cue_start, cue_end))
+            break
+
+        # 优先在硬标点处切
+        hard_cut = -1
+        for p in hard_punc:
+            idx = remaining.find(p, 0, max_chars + 1)
+            if idx > 0 and (hard_cut < 0 or idx < hard_cut):
+                hard_cut = idx
+
+        if hard_cut > 0:
+            cue_text = remaining[:hard_cut + 1]
+            cue_start = char_times[text_pos][0]
+            cue_end = char_times[text_pos + hard_cut][1]
+            cues.append((cue_text, cue_start, cue_end))
+            text_pos += hard_cut + 1
+            continue
+
+        # 找软标点
+        soft_cut = -1
+        for p in soft_punc:
+            idx = remaining.rfind(p, 0, max_chars + 1)
+            if idx > 0 and (soft_cut < 0 or idx > soft_cut):
+                soft_cut = idx
+
+        if soft_cut > 0:
+            cue_text = remaining[:soft_cut + 1]
+            cue_start = char_times[text_pos][0]
+            cue_end = char_times[text_pos + soft_cut][1]
+            cues.append((cue_text, cue_start, cue_end))
+            text_pos += soft_cut + 1
+            continue
+
+        # 按字数硬切
+        cue_text = remaining[:max_chars]
+        cue_start = char_times[text_pos][0]
+        cue_end = char_times[text_pos + max_chars - 1][1]
+        cues.append((cue_text, cue_start, cue_end))
+        text_pos += max_chars
+
+    utt_start = words[0].start_ms
+    utt_end = words[-1].end_ms
+    return cues if cues else [(corrected_text, utt_start, utt_end)]
+
+
+def _build_word_corrections(
+    all_words: List[Word],
+    word_time_to_model_pos: Dict[Tuple[int, int], int],
+    asr_fix: AsrFix,
+) -> Dict[Tuple[int, int], str]:
+    """
+    为每个 word 预算修正后的文本。
+
+    对每个 asr_fix pos：
+    1. 收集属于该 pos 的所有 words，拼接 word 文本
+    2. LCS 对齐 word 文本与 fix 文本
+    3. 基于对齐，将 fix 的字符级校准应用到每个 word
+
+    这样无论归一化如何拆分 utterance，每个 word 都带着正确的修正文本。
+
+    Returns:
+        {(start_ms, end_ms): corrected_text} 映射
+    """
+    # 按 pos 分组 words（保持时间顺序）
+    pos_to_words: Dict[int, List[Word]] = {}
+    for w in all_words:
+        pos = word_time_to_model_pos.get((w.start_ms, w.end_ms))
+        if pos is not None:
+            if pos not in pos_to_words:
+                pos_to_words[pos] = []
+            pos_to_words[pos].append(w)
+
+    result: Dict[Tuple[int, int], str] = {}
+
+    for pos, words in pos_to_words.items():
+        if pos >= len(asr_fix.utterances):
+            continue
+
+        fix_text = asr_fix.utterances[pos].text
+
+        # 拼接 word 文本
+        word_texts = [w.text for w in words]
+        concat_word_text = "".join(word_texts)
+
+        if concat_word_text == fix_text:
+            # 完全一致，直接映射
+            for w in words:
+                result[(w.start_ms, w.end_ms)] = w.text
+            continue
+
+        # LCS 对齐 word 文本与 fix 文本
+        alignment = _compute_lcs_alignment(concat_word_text, fix_text)
+
+        if not alignment:
+            # 无法对齐，保持原文
+            for w in words:
+                result[(w.start_ms, w.end_ms)] = w.text
+            continue
+
+        # 为 word 文本每个字符位置构建修正映射（支持不等长替换）
+        # corrected_map[i] = 该位置字符的修正结果（可为空串或多字符）
+        corrected_map: List[str] = list(concat_word_text)
+
+        prev_wi, prev_fi = -1, -1
+        for ai in range(len(alignment) + 1):
+            if ai < len(alignment):
+                cur_wi, cur_fi = alignment[ai]
+            else:
+                cur_wi, cur_fi = len(concat_word_text), len(fix_text)
+
+            # gap: word[prev_wi+1 : cur_wi], fix[prev_fi+1 : cur_fi]
+            w_gap_start = prev_wi + 1
+            w_gap_end = cur_wi
+            f_gap_start = prev_fi + 1
+            f_gap_end = cur_fi
+            w_gap_len = w_gap_end - w_gap_start
+            f_gap_len = f_gap_end - f_gap_start
+
+            if w_gap_len > 0 and f_gap_len > 0:
+                # 两侧都有未匹配字符 → 替换（含不等长）
+                fix_replacement = fix_text[f_gap_start:f_gap_end]
+                corrected_map[w_gap_start] = fix_replacement
+                for k in range(1, w_gap_len):
+                    corrected_map[w_gap_start + k] = ""
+            elif w_gap_len > 0 and f_gap_len == 0:
+                # word 侧有字符但 fix 侧无 → 人工删除
+                for k in range(w_gap_len):
+                    corrected_map[w_gap_start + k] = ""
+
+            if ai < len(alignment):
+                prev_wi, prev_fi = cur_wi, cur_fi
+
+        # 将修正后的字符分配回各个 word
+        char_offset = 0
+        for w in words:
+            w_len = len(w.text)
+            corrected_word = "".join(corrected_map[char_offset:char_offset + w_len])
+            result[(w.start_ms, w.end_ms)] = corrected_word
+            char_offset += w_len
+
+    return result

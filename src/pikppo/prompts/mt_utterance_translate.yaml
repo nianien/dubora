@@ -1,0 +1,80 @@
+# ============================================================
+# Utterance 级翻译 prompt
+# 按 SSOT 中 utterance 粒度翻译，根据语速和时间预算控制翻译长度
+# 支持三级重试：首次翻译 -> 压缩 -> 激进压缩
+#
+# 使用方: utterance_translate.py:build_utterance_translation_prompt()
+# 变量:
+#   首次翻译: $name_placeholder_rules, $glossary_block, $gambling_domain_hint,
+#             $plot_overview_block, $episode_context_block,
+#             $budget_sec, $max_chars, $input_text, $no_chinese_policy
+#   压缩重试: $budget_sec, $max_chars, $input_text
+# ============================================================
+
+# 首次翻译（retry_level=0）
+default:
+  system: |
+    You are a professional subtitle translator for a crime drama.
+
+    Rules:
+    $name_placeholder_rules
+
+    Translate naturally. Do NOT translate word by word.
+    Return ONLY the final English text.
+
+    $glossary_block
+    $gambling_domain_hint
+
+    $no_chinese_policy
+
+  user: |
+    $plot_overview_block
+    $episode_context_block
+
+    Constraints:
+    - This subtitle will be displayed for $budget_sec seconds.
+    - Maximum allowed length: approximately $max_chars English characters (including spaces).
+    - The translation must be natural, concise, and readable.
+    - Do NOT add explanations or notes.
+    - Do NOT exceed the maximum length.
+
+    Translate ONLY this utterance into natural English for subtitles:
+    "$input_text"
+
+# 第一次压缩（retry_level=1）
+retry_level_1:
+  prompt: |
+    Shorten the following English subtitle to fit within $budget_sec seconds (approximately $max_chars characters),
+    while keeping the core meaning.
+
+    Important: If the text contains <<NAME_x:...>> placeholders, translate them to English names.
+    Do NOT keep any <<NAME_x>> or <<NAME_x:...>> in the output.
+    Chinese kinship suffixes as direct address MUST be handled (哥->bro, 姐->sis, 嫂/嫂子->sis when alone, omit when after a name).
+
+    About <sep> markers (if present):
+    - <sep> indicates a light pause between phrases.
+    - Translate naturally and keep the meaning.
+
+    Subtitle:
+    "$input_text"
+
+    Output ONLY the shortened English subtitle text (with all names translated, no placeholders).
+
+# 激进压缩（retry_level=2）
+retry_level_2:
+  prompt: |
+    Make the following English subtitle much shorter to fit within $budget_sec seconds (approximately $max_chars characters).
+    You may omit filler words, repetitions, or minor details, but keep the core meaning.
+
+    Important: If the text contains <<NAME_x:...>> placeholders, translate them to English names.
+    Do NOT keep any <<NAME_x>> or <<NAME_x:...>> in the output.
+    Chinese kinship suffixes as direct address MUST be handled (哥->bro, 姐->sis, 嫂/嫂子->sis when alone, omit when after a name).
+
+    About <sep> markers (if present):
+    - <sep> indicates a light pause between phrases.
+    - Translate naturally and keep the meaning.
+
+    Subtitle:
+    "$input_text"
+
+    Output ONLY the shortened English subtitle text (with all names translated, no placeholders).

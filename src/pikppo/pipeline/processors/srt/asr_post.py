@@ -9,7 +9,7 @@ ASR 后处理：ASR raw → Subtitle Model (SSOT)
 核心处理：
 - utterance → segment 转换（时间轴、文本、speaker）
 - emotion 决策（score < 阈值 → neutral）
-- speaker 规范化（"1" → "spk_1"）
+- speaker 规范化（"1" → "1"，去除 spk_ 前缀）
 - 文本清洗（去重标点、合并碎句）
 - 语义切分（长句兜底）
 

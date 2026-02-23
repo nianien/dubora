@@ -5,12 +5,43 @@
 - 统一加载 dub/dict/ 目录下的所有字典文件
 - 实现优先级：names.json（最高）→ slang.json → 其他
 - 提供轻量校验接口（glossary violation check）
+- 歧义术语（X万/X条）上下文感知：仅在麻将语境中注入/校验
 """
 import json
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from pikppo.utils.logger import info, warning
+
+# ── 歧义牌名上下文检测 ─────────────────────────────────────
+
+# 歧义后缀：万/条 既是麻将花色，又是数量单位/量词
+_AMBIGUOUS_TILE_SUFFIXES = ("万", "条")
+
+# 中文数字前缀（一到九）
+_CN_DIGITS = frozenset("一二三四五六七八九")
+
+# 无歧义麻将指标词：出现任何一个即可认定为麻将上下文
+_MAHJONG_INDICATORS = (
+    "筒", "饼",
+    "碰", "杠", "暗杠", "明杠",
+    "胡", "截胡", "屁胡", "地胡", "天胡",
+    "自摸", "听牌", "点炮", "放炮", "钓",
+)
+
+
+def _is_ambiguous_tile_key(zh_term: str) -> bool:
+    """判断 slang key 是否为歧义牌名（X万/X条，如「五万」「三条」）"""
+    return (
+        len(zh_term) == 2
+        and zh_term[0] in _CN_DIGITS
+        and zh_term[1] in _AMBIGUOUS_TILE_SUFFIXES
+    )
+
+
+def _has_mahjong_context(src_text: str) -> bool:
+    """判断源文本是否含有无歧义的麻将指标词"""
+    return any(ind in src_text for ind in _MAHJONG_INDICATORS)
 
 
 class DictLoader:
@@ -30,7 +61,7 @@ class DictLoader:
     
     def _load_all(self):
         """加载所有字典文件（按优先级顺序）"""
-        # 1. 加载 names.json（最高优先级）
+        # 1. 加载 names.json：{"中文名": "英文名"}
         names_path = self.dict_dir / "names.json"
         if names_path.exists():
             try:
@@ -55,21 +86,8 @@ class DictLoader:
             info(f"Slang dictionary not found: {slang_path}, using empty dict")
     
     def resolve_name(self, src_name: str) -> Optional[str]:
-        """
-        解析人名（从 names.json）。
-
-        Args:
-            src_name: 中文人名
-
-        Returns:
-            英文名或 None（如果不存在）
-        """
-        entry = self.names.get(src_name)
-        if entry is None:
-            return None
-        if isinstance(entry, dict):
-            return entry.get("target")
-        return str(entry)
+        """解析人名，返回英文名或 None。"""
+        return self.names.get(src_name)
     
     def has_name(self, src_name: str) -> bool:
         """检查人名是否在字典中"""
@@ -120,6 +138,9 @@ class DictLoader:
         """
         获取与源文本匹配的 glossary 条目（按需注入，不污染无关句子）。
 
+        歧义牌名（X万/X条）仅在源文本含有无歧义麻将指标词时才注入，
+        避免「五万」在金钱语境下被错误映射为「5-Character」。
+
         Args:
             src_text: 当前 utterance 的中文源文本
 
@@ -129,9 +150,12 @@ class DictLoader:
         if not self.slang:
             return ""
 
+        mahjong_ctx = _has_mahjong_context(src_text)
         hits = []
         for zh_term, en_translation in sorted(self.slang.items()):
             if zh_term in src_text:
+                if _is_ambiguous_tile_key(zh_term) and not mahjong_ctx:
+                    continue
                 hits.append(f"{zh_term} -> {en_translation}")
 
         return "\n".join(hits) if hits else ""
@@ -139,25 +163,28 @@ class DictLoader:
     def check_glossary_violation(self, src_text: str, out_text: str) -> List[str]:
         """
         检查 glossary 违反情况（轻量校验）。
-        
+
+        歧义牌名（X万/X条）仅在源文本含有无歧义麻将指标词时才校验。
+
         Args:
             src_text: 源文本（中文）
             out_text: 输出文本（英文）
-        
+
         Returns:
             违反的术语列表（空列表表示无违反）
-        
+
         规则：如果源文本包含 glossary key，但输出文本不包含对应 value，则视为违反。
         """
         violations = []
         out_lower = out_text.lower()
-        
+        mahjong_ctx = _has_mahjong_context(src_text)
+
         for zh_term, en_translation in self.slang.items():
             if zh_term in src_text:
-                # 源文本包含术语，检查输出是否包含对应翻译
+                if _is_ambiguous_tile_key(zh_term) and not mahjong_ctx:
+                    continue
                 en_lower = en_translation.lower()
-                # 检查是否包含（允许部分匹配，如 "three of a kind" 包含 "three"）
                 if en_lower not in out_lower:
                     violations.append(f"{zh_term} -> {en_translation}")
-        
+
         return violations

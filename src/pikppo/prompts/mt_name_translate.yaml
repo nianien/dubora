@@ -1,0 +1,38 @@
+# ============================================================
+# 人名翻译 prompt
+# 将中文人名翻译为英文（拼音或姓氏形式）
+# 用于 NameMap 补全：翻译首次出现的未知人名
+#
+# 使用方: name_map_complete.py:build_name_translation_prompt()
+# 变量: $names_text
+# ============================================================
+
+# 人名翻译（Gemini 使用 prompt，OpenAI 使用 system + prompt）
+prompt: |
+  Translate the following Chinese personal names into English.
+
+  Rules:
+  - Do NOT invent Western names.
+  - Do NOT translate meaning.
+  - Prefer pinyin or surname-based forms.
+  - For honorific prefixes (老/小/阿), convert appropriately:
+    - "老X" -> "Mr. X" (older, respectful)
+    - "小X" -> "X" or "Little X" (younger, informal)
+    - "阿X" -> "X" (informal, given name)
+  - Return only the translated names.
+
+  Names to translate:
+  $names_text
+
+  Output format: JSON object with the following structure:
+  {
+    "老张": "Mr. Zhang",
+    "阿强": "Qiang",
+    "平安": "Ping An"
+  }
+
+  Output ONLY valid JSON, no explanations.
+
+# OpenAI 专用 system prompt
+openai_system: |
+  You are a professional translator specializing in Chinese name translation. Always output valid JSON only.

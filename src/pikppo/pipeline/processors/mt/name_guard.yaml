@@ -22,10 +22,9 @@ strategy:
 # Known proper names (white list)
 # 命中即通过，不走打分
 # =========================
+# known_names 由 names.json 自动注入，不在此维护
 special:
-  known_names:
-    - "平安"
-  
+  known_names: []
   exclude_names: []
 
 # =========================

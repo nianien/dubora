@@ -6,7 +6,7 @@ Voiceprint Phase: 声纹识别（Sub 之后、MT 之前）
   - asr.asr_result: ASR 原始结果（含 speaker 分段）
 
 输出:
-  - voiceprint.speaker_map: spk_X -> char_id 映射（JSON）
+  - voiceprint.speaker_map: speaker -> char_id 映射（JSON）
   - voiceprint.reference_clips: 参考音频片段目录
 
 声纹库存储在剧级目录：{series_dub}/voiceprint/library.json

@@ -14,6 +14,7 @@
 import math
 from typing import Any, Callable, Dict, List, Optional
 
+from pikppo.prompts import load_prompt
 from pikppo.utils.logger import info, warning
 
 
@@ -52,36 +53,22 @@ def build_translation_prompt(
     max_chars: int,
 ) -> str:
     """
-    构建受限翻译 Prompt（单条 cue）。
-    
+    构建受限翻译 Prompt（单条 cue）。从 YAML 模板加载。
+
     Args:
         zh_text: 中文原文
         duration_sec: 显示时长（秒）
         max_chars: 最大允许字符数
-    
+
     Returns:
         Prompt 字符串
     """
-    prompt = f"""You are translating Chinese subtitles into English for on-screen subtitles.
-
-Constraints:
-- This subtitle will be displayed for {duration_sec:.1f} seconds.
-- Maximum allowed length: {max_chars} English characters (including spaces).
-- The translation must be natural, concise, and readable.
-- Do NOT add explanations or notes.
-- Do NOT exceed the maximum length.
-
-If the original meaning is long, prioritize clarity over completeness.
-
-After generating the translation, silently verify that the length does not exceed {max_chars}.
-If it does, rewrite it shorter.
-
-Chinese subtitle:
-"{zh_text}"
-
-Output ONLY the English subtitle text."""
-    
-    return prompt
+    p = load_prompt("mt_time_constrained.translate",
+        duration_sec=f"{duration_sec:.1f}",
+        max_chars=str(max_chars),
+        zh_text=zh_text,
+    )
+    return p.text
 
 
 def build_compression_prompt(
@@ -89,24 +76,20 @@ def build_compression_prompt(
     max_chars: int,
 ) -> str:
     """
-    构建二次压缩 Prompt（兜底策略）。
-    
+    构建二次压缩 Prompt（兜底策略）。从 YAML 模板加载。
+
     Args:
         candidate: 第一次翻译的结果（超长）
         max_chars: 最大允许字符数
-    
+
     Returns:
         Prompt 字符串
     """
-    prompt = f"""Shorten the following English subtitle to fit within {max_chars} characters,
-while keeping the core meaning.
-
-Subtitle:
-"{candidate}"
-
-Output ONLY the shortened subtitle."""
-    
-    return prompt
+    p = load_prompt("mt_time_constrained.compress",
+        max_chars=str(max_chars),
+        candidate=candidate,
+    )
+    return p.text
 
 
 def should_allow_loose_translation(

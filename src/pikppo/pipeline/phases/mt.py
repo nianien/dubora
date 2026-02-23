@@ -24,7 +24,7 @@ from pikppo.pipeline.processors.mt.dict_loader import DictLoader
 from pikppo.pipeline.processors.mt.name_map_complete import (
     complete_names_with_llm,
 )
-from pikppo.config.settings import get_openai_api_key
+from pikppo.config.settings import get_openai_key
 from pikppo.utils.logger import info, error, warning
 
 
@@ -194,7 +194,7 @@ class MTPhase(Phase):
         else:
             # OpenAI 方案
             model = phase_config.get("model", ctx.config.get("mt_model", ctx.config.get("openai_model", "gpt-4o-mini")))
-            api_key = phase_config.get("api_key") or get_openai_api_key()
+            api_key = phase_config.get("api_key") or get_openai_key()
             if not api_key:
                 return PhaseResult(
                     status="failed",
@@ -215,7 +215,7 @@ class MTPhase(Phase):
             # Fallback 使用另一个引擎
             if is_gemini:
                 # 主引擎是 Gemini，fallback 使用 OpenAI
-                fallback_api_key = phase_config.get("fallback_api_key") or get_openai_api_key()
+                fallback_api_key = phase_config.get("fallback_api_key") or get_openai_key()
                 fallback_model = phase_config.get("fallback_model", ctx.config.get("openai_model", "gpt-4o-mini"))
             else:
                 # 主引擎是 OpenAI，fallback 使用 Gemini
@@ -261,7 +261,18 @@ class MTPhase(Phase):
         
         # 初始化字典加载器（统一管理所有字典）
         dict_loader = DictLoader(dict_dir)
-        
+
+        # 将 names.json 中的人名同步到 NameGuard 白名单
+        # 这样用户手动添加的人名、LLM 之前识别的人名都能被自动检测
+        if name_guard and dict_loader.names:
+            synced = 0
+            for name in dict_loader.names:
+                if name not in name_guard.config.known_names:
+                    name_guard.config.known_names.append(name)
+                    synced += 1
+            if synced:
+                info(f"Synced {synced} names from dict to NameGuard whitelist")
+
         # 兼容旧版 NameMap（如果启用）
         name_map_instance = None
         if enable_name_map:
@@ -640,33 +651,34 @@ class MTPhase(Phase):
                     en_text = f"{base}{end_punct}"
                     info(f"  {utt_id}: MT 输出仅标点，兜底用字典名生成: {en_text}")
             
-            # 反作弊校验：确保输出没有占位符、<sep>、中文（这是最终输出，不允许系统痕迹）
+            # 反作弊校验：确保输出没有占位符、<sep>、中文
             import re
-            has_placeholder = re.search(r"<<NAME_\d+", en_text)
-            has_sep = "<sep>" in en_text
-            has_chinese = re.search(r"[\u4e00-\u9fff]", en_text)  # 检测中文字符
-            
-            if has_placeholder or has_sep or has_chinese:
-                issues = []
-                if has_placeholder:
-                    issues.append("NAME placeholder")
-                if has_sep:
-                    issues.append("<sep> marker")
-                if has_chinese:
-                    issues.append("Chinese characters")
-                error_msg = (
-                    f"LLM output still contains {', '.join(issues)} for utterance {utt_id}. "
-                    f"This is not allowed - the output must be clean English with no placeholders, <sep>, or Chinese. "
-                    f"Output: {en_text[:200]}"
+
+            # 中文残留：重试一次，还不行就剥掉
+            if re.search(r"[\u4e00-\u9fff]", en_text):
+                warning(f"  {utt_id}: Output contains Chinese, retrying: {en_text[:120]}")
+                en_text_retry, _ = translate_utterance_with_retry(
+                    zh_text=zh_text,
+                    budget_ms=budget_ms,
+                    translate_fn=translate_fn,
+                    max_retries=1,
+                    episode_context=episode_context_text,
+                    plot_overview=plot_overview,
+                    slang_glossary_text=slang_glossary_text,
+                    is_gemini=is_gemini,
                 )
-                error(error_msg)
-                return PhaseResult(
-                    status="failed",
-                    error=ErrorInfo(
-                        type="RuntimeError",
-                        message=error_msg,
-                    ),
-                )
+                if en_text_retry and not re.search(r"[\u4e00-\u9fff]", en_text_retry):
+                    en_text = clean_translation_output(en_text_retry)
+                    info(f"  {utt_id}: Retry succeeded, Chinese removed")
+                else:
+                    en_text = re.sub(r"[\u4e00-\u9fff]+", "", en_text).strip()
+                    en_text = re.sub(r"\s+", " ", en_text).strip()
+                    warning(f"  {utt_id}: Stripped remaining Chinese, result: {en_text[:120]}")
+
+            # 占位符 / <sep> 残留：直接清理（不需要重试，clean 函数能处理）
+            if re.search(r"<<NAME_\d+", en_text) or "<sep>" in en_text:
+                warning(f"  {utt_id}: Output still has placeholders/<sep>, force cleaning: {en_text[:120]}")
+                en_text = clean_translation_output(en_text)
             
             # 估算英文时长
             en_est_ms = estimate_en_duration_ms(en_text)
@@ -699,13 +711,23 @@ class MTPhase(Phase):
         mt_output_path = outputs.get("mt.mt_output")
         mt_output_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # 强制校验：确保所有输出都不含占位符、<sep>、中文
+        # 最终防御：剥掉任何残留的系统痕迹（不再 assert 挂掉）
         import re
         for line in mt_output_lines:
             en_text = line.get("target", {}).get("text", "")
-            assert "<<NAME_" not in en_text, f"Output contains NAME placeholder: {en_text[:200]}"
-            assert "<sep>" not in en_text, f"Output contains <sep> marker: {en_text[:200]}"
-            assert not re.search(r"[\u4e00-\u9fff]", en_text), f"Output contains Chinese characters: {en_text[:200]}"
+            if not en_text:
+                continue
+            dirty = False
+            if "<<NAME_" in en_text or "<sep>" in en_text:
+                en_text = clean_translation_output(en_text)
+                dirty = True
+            if re.search(r"[\u4e00-\u9fff]", en_text):
+                en_text = re.sub(r"[\u4e00-\u9fff]+", "", en_text).strip()
+                en_text = re.sub(r"\s+", " ", en_text).strip()
+                dirty = True
+            if dirty:
+                warning(f"  Final cleanup for {line['utt_id']}: {en_text[:120]}")
+                line["target"]["text"] = en_text
         
         with open(mt_output_path, "w", encoding="utf-8") as f:
             for line in mt_output_lines:

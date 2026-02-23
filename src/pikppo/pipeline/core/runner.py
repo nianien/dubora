@@ -92,7 +92,7 @@ class PhaseRunner:
             except Exception:
                 pass
 
-        # 6. 检查输出文件是否存在和 fingerprint 是否匹配
+        # 6. 检查输出文件是否存在（不比较 fingerprint，允许人工原地编辑）
         phase_artifacts = phase_data.get("artifacts", {})
         if not phase_artifacts:
             return True, "no artifacts found in phase data"
@@ -105,14 +105,6 @@ class PhaseRunner:
             artifact_path = self.workspace / relpath
             if not artifact_path.exists():
                 return True, f"output artifact '{key}' file not found: {artifact_path}"
-
-            stored_fp = artifact_data.get("fingerprint")
-            if not stored_fp:
-                return True, f"output artifact '{key}' has no fingerprint in phase data"
-
-            current_fp = hash_path(artifact_path)
-            if stored_fp != current_fp:
-                return True, f"output artifact '{key}' fingerprint mismatch: stored={stored_fp[:16]}... current={current_fp[:16]}..."
 
         # 7. 如果 status 不是 "succeeded"，也需要重新运行
         if phase_data.get("status") != "succeeded":

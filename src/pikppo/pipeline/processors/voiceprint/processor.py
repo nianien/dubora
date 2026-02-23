@@ -25,13 +25,13 @@ def run_voiceprint(
     ref_duration_s: float = 8.0,
 ) -> ProcessorResult:
     """
-    声纹识别处理器：将 ASR 的匿名 spk_X 映射到稳定角色 char_id。
+    声纹识别处理器：将 ASR 的匿名 speaker 映射到稳定角色 char_id。
 
     流程：
     1. 从 segments 中提取所有 unique speakers
     2. 对每个 speaker 提取 embedding
     3. 与剧级声纹库比对
-    4. 匹配成功 -> 映射 spk_X -> char_id，EMA 更新 embedding
+    4. 匹配成功 -> 映射 speaker -> char_id，EMA 更新 embedding
        匹配失败 -> 注册新角色
     5. 导出参考音频片段
     6. 保存 speaker_map.json 和更新后的声纹库

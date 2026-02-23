@@ -17,6 +17,7 @@
 import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
+from pikppo.prompts import load_prompt, load_shared
 from pikppo.utils.logger import info, warning
 
 if TYPE_CHECKING:
@@ -41,6 +42,16 @@ SAFETY_GAP_MS = 60  # 安全间隔（防止重叠）
 
 # 重翻译最大次数
 MAX_RETRIES = 3
+
+# 赌博/牌局关键词（触发 domain hint）
+# 注意：「万」「条」不能放，它们作为量词太常见（五万=50K，三条路=three roads）
+_GAMBLING_KEYWORDS = (
+    "牌", "胡", "杠", "碰", "筒", "饼",
+    "钓", "截胡", "点炮", "放炮", "屁胡", "自摸",
+    "地胡", "天胡", "听牌",
+    "筹码", "庄", "对家", "起手", "翻牌",
+    "尖", "蓝道", "下注", "all-in", "底注",
+)
 
 
 def clean_translation_output(text: str) -> str:
@@ -99,10 +110,10 @@ def is_only_punctuation(text: str) -> bool:
 def pick_k(zh_tps: float) -> float:
     """
     根据语速选择 k 值。
-    
+
     Args:
         zh_tps: 中文 tokens per second
-    
+
     Returns:
         k 值（1.0 / 1.15 / 1.2）
     """
@@ -117,12 +128,12 @@ def pick_k(zh_tps: float) -> float:
 def estimate_en_duration_ms(en_text: str) -> float:
     """
     估计英文文本的时长（毫秒）。
-    
+
     使用字符速（CPS）估计，不含空格。
-    
+
     Args:
         en_text: 英文文本
-    
+
     Returns:
         预计时长（毫秒）
     """
@@ -130,11 +141,11 @@ def estimate_en_duration_ms(en_text: str) -> float:
     en_chars = len(re.sub(r'[^a-zA-Z0-9]', '', en_text))
     if en_chars == 0:
         return 0.0
-    
+
     # 使用 CPS 估计
     en_est_sec = en_chars / EN_CPS
     en_est_ms = en_est_sec * 1000.0
-    
+
     return en_est_ms
 
 
@@ -145,25 +156,25 @@ def calculate_extend_ms(
 ) -> float:
     """
     计算可扩展的时间（不重叠）。
-    
+
     Args:
         need_ms: 需要额外的时间（毫秒）
         end_ms: 当前 utterance 的结束时间（毫秒）
         next_utt_start_ms: 下一个 utterance 的开始时间（毫秒，None 表示没有下一句）
-    
+
     Returns:
         可扩展的时间（毫秒，0 表示无法扩展）
     """
     # 扩展上限
     extend_cap_ms = EXTEND_CAP_MS
-    
+
     # 计算不与下一句重叠的最大扩展时间
     if next_utt_start_ms is not None:
         no_overlap_cap_ms = next_utt_start_ms - end_ms - SAFETY_GAP_MS
         if no_overlap_cap_ms < 0:
             return 0.0  # 无法扩展（会重叠）
         extend_cap_ms = min(extend_cap_ms, no_overlap_cap_ms)
-    
+
     # 最终可扩展时间
     extend_ms = min(need_ms, extend_cap_ms)
     return max(0.0, extend_ms)
@@ -180,8 +191,8 @@ def build_utterance_translation_prompt(
     is_gemini: bool = False,
 ) -> str:
     """
-    构建 utterance 翻译 Prompt。
-    
+    构建 utterance 翻译 Prompt（从 YAML 模板加载）。
+
     Args:
         zh_text: 中文文本（utterance 内所有 cues 合并）
         budget_ms: 时间预算（毫秒）
@@ -189,120 +200,74 @@ def build_utterance_translation_prompt(
         episode_context: 整集对话上下文（从 asr.result.text 获取）
         plot_overview: 剧情简介（可选）
         slang_glossary_text: 行话词表文本（从 DictLoader 获取）
-    
+
     Returns:
         Prompt 字符串
     """
     budget_sec = budget_ms / 1000.0
     max_chars = int((budget_ms / 1000.0) * EN_CPS)
-    
-    # Slang glossary（从 DictLoader 传入）
-    slang_glossary = slang_glossary_text
-    
-    if retry_level == 0:
-        # 首次翻译
-        # System prompt（硬规则）
-        system_parts = [
-            "You are a professional subtitle translator for a crime drama.",
-            "",
-            "Rules:",
-            "1) The input may contain <<NAME_i:...>> which is a Chinese personal name.",
-            "   Translate the name into English (pinyin or surname-based). Do NOT invent Western names.",
-            "   Do NOT translate name meanings.",
-            "   IMPORTANT: Chinese kinship suffixes used as direct address next to <<NAME_i:...>>:",
-            "   - 哥 → bro",
-            "   - 姐 → sis",
-            "   - 嫂/嫂子 → 'sis' when used alone; omit when after a name",
-            "   (Use kinship terms only when they function as natural forms of address in English; otherwise omit.)",
-            "   Examples: <<NAME_0:平安>>哥 → Ping An, bro | <<NAME_0:小美>>姐 → Xiao Mei, sis",
-            "2) Translate naturally. Do NOT translate word by word.",
-            "3) Output must be clean English for subtitles:",
-            "   - Remove all <<NAME_i:...>> placeholders (render the translated name).",
-            "   - Remove <sep> separators (use punctuation/pauses naturally).",
-            "Return ONLY the final English text.",
-        ]
 
-        # Glossary（按需注入：只注入当前句命中的条目）
+    if retry_level == 0:
+        # 构建可选块
+        glossary_block = ""
         if slang_glossary_text:
-            system_parts.append("")
-            system_parts.append("Glossary — only apply if the exact source phrase appears in THIS utterance. Do not infer or generalize:")
-            system_parts.append(slang_glossary_text)
+            glossary_block = (
+                "Glossary — only apply if the exact source phrase appears in THIS utterance. "
+                "Do not infer or generalize:\n" + slang_glossary_text
+            )
 
         # Domain hint（按需注入：只在源文本含赌博/牌局关键词时添加）
-        _GAMBLING_KEYWORDS = (
-            "牌", "胡", "杠", "碰", "筒", "条", "筹码", "庄",
-            "对家", "听牌", "起手", "翻牌", "尖", "三条", "蓝道",
-            "下注", "all-in", "底注",
-        )
+        gambling_domain_hint = ""
         has_gambling = any(kw in zh_text for kw in _GAMBLING_KEYWORDS)
-
-        # User prompt（上下文 + 当前句）
-        user_parts = []
-
-        # 1. 剧情简介（可选）
-        if plot_overview:
-            user_parts.append(f"Plot overview:\n{plot_overview}\n")
-
-        # 2. Episode Context
-        if episode_context:
-            # 截断到合理长度（避免 token 超限）
-            max_context_chars = 5000  # 约 1000-1500 tokens
-            if len(episode_context) > max_context_chars:
-                episode_context = episode_context[:max_context_chars] + "..."
-            user_parts.append(f"Episode dialogue context:\n{episode_context}\n")
-
-        # 3. Domain Hint（按需）
         if has_gambling:
-            user_parts.append("Context: This utterance contains gambling / card-game slang. Use natural English equivalents.")
+            gambling_domain_hint = (
+                "Context: This is a GAMBLING SCENE in a Chinese drama.\n"
+                "Determine the game type from context (mahjong, poker, card games, etc.) "
+                "and translate accordingly.\n"
+                "IMPORTANT: [Number]+万/条 can mean MONEY or TILES depending on context:\n"
+                "- With verbs 借/给/欠/输/赢/还 → MONEY (e.g. 借五万 = borrow fifty grand)\n"
+                "- With verbs 打/出/摸/钓 or said alone as a call → TILE (e.g. 打一万 = 1-Character)\n"
+                "When in doubt, use episode context to decide.\n\n"
+                + load_shared("gambling_glossary")
+            )
 
-        # 4. Focus：当前 utterance
-        user_parts.append(f"\nConstraints:")
-        user_parts.append(f"- This subtitle will be displayed for {budget_sec:.2f} seconds.")
-        user_parts.append(f"- Maximum allowed length: approximately {max_chars} English characters (including spaces).")
-        user_parts.append(f"- The translation must be natural, concise, and readable.")
-        user_parts.append(f"- Do NOT add explanations or notes.")
-        user_parts.append(f"- Do NOT exceed the maximum length.")
-        user_parts.append("")
-        user_parts.append(f"Translate ONLY this utterance into natural English for subtitles:")
-        user_parts.append(f'"{zh_text}"')
-        
-        # 组合 prompt
-        prompt = "\n".join(system_parts) + "\n\n" + "\n".join(user_parts)
+        plot_overview_block = ""
+        if plot_overview:
+            plot_overview_block = f"Plot overview:\n{plot_overview}\n"
+
+        episode_context_block = ""
+        if episode_context:
+            max_context_chars = 5000
+            ctx = episode_context[:max_context_chars] + "..." if len(episode_context) > max_context_chars else episode_context
+            episode_context_block = f"Episode dialogue context:\n{ctx}\n"
+
+        p = load_prompt("mt_utterance_translate.default",
+            name_placeholder_rules=load_shared("name_placeholder_rules"),
+            glossary_block=glossary_block,
+            gambling_domain_hint=gambling_domain_hint,
+            no_chinese_policy=load_shared("no_chinese_policy"),
+            plot_overview_block=plot_overview_block,
+            episode_context_block=episode_context_block,
+            budget_sec=f"{budget_sec:.2f}",
+            max_chars=str(max_chars),
+            input_text=zh_text,
+        )
+        prompt = p.system + "\n\n" + p.user
     elif retry_level == 1:
-        # 第一次压缩
-        prompt = f"""Shorten the following English subtitle to fit within {budget_sec:.2f} seconds (approximately {max_chars} characters),
-while keeping the core meaning.
-
-Important: If the text contains <<NAME_x:...>> placeholders, translate them to English names.
-Do NOT keep any <<NAME_x>> or <<NAME_x:...>> in the output.
-Chinese kinship suffixes as direct address MUST be handled (哥→bro, 姐→sis, 嫂/嫂子→sis when alone, omit when after a name).
-
-About <sep> markers (if present):
-- <sep> indicates a light pause between phrases.
-- Translate naturally and keep the meaning.
-
-Subtitle:
-"{zh_text}"
-
-Output ONLY the shortened English subtitle text (with all names translated, no placeholders)."""
+        p = load_prompt("mt_utterance_translate.retry_level_1",
+            budget_sec=f"{budget_sec:.2f}",
+            max_chars=str(max_chars),
+            input_text=zh_text,
+        )
+        prompt = p.text
     else:
-        # 更强压缩（允许省略语气词/重复信息）
-        prompt = f"""Make the following English subtitle much shorter to fit within {budget_sec:.2f} seconds (approximately {max_chars} characters).
-You may omit filler words, repetitions, or minor details, but keep the core meaning.
+        p = load_prompt("mt_utterance_translate.retry_level_2",
+            budget_sec=f"{budget_sec:.2f}",
+            max_chars=str(max_chars),
+            input_text=zh_text,
+        )
+        prompt = p.text
 
-Important: If the text contains <<NAME_x:...>> placeholders, translate them to English names.
-Do NOT keep any <<NAME_x>> or <<NAME_x:...>> in the output.
-Chinese kinship suffixes as direct address MUST be handled (哥→bro, 姐→sis, 嫂/嫂子→sis when alone, omit when after a name).
-
-About <sep> markers (if present):
-- <sep> indicates a light pause between phrases.
-- Translate naturally and keep the meaning.
-
-Subtitle:
-"{zh_text}"
-
-Output ONLY the shortened English subtitle text (with all names translated, no placeholders)."""
-    
     return prompt
 
 
@@ -322,7 +287,7 @@ def translate_utterance_with_retry(
 ) -> Tuple[str, int]:
     """
     翻译 utterance（带重试）。
-    
+
     Args:
         zh_text: 中文文本
         budget_ms: 时间预算（毫秒）
@@ -331,7 +296,7 @@ def translate_utterance_with_retry(
         episode_context: 整集对话上下文
         plot_overview: 剧情简介
         slang_glossary_text: 行话词表文本
-    
+
     Returns:
         (翻译结果, 重试次数)
     """
@@ -360,10 +325,10 @@ def translate_utterance_with_retry(
                 is_gemini=is_gemini,
             )
         en_text = translate_fn(prompt)
-        
+
         if not en_text:
             continue
-        
+
         # 注意：这里不再调用 clean_translation_output。
         # 占位符（<<NAME_x>> / <<NAME_x:...>>）、<sep> 等系统标记由 MT Phase 统一处理：
         # 1）先用 DictLoader / placeholder_to_name 替换人名占位符为英文名
@@ -371,14 +336,14 @@ def translate_utterance_with_retry(
         en_est_ms = estimate_en_duration_ms(en_text)
         if en_est_ms <= budget_ms:
             return en_text, retry
-        
+
         # 超限，继续重试
         if retry < max_retries - 1:
             warning(
                 f"Translation too long: {en_est_ms:.0f}ms > {budget_ms:.0f}ms, "
                 f"retrying (attempt {retry + 2}/{max_retries})"
             )
-    
+
     # 所有重试都失败，返回最后一次结果（即使超限）
     return en_text, max_retries - 1
 
@@ -391,23 +356,23 @@ def resegment_utterance(
 ) -> List[Dict[str, Any]]:
     """
     在 utterance 时间窗口内重断句（不跨 utterance 边界）。
-    
+
     核心原则（非常重要）：
-    - ❌ 不使用 SSOT 的 cue.start/end（那是中文语音事实切片，不适用于英文）
-    - ✅ 只使用 utterance 的 start/end 作为总时间预算
-    - ✅ 基于语速模型重新分配时间轴
-    
+    - 不使用 SSOT 的 cue.start/end（那是中文语音事实切片，不适用于英文）
+    - 只使用 utterance 的 start/end 作为总时间预算
+    - 基于语速模型重新分配时间轴
+
     时间分配算法（三步法）：
     1. 锁定 utterance 总时间窗：[utt_start_ms, utt_end_ms]（不可动的硬边界）
     2. 根据英文文本 + 目标语速，计算每个 segment 的理论发音时长
     3. 在 utt 时间窗内，按比例重新分配时间轴
-    
+
     Args:
         en_text: 英文整句/整段（可能包含由 <sep> 诱导产生的标点）
         utt_start_ms: utterance 开始时间（毫秒，来自 SSOT）
         utt_end_ms: utterance 结束时间（毫秒，可能已扩展）
         target_wps: 目标语速（words per second，默认 2.5）
-    
+
     Returns:
         segments[]（英文字幕段），每个包含：
         {
@@ -442,7 +407,7 @@ def resegment_utterance(
     for match in re.finditer(punctuation_pattern, en_text):
         pos = match.end()  # 标点后的位置（包含后续空格）
         punctuation_positions.append(pos)
-    
+
     # Step 2: 按自然切分点切分文本（语义断句）
     text_segments = []
     current_pos = 0
@@ -456,7 +421,7 @@ def resegment_utterance(
                 if segment_text and not is_only_punctuation(segment_text):
                     text_segments.append(segment_text)
                 current_pos = punc_pos
-        
+
         # 添加最后一段
         if current_pos < len(en_text):
             segment_text = en_text[current_pos:].strip()
@@ -468,24 +433,24 @@ def resegment_utterance(
         words = en_text.split()
         if not words:
             return []
-        
+
         # 简单策略：每 8-12 个词一段（或根据总时长动态调整）
         words_per_segment = max(8, min(12, int(len(words) / max(1, utt_duration_ms / 2000))))  # 每段约 2 秒
-        
+
         for i in range(0, len(words), words_per_segment):
             segment_text = " ".join(words[i:i + words_per_segment])
             if segment_text:
                 text_segments.append(segment_text)
-    
+
     if not text_segments:
         # 如果无法切分，整个 utterance 作为一个 segment
         text_segments = [en_text.strip()]
-    
+
     # Step 3: 计算每个 segment 的理论发音时长（基于语速模型）
     # 使用单词数估算（更准确）
     segment_estimates = []
     total_est_ms = 0.0
-    
+
     for seg_text in text_segments:
         # 计算单词数（简单方法：空格数 + 1）
         word_count = len(seg_text.split())
@@ -498,7 +463,7 @@ def resegment_utterance(
             "word_count": word_count,
         })
         total_est_ms += est_ms
-    
+
     # Step 4: 在 utt 时间窗内，按比例重新分配时间轴
     # scale = utt_duration / total_est
     if total_est_ms <= 0:
@@ -515,30 +480,30 @@ def resegment_utterance(
             })
             current_time += segment_duration
         return segments
-    
+
     scale = utt_duration_ms / total_est_ms
-    
+
     segments = []
     current_time = utt_start_ms
-    
+
     for seg_info in segment_estimates:
         # 映射到真实时间轴
         segment_duration = seg_info["est_ms"] * scale
         segment_start = int(current_time)
         segment_end = int(current_time + segment_duration)
-        
+
         # 确保不超过 utterance 边界
         if segment_end > utt_end_ms:
             segment_end = utt_end_ms
-        
+
         segments.append({
             "start_ms": segment_start,
             "end_ms": segment_end,
             "text": seg_info["text"],
         })
-        
+
         current_time = segment_end
-    
+
     # 确保最后一个 segment 的 end 正好是 utt_end_ms
     if segments:
         segments[-1]["end_ms"] = utt_end_ms
@@ -571,7 +536,7 @@ def translate_utterance(
 ) -> Dict[str, Any]:
     """
     翻译单个 utterance（完整流程）。
-    
+
     Args:
         utterance: Utterance 数据（来自 SSOT），包含：
             - utt_id: Utterance ID
@@ -582,7 +547,7 @@ def translate_utterance(
             - 注意：v1.3 已移除 cue_id，使用索引即可
         next_utterance: 下一个 utterance（用于计算不重叠扩展），None 表示没有下一句
         translate_fn: 翻译函数
-    
+
     Returns:
         TranslationSet 条目：
         {
@@ -612,7 +577,7 @@ def translate_utterance(
     speech_rate = utterance.get("speech_rate", {})
     zh_tps = speech_rate.get("zh_tps", 0.0)
     cues = utterance.get("cues", [])
-    
+
     # 1. 合并中文文本
     zh_merged = "".join(cue.get("source", {}).get("text", "") for cue in cues)
     if not zh_merged:
@@ -629,36 +594,36 @@ def translate_utterance(
                 "retries": 0,
             },
         }
-    
+
     # 2. 计算 k 值和时间预算
     window_ms = end_ms - start_ms
     k = pick_k(zh_tps)
     budget_ms = window_ms * k
-    
+
     # 3. 首次翻译
     en_text, retries = translate_utterance_with_retry(
         zh_text=zh_merged,
         budget_ms=budget_ms,
         translate_fn=translate_fn,
     )
-    
+
     # 4. 估计英文时长
     en_est_ms = estimate_en_duration_ms(en_text)
-    
+
     # 5. 如果超限，尝试扩展 end_time
     extend_ms = 0.0
     end_ms_final = end_ms
     budget_ms2 = budget_ms
-    
+
     if en_est_ms > budget_ms:
         need_ms = en_est_ms - budget_ms
         next_utt_start_ms = next_utterance.get("start_ms") if next_utterance else None
         extend_ms = calculate_extend_ms(need_ms, end_ms, next_utt_start_ms)
-        
+
         if extend_ms > 0:
             end_ms_final = int(end_ms + extend_ms)
             budget_ms2 = budget_ms + extend_ms
-            
+
             # 如果扩展后仍超限，重翻译
             if en_est_ms > budget_ms2:
                 en_text, retries = translate_utterance_with_retry(
@@ -667,7 +632,7 @@ def translate_utterance(
                     translate_fn=translate_fn,
                 )
                 en_est_ms = estimate_en_duration_ms(en_text)
-    
+
     # 6. 重断句（不跨 utterance 边界）
     # 重要：不使用 SSOT 的 cue 时间，只使用 utterance 时间预算
     segments = resegment_utterance(
@@ -676,7 +641,7 @@ def translate_utterance(
         utt_end_ms=end_ms_final,
         target_wps=2.5,  # 目标语速：words per second
     )
-    
+
     return {
         "utt_id": utt_id,
         "end_ms_final": end_ms_final,
@@ -698,11 +663,11 @@ def translate_utterances(
 ) -> Dict[str, Any]:
     """
     翻译所有 utterances（utterance 粒度）。
-    
+
     Args:
         utterances: Utterance 列表（来自 SSOT）
         translate_fn: 翻译函数
-    
+
     Returns:
         TranslationSet：
         {
@@ -717,14 +682,14 @@ def translate_utterances(
         }
     """
     results = {}
-    
+
     info(f"Translating {len(utterances)} utterances (utterance-level)...")
-    
+
     for i, utterance in enumerate(utterances):
         next_utterance = utterances[i + 1] if i + 1 < len(utterances) else None
         result = translate_utterance(utterance, next_utterance, translate_fn)
         results[result["utt_id"]] = result
-    
+
     # 统计信息
     total_extend_ms = sum(r["metrics"]["extend_ms"] for r in results.values())
     total_retries = sum(r["metrics"]["retries"] for r in results.values())
@@ -732,7 +697,7 @@ def translate_utterances(
         f"Translation completed: {len(results)} utterances, "
         f"total extend: {total_extend_ms:.0f}ms, total retries: {total_retries}"
     )
-    
+
     return {
         "by_utt": results,
     }

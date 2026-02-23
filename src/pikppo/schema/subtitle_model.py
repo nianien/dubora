@@ -94,7 +94,7 @@ class SpeakerInfo:
     说话人信息（v1.3：提升为对象，收编说话人相关属性）。
 
     字段：
-    - id: 说话人标识（规范化后，如 "spk_1"）
+    - id: 说话人标识（规范化后，如 "1", "pa"）
     - gender: 性别（如 "male", "female"，可选）
     - speech_rate: 语速信息（zh_tps）
     - emotion: 情绪信息（可选，用于 TTS style hint）

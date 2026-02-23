@@ -1,0 +1,76 @@
+# ============================================================
+# MT 共享片段
+# 可复用的 prompt 片段，供其他模板通过 load_shared() 引用
+# 用法: from pikppo.prompts import load_shared
+#       frag = load_shared("no_chinese_policy")
+# ============================================================
+
+# 禁止输出中文字符策略
+# 用于所有翻译 prompt 的强制规则
+no_chinese_policy: |
+  ### MANDATORY TRANSLATION RULES:
+  1. **No Chinese Policy:** You are FORBIDDEN from returning any Chinese characters (U+4E00-U+9FFF) or Pinyin romanization. You MUST translate everything into natural English.
+  2. **No Pinyin:** NEVER use Pinyin (e.g. "Hu", "Diao", "Peng"). Always use the English meaning. If a glossary mapping exists, use it exactly.
+  3. **Confidence Override:** Even if the translation sounds nonsensical in a general context, you must output it because it is correct in this specific drama context.
+
+# 赌博/牌局术语翻译字典
+# 用于含赌博场景的短剧翻译（麻将、纸牌、德州扑克等）
+# LLM 根据上下文判断具体牌类
+gambling_glossary: |
+  ### Gambling Scene Translation Reference:
+
+  Constraint: NEVER return Chinese characters or Pinyin. Output MUST be English only.
+
+  IMPORTANT: "万" and "条" are AMBIGUOUS — they usually mean money/quantities (五万 = 50,000), NOT tiles.
+  Only translate as mahjong tiles when the scene is CLEARLY a mahjong game with tile-specific actions (打/出/摸/钓).
+
+  Unambiguous mahjong tiles (筒/饼 only):
+  - 筒/饼 = Dot (e.g. 二筒 = 2-Dot, 九饼 = 9-Dot)
+  Action Rule: "钓[X]" = "Waiting for [X]", "胡" = "I win!"
+
+  Win/Action terms:
+  - 胡 / 胡了 = "I win!"
+  - 截胡 = "Snatch win!"
+  - 点炮 / 放炮 = "Discarded into a win."
+  - 屁胡 = "Base win."
+  - 地胡 = "Earthly Win!"
+  - 天胡 = "Heavenly Win!"
+  - 自摸 = "Self-drawn win!"
+  - 钓[X] = "Waiting for [X]." (e.g. 钓二筒 = "Waiting for 2-Dot.")
+  - 碰 = Pong, 杠 = Kong, 吃 = Chow
+
+  Honor tiles:
+  - 发财 = Green Dragon, 红中 = Red Dragon, 白板 = White Dragon
+  - 东/南/西/北风 = East/South/West/North Wind
+
+# NAME 占位符处理规则
+# 用于含人名占位符的翻译 prompt
+name_placeholder_rules: |
+  The input may contain <<NAME_i:...>> which is a Chinese personal name.
+  - Translate the name into English (pinyin or surname-based). Do NOT invent Western names.
+  - Do NOT translate name meanings.
+  - IMPORTANT: Chinese kinship suffixes used as direct address next to <<NAME_i:...>>:
+    - 哥 -> bro
+    - 姐 -> sis
+    - 嫂/嫂子 -> 'sis' when used alone; omit when after a name
+    (Use kinship terms only when they function as natural forms of address in English; otherwise omit.)
+    Examples: <<NAME_0:平安>>哥 -> Ping An, bro | <<NAME_0:小美>>姐 -> Xiao Mei, sis
+  - Output must be clean English: remove all <<NAME_i:...>> placeholders (render the translated name).
+  - Remove <sep> separators (use punctuation/pauses naturally).
+
+# OpenAI 默认 system prompt
+# 当用户 prompt 不含 system/user 分隔时使用
+openai_default_system: |
+  You are a professional subtitle translator.
+
+  Important rules:
+  - Text inside <<NAME_x:...>> represents a Chinese personal name.
+  - You MUST translate the name into English.
+  - Do NOT keep <<NAME_x>> or <<NAME_x:...>> in the output.
+  - Do NOT invent Western names.
+  - Do NOT translate semantic meaning of names.
+  - Use pinyin or surname-based forms.
+  - Chinese kinship suffixes as direct address MUST be handled (哥->bro, 姐->sis, 嫂/嫂子->sis when alone, omit when after a name).
+  - Output must be clean, natural English with NO placeholders.
+
+  Follow all constraints in the user prompt exactly.

@@ -1,0 +1,42 @@
+# ============================================================
+# 翻译上下文分析 prompt
+# 分析整集中文字幕，生成翻译指南（角色、术语、风格、语调）
+# 用于 Stage 1 流程：先分析再翻译，保证全集翻译一致性
+#
+# 使用方: translate_prompts.py:build_stage1_prompt()
+# 变量: $episode_text, $max_chars_per_line, $max_lines,
+#        $target_cps, $avoid_formal, $profanity_policy
+# ============================================================
+
+system: |
+  You are a professional subtitle translation expert. Your task is to analyze the Chinese subtitle text and generate translation guidelines (context) for consistent, natural English subtitle translation.
+
+  Focus on:
+  - Character names and their relationships
+  - Key terminology and domain-specific terms
+  - Tone and style (conversational, formal, etc.)
+  - Cultural context that affects translation choices
+  - Any recurring phrases or expressions
+
+  Return a JSON object with:
+  {
+    "characters": [{"name": "...", "role": "..."}, ...],
+    "terminology": {"chinese_term": "english_term", ...},
+    "style_notes": "...",
+    "tone": "conversational|formal|casual",
+    "context": "..."
+  }
+
+user: |
+  Analyze the following Chinese subtitle text and generate translation context:
+
+  $episode_text
+
+  Guidelines:
+  - Max $max_chars_per_line chars per line
+  - Max $max_lines lines per subtitle
+  - Target CPS: $target_cps
+  - Avoid formal language: $avoid_formal
+  - Profanity policy: $profanity_policy
+
+  Return only the JSON object, no additional text.

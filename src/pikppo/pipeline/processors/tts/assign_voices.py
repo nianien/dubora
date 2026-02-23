@@ -2,7 +2,7 @@
 声线分配：为每个 speaker 分配 voice
 
 支持两种模式：
-1. 无声纹映射：按 spk_X 交替分配（原始行为）
+1. 无声纹映射：按 speaker 交替分配（原始行为）
 2. 有声纹映射：按 char_id 作为稳定 key 分配，跨集复用同一 voice_id
 """
 import json
@@ -59,7 +59,7 @@ def assign_voices(
     # 加载 voice pool
     voice_pool = VoicePool(pool_path=voice_pool_path)
 
-    # 加载 speaker_map（spk_X → char_id）
+    # 加载 speaker_map（speaker → char_id）
     speaker_map: Dict[str, str] = {}
     if speaker_map_path:
         sm_path = Path(speaker_map_path)

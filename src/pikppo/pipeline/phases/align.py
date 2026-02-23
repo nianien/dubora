@@ -361,7 +361,7 @@ class AlignPhase(Phase):
         max_extend_cap_ms = int(tts_config.get("max_extend_cap_ms", 800))
 
         dub_utterances = []
-        for utt in aligned_utterances:
+        for idx, utt in enumerate(aligned_utterances):
             utt_id = utt["utt_id"]
             start_ms = utt["start_ms"]
             end_ms = utt["end_ms"]
@@ -379,19 +379,33 @@ class AlignPhase(Phase):
             )
             text_zh = ""
             if original_utt:
-                # Get text from cues
                 cues = original_utt.get("cues", [])
                 text_zh = " ".join(
                     cue.get("source", {}).get("text", "")
                     for cue in cues
                 )
 
+            # 动态 allow_extend_ms：不跟下一句重叠即可
+            gap_to_next_ms = None
+            if idx + 1 < len(aligned_utterances):
+                next_start = aligned_utterances[idx + 1]["start_ms"]
+                gap_to_next_ms = next_start - end_ms
+
+            if gap_to_next_ms is not None and gap_to_next_ms > 0:
+                # 留 60ms 安全间隔，不跟下一句重叠
+                utt_allow_extend_ms = max(0, gap_to_next_ms - 60)
+            else:
+                # 最后一句：可以延伸到音频结尾
+                gap_to_end = audio_duration_ms - end_ms
+                if gap_to_end > 0:
+                    utt_allow_extend_ms = gap_to_end
+                else:
+                    utt_allow_extend_ms = default_allow_extend_ms
+
             # Short utterance protection: ensure TTS window >= min_tts_window_ms
-            # For budget < min_tts_window_ms, grant extra time so TTS has room to speak
-            utt_allow_extend_ms = default_allow_extend_ms
             if budget_ms < min_tts_window_ms:
                 utt_allow_extend_ms = max(
-                    default_allow_extend_ms,
+                    utt_allow_extend_ms,
                     min(min_tts_window_ms - budget_ms, max_extend_cap_ms),
                 )
                 info(f"  {utt_id}: budget={budget_ms}ms < {min_tts_window_ms}ms, allow_extend_ms={utt_allow_extend_ms}ms")

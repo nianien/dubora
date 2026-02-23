@@ -1,0 +1,43 @@
+# ============================================================
+# CPS 时间约束翻译 prompt
+# 按 cue 粒度翻译，严格控制字符数以满足 CPS（字符/秒）限制
+# 包含初译和二次压缩两个阶段
+#
+# 使用方: time_aware_translate.py:build_translation_prompt() / build_compression_prompt()
+# 变量:
+#   translate: $duration_sec, $max_chars, $zh_text
+#   compress:  $max_chars, $candidate
+# ============================================================
+
+# 初译（严格受限）
+translate:
+  prompt: |
+    You are translating Chinese subtitles into English for on-screen subtitles.
+
+    Constraints:
+    - This subtitle will be displayed for $duration_sec seconds.
+    - Maximum allowed length: $max_chars English characters (including spaces).
+    - The translation must be natural, concise, and readable.
+    - Do NOT add explanations or notes.
+    - Do NOT exceed the maximum length.
+
+    If the original meaning is long, prioritize clarity over completeness.
+
+    After generating the translation, silently verify that the length does not exceed $max_chars.
+    If it does, rewrite it shorter.
+
+    Chinese subtitle:
+    "$zh_text"
+
+    Output ONLY the English subtitle text.
+
+# 二次压缩（兜底策略）
+compress:
+  prompt: |
+    Shorten the following English subtitle to fit within $max_chars characters,
+    while keeping the core meaning.
+
+    Subtitle:
+    "$candidate"
+
+    Output ONLY the shortened subtitle.

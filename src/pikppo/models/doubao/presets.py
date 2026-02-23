@@ -45,6 +45,8 @@ def _base_request_cfg(*, hotwords: Optional[List[str]] = None) -> RequestConfig:
         enable_gender_detection=True,  # 性别信息（辅助 speaker）
         enable_emotion_detection=True,  # 情绪信息（辅助判断）
         corpus=_corpus(hotwords),  # 热词/上下文（稳定人名称呼）
+        # show_speech_rate=True,  # 分句信息携带语速
+        # show_volume=True  # 分句信息携带音量
     )
 
 

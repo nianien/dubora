@@ -15,6 +15,7 @@
 from typing import Any, Callable, Dict, List, Optional
 
 from pikppo.models.openai.translate_client import create_openai_client, call_openai_with_retry
+from pikppo.prompts import load_shared
 from pikppo.utils.logger import info, warning, error
 from .time_aware_translate import (
     translate_cues_time_aware,
@@ -78,8 +79,8 @@ def create_translate_fn(
         # OpenAI 主引擎
         try:
             if not api_key:
-                from pikppo.config.settings import get_openai_api_key
-                api_key = get_openai_api_key()
+                from pikppo.config.settings import get_openai_key
+                api_key = get_openai_key()
             if not api_key:
                 raise RuntimeError("OpenAI API key not found")
             
@@ -92,19 +93,7 @@ def create_translate_fn(
                     system_content = parts[0]
                     user_content = parts[1] if len(parts) > 1 else ""
                 else:
-                    system_content = """You are a professional subtitle translator.
-
-Important rules:
-- Text inside <<NAME_x:...>> represents a Chinese personal name.
-- You MUST translate the name into English.
-- Do NOT keep <<NAME_x>> or <<NAME_x:...>> in the output.
-- Do NOT invent Western names.
-- Do NOT translate semantic meaning of names.
-- Use pinyin or surname-based forms.
-- Chinese kinship suffixes as direct address MUST be handled (哥→bro, 姐→sis, 嫂/嫂子→sis when alone, omit when after a name).
-- Output must be clean, natural English with NO placeholders.
-
-Follow all constraints in the user prompt exactly."""
+                    system_content = load_shared("openai_default_system")
                     user_content = prompt
                 
                 messages = [
@@ -130,8 +119,8 @@ Follow all constraints in the user prompt exactly."""
     if fallback_enabled:
         try:
             if not fallback_api_key:
-                from pikppo.config.settings import get_openai_api_key
-                fallback_api_key = get_openai_api_key()
+                from pikppo.config.settings import get_openai_key
+                fallback_api_key = get_openai_key()
             if not fallback_api_key:
                 warning("Fallback enabled but API key not found, fallback will be unavailable")
             else:
@@ -143,19 +132,7 @@ Follow all constraints in the user prompt exactly."""
                         system_content = parts[0]
                         user_content = parts[1] if len(parts) > 1 else ""
                     else:
-                        system_content = """You are a professional subtitle translator.
-
-Important rules:
-- Text inside <<NAME_x:...>> represents a Chinese personal name.
-- You MUST translate the name into English.
-- Do NOT keep <<NAME_x>> or <<NAME_x:...>> in the output.
-- Do NOT invent Western names.
-- Do NOT translate semantic meaning of names.
-- Use pinyin or surname-based forms.
-- Chinese kinship suffixes as direct address MUST be handled (哥→bro, 姐→sis, 嫂/嫂子→sis when alone, omit when after a name).
-- Output must be clean, natural English with NO placeholders.
-
-Follow all constraints in the user prompt exactly."""
+                        system_content = load_shared("openai_default_system")
                         user_content = prompt
                     
                     messages = [

@@ -500,8 +500,11 @@ class NameGuard:
                         (char_after and char_after in boundary_chars)
                     )
                     
-                    # 如果不在边界，且不是呼唤位，跳过（避免匹配句子中间）
-                    if not is_at_boundary and not is_at_start:
+                    # 白名单名字不受边界限制（用户/LLM 已确认是人名）
+                    is_known = word in self.config.known_names
+
+                    # 如果不在边界、不是呼唤位、也不在白名单，跳过
+                    if not is_at_boundary and not is_at_start and not is_known:
                         continue
                     
                     # 判断是否在呼唤位

@@ -25,6 +25,10 @@ from .types import (
     SegmentList,
     SrtCueList,
 )
+from .asr_fix import (
+    AsrFix,
+    AsrFixUtterance,
+)
 from .subtitle_model import (
     SubtitleModel,
     SubtitleCue,
@@ -37,6 +41,9 @@ from .subtitle_model import (
 )
 
 __all__ = [
+    # ASR Model（人工校准层）
+    "AsrFix",
+    "AsrFixUtterance",
     "Word",
     "Utterance",  # ASR 原始响应（schema/types.py）
     "Segment",

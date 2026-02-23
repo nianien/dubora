@@ -223,6 +223,7 @@ class Manifest:
             },
             "asr": {
                 "asr_result": "source/asr-result.json",
+                "asr_fix": "source/asr.fix.json",
             },
             "subs": {
                 "subtitle_model": "source/subtitle.model.json",

@@ -9,6 +9,7 @@ NameMap 补全器：使用 LLM 翻译缺失的人名（极简版）
 import json
 from typing import Dict, List, Optional, Any, Callable
 
+from pikppo.prompts import load_prompt
 from pikppo.utils.logger import info, warning
 
 
@@ -16,42 +17,20 @@ def build_name_translation_prompt(
     missing_names: List[str],
 ) -> str:
     """
-    构建人名翻译 Prompt（极简版）。
-    
+    构建人名翻译 Prompt（极简版）。从 YAML 模板加载。
+
     Args:
         missing_names: 需要翻译的人名列表
-    
+
     Returns:
         Prompt 文本
     """
     names_text = "\n".join(f"- {name}" for name in missing_names)
-    
-    prompt = f"""Translate the following Chinese personal names into English.
 
-Rules:
-- Do NOT invent Western names.
-- Do NOT translate meaning.
-- Prefer pinyin or surname-based forms.
-- For honorific prefixes (老/小/阿), convert appropriately:
-  - "老X" → "Mr. X" (older, respectful)
-  - "小X" → "X" or "Little X" (younger, informal)
-  - "阿X" → "X" (informal, given name)
-- Return only the translated names.
-
-Names to translate:
-{names_text}
-
-Output format: JSON object with the following structure:
-{{
-  "老张": "Mr. Zhang",
-  "阿强": "Qiang",
-  "平安": "Ping An"
-}}
-
-Output ONLY valid JSON, no explanations.
-"""
-    
-    return prompt
+    p = load_prompt("mt_name_translate",
+        names_text=names_text,
+    )
+    return p.text
 
 
 def complete_names_with_llm(
@@ -83,8 +62,8 @@ def complete_names_with_llm(
         full_prompt = prompt
     else:
         # OpenAI 的 translate_fn 会自动处理 \n\n 分隔的 system/user 格式
-        # 第一行作为 system，其余作为 user
-        system_content = "You are a professional translator specializing in Chinese name translation. Always output valid JSON only."
+        p = load_prompt("mt_name_translate")
+        system_content = p.system if p.system else "You are a professional translator specializing in Chinese name translation. Always output valid JSON only."
         full_prompt = f"{system_content}\n\n{prompt}"
     
     try:

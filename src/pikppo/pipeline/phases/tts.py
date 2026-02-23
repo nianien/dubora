@@ -7,7 +7,7 @@ TTS Phase: 语音合成（Timeline-First Architecture）
   - tts.report: TTS synthesis report (JSON)
   - tts.voice_assignment: Speaker -> voice mapping
 
-声线分配通过 speaker_to_role.json 解析（由 Sub 阶段自动生成，用户手动编辑）。
+声线分配通过 role_cast.json 解析（speakers/roles/default_roles 统一管理）。
 """
 import json
 import os
@@ -47,7 +47,7 @@ class TTSPhase(Phase):
 
         流程：
         1. 读取 dub.model.json (SSOT for dubbing)
-        2. 通过 speaker_to_role.json 解析声线分配
+        2. 通过 role_cast.json 解析声线分配
         3. TTS per-segment 合成 (VolcEngine)
         4. 生成 tts_report.json
         """
@@ -96,7 +96,7 @@ class TTSPhase(Phase):
 
         # 通用配置
         max_workers = phase_config.get("max_workers", ctx.config.get("tts_max_workers", 4))
-        language = phase_config.get("language", ctx.config.get("tts_language", "en-US"))
+        language = phase_config.get("language", ctx.config.get("azure_tts_language", "en-US"))
 
         # 验证 VolcEngine 配置
         if not volcengine_app_id or not volcengine_access_key:
@@ -127,9 +127,8 @@ class TTSPhase(Phase):
                     ),
                 )
 
-            # 声线映射文件路径（均在 {series}/dub/voices/ 下）
+            # 声线映射文件路径
             voices_dir = workspace_path.parent / "voices"
-            speaker_to_role_path = str(voices_dir / "speaker_to_role.json")
             role_cast_path = str(voices_dir / "role_cast.json")
 
             # 输出路径
@@ -144,9 +143,7 @@ class TTSPhase(Phase):
             result = tts_run_per_segment(
                 dub_manifest=dub_manifest,
                 segments_dir=str(segments_dir),
-                speaker_to_role_path=speaker_to_role_path,
                 role_cast_path=role_cast_path,
-                episode_id=episode_id,
                 volcengine_app_id=volcengine_app_id,
                 volcengine_access_key=volcengine_access_key,
                 volcengine_resource_id=volcengine_resource_id,
