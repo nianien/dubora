@@ -234,7 +234,6 @@ def _call_volcengine_tts(
     response.raise_for_status()
     
     # Collect audio data - 按照官方示例：逐个 chunk 解码并累积字节
-    # 参考 test/tts_http_demo.py 的正确实现
     audio_data = bytearray()  # 使用 bytearray 累积解码后的字节
     sentence_data = None  # Will contain the last sentence response
     chunk_count = 0

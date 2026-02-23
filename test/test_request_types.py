@@ -1,10 +1,5 @@
-#!/usr/bin/env python3
 """测试 request_types 的校验功能"""
-import sys
-from pathlib import Path
-
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "src"))
+import pytest
 
 from pikppo.models.doubao.request_types import (
     DoubaoASRRequest,
@@ -13,41 +8,38 @@ from pikppo.models.doubao.request_types import (
     CorpusConfig,
 )
 
-# 测试校验：vad_segment=True 但 end_window_size=None
-try:
-    req = DoubaoASRRequest(
-        audio=AudioConfig(url='https://example.com/audio.wav', format='wav'),
-        request=RequestConfig(vad_segment=True, end_window_size=None),
-    )
-    req.validate()
-    print('✗ 应该报错但没有')
-except ValueError as e:
-    print(f'✓ 校验1正确: {e}')
 
-# 测试校验：enable_channel_split=True 但 channel=1
-try:
+def _make_request(**request_kwargs) -> DoubaoASRRequest:
+    return DoubaoASRRequest(
+        audio=AudioConfig(url="https://example.com/audio.wav", format="wav"),
+        request=RequestConfig(**request_kwargs),
+    )
+
+
+def test_vad_segment_requires_end_window_size():
+    req = _make_request(vad_segment=True, end_window_size=None)
+    with pytest.raises(ValueError):
+        req.validate()
+
+
+def test_channel_split_requires_multi_channel():
     req = DoubaoASRRequest(
-        audio=AudioConfig(url='https://example.com/audio.wav', format='wav', channel=1),
+        audio=AudioConfig(
+            url="https://example.com/audio.wav", format="wav", channel=1
+        ),
         request=RequestConfig(enable_channel_split=True),
     )
-    req.validate()
-    print('✗ 应该报错但没有')
-except ValueError as e:
-    print(f'✓ 校验2正确: {e}')
+    with pytest.raises(ValueError):
+        req.validate()
 
-# 测试校验：ssd_version 但 enable_speaker_info=False
-try:
-    req = DoubaoASRRequest(
-        audio=AudioConfig(url='https://example.com/audio.wav', format='wav'),
-        request=RequestConfig(ssd_version='200', enable_speaker_info=False),
-    )
-    req.validate()
-    print('✗ 应该报错但没有')
-except ValueError as e:
-    print(f'✓ 校验3正确: {e}')
 
-# 测试 helper 方法
-corpus = CorpusConfig.from_hotwords(['平安', '平安哥', '哥'])
-print(f'✓ CorpusConfig.from_hotwords() 工作正常: {corpus.context[:50]}...')
+def test_ssd_version_requires_speaker_info():
+    req = _make_request(ssd_version="200", enable_speaker_info=False)
+    with pytest.raises(ValueError):
+        req.validate()
 
-print('\n所有测试通过！')
+
+def test_corpus_config_from_hotwords():
+    corpus = CorpusConfig.from_hotwords(["平安", "平安哥", "哥"])
+    assert corpus.context is not None
+    assert len(corpus.context) > 0
