@@ -7,7 +7,7 @@ TTS Phase: 语音合成（Timeline-First Architecture）
   - tts.report: TTS synthesis report (JSON)
   - tts.voice_assignment: Speaker -> voice mapping
 
-声线分配通过 role_cast.json 解析（speakers/roles/default_roles 统一管理）。
+声线分配通过 role_speakers.json 解析（speakers/roles/default_roles 统一管理）。
 """
 import json
 import os
@@ -47,7 +47,7 @@ class TTSPhase(Phase):
 
         流程：
         1. 读取 dub.model.json (SSOT for dubbing)
-        2. 通过 role_cast.json 解析声线分配
+        2. 通过 role_speakers.json 解析声线分配
         3. TTS per-segment 合成 (VolcEngine)
         4. 生成 tts_report.json
         """
@@ -128,8 +128,8 @@ class TTSPhase(Phase):
                 )
 
             # 声线映射文件路径
-            voices_dir = workspace_path.parent / "voices"
-            role_cast_path = str(voices_dir / "role_cast.json")
+            dict_dir = workspace_path.parent / "dict"
+            role_speakers_path = str(dict_dir / "role_speakers.json")
 
             # 输出路径
             segments_dir = outputs.get("tts.segments_dir")
@@ -143,7 +143,7 @@ class TTSPhase(Phase):
             result = tts_run_per_segment(
                 dub_manifest=dub_manifest,
                 segments_dir=str(segments_dir),
-                role_cast_path=role_cast_path,
+                role_speakers_path=role_speakers_path,
                 volcengine_app_id=volcengine_app_id,
                 volcengine_access_key=volcengine_access_key,
                 volcengine_resource_id=volcengine_resource_id,

@@ -265,7 +265,7 @@ class SubtitlePhase(Phase):
             render_srt(segments_for_srt, srt_path)
             info(f"Rendered SRT file to: {srt_path}")
             
-            # Side-effect: 追加新 speaker 到 role_cast.json（剧级文件）
+            # Side-effect: 追加新 speaker 到 role_speakers.json（剧级文件）
             try:
                 unique_speakers = list(dict.fromkeys(
                     utt_dict["speaker"]["id"]
@@ -274,12 +274,12 @@ class SubtitlePhase(Phase):
                 ))
                 if unique_speakers:
                     from pikppo.pipeline.processors.voiceprint.speaker_to_role import update_speakers
-                    voices_dir = workspace_path.parent / "voices"
-                    rc_path = str(voices_dir / "role_cast.json")
+                    dict_dir = workspace_path.parent / "dict"
+                    rc_path = str(dict_dir / "role_speakers.json")
                     episode_id = workspace_path.name
                     update_speakers(unique_speakers, rc_path, episode_id)
             except Exception as e:
-                info(f"Warning: failed to update role_cast.json: {e}")
+                info(f"Warning: failed to update role_speakers.json: {e}")
 
             # 返回 PhaseResult：只声明哪些 outputs 成功
             return PhaseResult(

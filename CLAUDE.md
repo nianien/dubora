@@ -71,13 +71,13 @@ demux → sep → asr → sub → [human review] → mt → align → tts → mi
 ### Voice Mapping (Single File)
 
 ```
-role_cast.json
+role_speakers.json
 speakers: { "pa": "PingAn", ... }     # speaker → role_id
 roles:    { "PingAn": "en_male_...", } # role_id → voice_type
 default_roles: { "male": "LrNan1" }   # fallback by gender
 ```
 
-Located at `{drama_dir}/dub/voices/role_cast.json`. Human-filled for role assignment.
+Located at `{drama_dir}/dub/dict/role_speakers.json`. Human-filled for role assignment.
 
 ### Workspace Layout
 

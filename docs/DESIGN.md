@@ -24,30 +24,61 @@
 
 ```
 demux → sep → asr → sub → [人工校验] → mt → align → tts → mix → burn
-  │       │      │      │                  │      │       │      │      │
-  │       │      │      │                  │      │       │      │      └─ burn.video (成片)
-  │       │      │      │                  │      │       │      └─ mix.audio (混音)
-  │       │      │      │                  │      │       └─ tts/segments/ (逐句音频)
-  │       │      │      │                  │      └─ dub.model.json (SSOT)
-  │       │      │      │                  └─ mt_output.jsonl
-  │       │      │      └─ subtitle.model.json (SSOT)
-  │       │      └─ asr-result.json
-  │       └─ vocals.wav / accompaniment.wav
-  └─ audio.wav
+  |       |      |      |                  |      |       |      |      |
+  |       |      |      |                  |      |       |      |      +-- burn.video (成片)
+  |       |      |      |                  |      |       |      +-- mix.audio (混音)
+  |       |      |      |                  |      |       +-- tts/segments/ (逐句音频)
+  |       |      |      |                  |      +-- dub.model.json (SSOT)
+  |       |      |      |                  +-- mt_output.jsonl
+  |       |      |      +-- subtitle.model.json (SSOT)
+  |       |      +-- asr-result.json
+  |       +-- vocals.wav / accompaniment.wav
+  +-- audio.wav
 ```
 
 9 个阶段严格线性执行，通过 `manifest.json` 记录状态和指纹，支持增量跑。
 
-### 2.2 CLI 用法
+### 2.2 整体分层
+
+```
++-------------------------------------------------------------+
+|  CLI (cli.py)                                               |
+|  run / bless / fix / phases ; config_to_dict -> RunContext  |
++-----------------------------+-------------------------------+
+                              |
++-----------------------------v-------------------------------+
+|  Pipeline Framework (pipeline/core/)                        |
+|  PhaseRunner, Manifest, Fingerprints, Atomic                |
++-----------------------------+-------------------------------+
+                              |
++-----------------------------v-------------------------------+
+|  Phases (pipeline/phases/)       | Processors (stateless)   |
+|  demux->sep->asr->sub->mt->     | 纯计算、可单测            |
+|  align->tts->mix->burn          |                           |
++-----------------------------+-------------------------------+
+                              |
++-----------------------------v-------------------------------+
+|  Schema (schema/)  | Config (config/)  | Models / Infra    |
+|  SSOT 数据模型      | PipelineConfig    | Doubao, OpenAI    |
++-------------------------------------------------------------+
+```
+
+- **Phase**：编排层，实现 `Phase` 抽象（`requires` / `provides` / `run`），负责文件路径解析、读入上游产物、调用 Processor、写回产物并返回 `PhaseResult`。
+- **Processor**：无状态业务逻辑，只做计算，不直接依赖 manifest 或 workspace 路径约定，便于单测与替换。
+- **Runner**：根据 manifest 与 fingerprint 决定是否执行、解析 inputs、分配 outputs、执行 phase、登记 artifact 与状态。
+
+### 2.3 CLI 用法
 
 ```bash
 vsd run video.mp4 --to burn                    # 全流程
 vsd run video.mp4 --from mt --to tts           # 从 mt 强制重跑到 tts
 vsd run video.mp4 --to burn                    # 增量跑（已完成的阶段自动跳过）
 vsd bless video.mp4 sub                        # 手动编辑产物后刷新指纹
+vsd fix video.mp4 asr                          # 从 asr-result.json 重新生成 asr.fix.json
+vsd run videos/drama/4-70.mp4 --to burn        # 批量模式（4-70 集）
 ```
 
-### 2.3 核心数据流（三个 SSOT）
+### 2.4 核心数据流（三个 SSOT）
 
 | SSOT | 产出阶段 | 消费阶段 | 说明 |
 |------|---------|---------|------|
@@ -55,42 +86,42 @@ vsd bless video.mp4 sub                        # 手动编辑产物后刷新指�
 | `subtitle.model.json` | sub | mt, align | 字幕数据源，utterance + cue 结构，支持人工校验 |
 | `dub.model.json` | align | tts, mix | 配音时间轴，包含翻译文本、时长预算、voice 映射 |
 
-### 2.4 文件布局
+### 2.5 文件布局
 
 ```
-videos/dbqsfy/              # 剧级目录
-├── 1.mp4                   # 原视频
-├── dub/
-│   ├── voices/                        # 剧级声线配置
-│   │   ├── speaker_to_role.json       #   按集映射 speaker → 角色名 + 性别兜底
-│   │   └── role_cast.json             #   角色名 → voice_type
-│   ├── dict/
-│   │   └── slang.json                 # 剧级行话词典
-│   └── 1/                             # 集级 workspace
-│       ├── manifest.json              # Pipeline 状态机
-│       ├── source/                    # 🧠 世界事实（SSOT，人工可编辑）
-│       │   ├── asr-result.json        #   ASR 原始输出
-│       │   ├── subtitle.model.json    #   字幕 SSOT（bless 后可手改）
-│       │   └── dub.model.json         #   配音 SSOT（align 生成）
-│       ├── derive/                    # 🧮 确定性派生（可重算）
-│       │   ├── subtitle.align.json    #   时间对齐结果
-│       │   └── voice-assignment.json  #   声线分配快照（resolved snapshot）
-│       ├── mt/                        # 🤖 翻译产物（LLM 不稳定）
-│       │   ├── mt_input.jsonl
-│       │   └── mt_output.jsonl
-│       ├── tts/                       # 🤖 合成产物
-│       │   ├── segments/              #   逐句 TTS 音频
-│       │   ├── segments.json          #   段索引（utt_id → wav/voice/duration/hash）
-│       │   └── tts_report.json
-│       ├── audio/                     # 🔊 声学工程
-│       │   ├── 1.wav                  #   原始音频
-│       │   ├── 1-vocals.wav           #   人声
-│       │   ├── 1-accompaniment.wav    #   伴奏
-│       │   └── 1-mix.wav             #   最终混音
-│       └── render/                    # 🎬 最终交付物
-│           ├── en.srt                 #   英文字幕（burn 消费）
-│           ├── zh.srt                 #   中文字幕
-│           └── 1-dubbed.mp4           #   成片
+videos/{剧名}/                  # 剧级目录
++-- 1.mp4                      # 原视频
++-- dub/
+    +-- dict/                           # 剧级词典 + 声线配置
+    |   +-- role_speakers.json          #   统一声线映射（speakers + roles + default_roles）
+    |   +-- slang.json                  #   行话词典
+    |   +-- names.json                  #   人名词典（中文 -> 英文）
+    +-- 1/                              # 集级 workspace
+        +-- manifest.json               # Pipeline 状态机
+        +-- source/                     # SSOT（人工可编辑）
+        |   +-- asr-result.json         #   ASR 原始输出
+        |   +-- asr.fix.json            #   人工校准层（speaker/text/时间轴修正）
+        |   +-- subtitle.model.json     #   字幕 SSOT（bless 后可手改）
+        |   +-- dub.model.json          #   配音 SSOT（align 生成）
+        +-- derive/                     # 确定性派生（可重算）
+        |   +-- subtitle.align.json     #   时间对齐结果
+        |   +-- voice-assignment.json   #   声线分配快照
+        +-- mt/                         # 翻译产物（LLM 输出）
+        |   +-- mt_input.jsonl
+        |   +-- mt_output.jsonl
+        +-- tts/                        # 合成产物
+        |   +-- segments/               #   逐句 TTS 音频
+        |   +-- segments.json           #   段索引
+        |   +-- tts_report.json
+        +-- audio/                      # 声学工程
+        |   +-- 1.wav                   #   原始音频
+        |   +-- 1-vocals.wav            #   人声
+        |   +-- 1-accompaniment.wav     #   伴奏
+        |   +-- 1-mix.wav               #   最终混音
+        +-- render/                     # 最终交付物
+            +-- en.srt                  #   英文字幕
+            +-- zh.srt                  #   中文字幕
+            +-- 1-dubbed.mp4            #   成片
 ```
 
 目录按语义角色分层：`source/` 是人工可编辑的事实，`derive/` 是可重算的派生，`mt/`/`tts/` 是模型产物，`audio/` 是声学工程，`render/` 是最终交付。
@@ -113,26 +144,34 @@ class Phase(ABC):
     def run(ctx, inputs, outputs) -> PhaseResult
 ```
 
-Phase 只声明输出，Runner 负责路径分配、指纹计算和 manifest 注册。
+Phase 只声明输出，Runner 负责路径分配、指纹计算和 manifest 注册。Phases 通过 `_LazyPhase` 延迟加载，避免在不需要的阶段导入重型依赖（如 torchaudio）。
 
 ### 3.2 增量执行（should_run 决策）
 
 Runner 的 7 级检查决定是否跳过：
 
 1. `force` 标记（`--from` 指定的阶段及之后）
-2. manifest 中无记录 → 跑
-3. `phase.version` 变化 → 跑
-4. 输入 artifact 指纹变化（上游产物内容变了） → 跑
-5. config 指纹变化 → 跑
-6. **输出文件指纹不匹配** → 跑（人工编辑会触发）
-7. status != succeeded → 跑
+2. manifest 中无记录 -> 跑
+3. `phase.version` 变化 -> 跑
+4. 输入 artifact 指纹变化（上游产物内容变了） -> 跑
+5. config 指纹变化 -> 跑
+6. **输出文件指纹不匹配** -> 跑（人工编辑会触发）
+7. status != succeeded -> 跑
 
 **`vsd bless` 命令**：人工编辑 subtitle.model.json 后，运行 `vsd bless video.mp4 sub` 刷新 manifest 中的输出指纹，避免 sub 阶段被重跑。
 
 ### 3.3 Processor / Phase 分离
 
-- **Processor**：无状态纯业务逻辑，不做文件 I/O
-- **Phase**：编排层，负责读输入、调 processor、写输出、更新 manifest
+- **Processor**（`pipeline/processors/`）：无状态纯业务逻辑，不做文件 I/O
+- **Phase**（`pipeline/phases/`）：编排层，负责读输入、调 processor、写输出、更新 manifest
+
+### 3.4 消除缓存幽灵的三条规则
+
+| 规则 | 约定 |
+|------|------|
+| **Rule A** | 任何**影响输出的逻辑变更**，必须 bump 对应 `phase.version` |
+| **Rule B** | 任何**影响输出的配置变更**，必须进入 config fingerprint |
+| **Rule C** | 任何**人工修改 SSOT**，必须对对应 phase 执行 `vsd bless` |
 
 ---
 
@@ -143,60 +182,66 @@ Runner 的 7 级检查决定是否跳过：
 | | |
 |---|---|
 | **输入** | 原视频 mp4 |
-| **输出** | `demux.audio` → WAV (16k, mono, PCM s16le) |
-| **实现** | ffmpeg 一行命令 |
+| **输出** | `demux.audio` -> WAV (16k, mono, PCM s16le) |
+| **实现** | FFmpeg |
 
 ### 4.2 Sep（人声分离）
 
 | | |
 |---|---|
 | **输入** | `demux.audio` |
-| **输出** | `sep.vocals` (人声), `sep.vocals_16k` (16k 人声), `sep.accompaniment` (伴奏) |
+| **输出** | `sep.vocals` (人声), `sep.accompaniment` (伴奏) |
 | **实现** | Demucs htdemucs v4（本地 GPU/CPU） |
 
-**问题与取舍**：
-- Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU）
-- 但它显著提升 ASR 准确率和混音质量，值得
-- 未来可用 GPU 加速或换更快的分离模型
+Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU），但显著提升 ASR 准确率和混音质量。
 
 ### 4.3 ASR（语音识别 + 说话人分离）
 
 | | |
 |---|---|
-| **输入** | `demux.audio` |
-| **输出** | `asr.asr_result` → JSON (原始 ASR 响应) |
+| **输入** | `demux.audio`（可配置为 `sep.vocals`） |
+| **输出** | `asr.asr_result` -> JSON (原始 ASR 响应) |
 | **服务** | 豆包大模型 ASR (ByteDance) |
-| **预设** | `asr_vad_spk`（VAD 分句 + Speaker Diarization） |
+| **预设** | `asr_spk_semantic`（语义分句 + Speaker Diarization） |
 
 **流程**：
 1. 音频上传至 TOS（火山引擎对象存储），基于内容哈希去重
-2. 调用豆包 ASR API（submit → poll query）
+2. 调用豆包 ASR API（submit -> poll query）
 3. 返回 word 级时间戳 + speaker 标签 + emotion/gender
-
-**问题与取舍**：
-- 原始设计用 Google STT，实际切换到豆包 ASR（中文识别更准、成本更低）
-- Diarization 存在误判：同一人物可能被分为多个 speaker（需人工校验 subtitle.model.json）
-- 短句/语气词容易 speaker 漂移
 
 ### 4.4 Sub（字幕模型生成）
 
 | | |
 |---|---|
 | **输入** | `asr.asr_result` |
-| **输出** | `subs.subtitle_model` (SSOT v1.3), `subs.zh_srt`, `subs.en_srt`（首次为空） |
-| **核心逻辑** | Utterance Normalization → Subtitle Model Build → SRT Render |
+| **输出** | `subs.subtitle_model` (SSOT v1.3), `subs.zh_srt` |
+| **核心逻辑** | Utterance Normalization -> Subtitle Model Build -> SRT Render |
 
-**Subtitle Model v1.3 结构**（speaker 提升为对象）：
+**双数据源模式**：当 `asr.fix.json` 存在时：
+- Word 级时间轴来自 `asr-result.json`（时间骨架）
+- Speaker/text 来自 `asr.fix.json`（人工校准层）
+- 归一化用校准后的 speaker 做切分边界
+
+**asr.fix.json 操作类型**：
+
+| 操作 | 说明 | 示例 |
+|------|------|------|
+| 编辑 | 指定 idx，修改 text/speaker | `{"idx": 3, "speaker": "pa", "text": "..."}` |
+| 拆分 | 同一 idx 多条 | `{"idx": 5, "text": "前半"}, {"idx": 5, "text": "后半"}` |
+| 删除 | 原始 utterance 的 idx 不出现在 fix 中 | 跳过 idx=6 |
+| 插入 | 指定 start/end 时间（支持 MM:SS 格式） | `{"speaker": "by", "text": "...", "start": "01:15", "end": "01:20"}` |
+
+**Subtitle Model v1.3 结构**：
 
 ```json
 {
   "schema": {"name": "subtitle.model", "version": "1.3"},
-  "audio": {"lang": "zh-CN", "duration_ms": 167000},
+  "audio": {"duration_ms": 95480},
   "utterances": [
     {
       "utt_id": "utt_0001",
       "speaker": {
-        "id": "spk_1",
+        "id": "pa",
         "gender": "male",
         "speech_rate": {"zh_tps": 4.2},
         "emotion": {"label": "sad", "confidence": 0.85, "intensity": "moderate"}
@@ -212,40 +257,34 @@ Runner 的 7 级检查决定是否跳过：
 }
 ```
 
-**Utterance Normalization**：ASR 的 utterance 边界不稳定，normalization 从 word 级时间戳重建边界：
-- 基于静音间隔（≥450ms，可配置）拆分
-- **Speaker 变化硬边界**：不同 speaker 的 word 永远不合并到同一 utterance
-- 最大时长约束（默认 8000ms，避免超长 utterance）
-- 附加标点：ASR word 级数据无标点，从 utterance 文本反推附加到 word
+**Utterance Normalization**：ASR 的 utterance 边界不稳定，从 word 级时间戳重建边界：
+- 基于静音间隔（>=450ms，可配置）拆分
+- Speaker 变化硬边界：不同 speaker 的 word 永远不合并到同一 utterance
+- 最大时长约束（默认 8000ms）
+- 附加标点：从 utterance 文本反推附加到 word
 
-**Gender 数据流**：gender 在 ASR 阶段识别，作为 speaker 级属性一路向下传递：
-```
-asr-result.json → extract_all_words (speaker_gender_map)
-  → normalize_utterances (NormalizedUtterance.gender)
-    → build_subtitle_model (SpeakerInfo.gender)
-      → subtitle.model.json → align → dub.model.json → TTS 性别兜底
-```
-
-**问题与取舍**：
-- ASR 的 speaker 标签偶有错误，需人工在 subtitle.model.json 中修正
-- 修正后用 `vsd bless video.mp4 sub` 刷新指纹，再从 mt 重跑
-- Word 级 ASR 无标点是已知限制，当前用启发式方法从 utterance 文本附加
-
-**副作用**：Sub 阶段完成后会自动更新 `speaker_to_role.json`（剧级文件），收集本集出现的所有 speaker。
+**副作用**：Sub 阶段完成后会自动更新 `role_speakers.json` 的 `speakers` 字段，收集本集出现的所有 speaker。
 
 ### 4.5 MT（机器翻译）
 
 | | |
 |---|---|
-| **输入** | `subs.subtitle_model` |
+| **输入** | `subs.subtitle_model`, `asr.asr_result` |
 | **输出** | `mt.mt_input` (JSONL), `mt.mt_output` (JSONL) |
-| **服务** | OpenAI GPT-4o / Google Gemini 2.0 Flash |
+| **服务** | Google Gemini 2.0 Flash / OpenAI GPT-4o-mini |
 
 **翻译策略**：
-- 按 utterance 粒度逐句翻译（不做整集批翻）
+- 按 utterance 粒度逐句翻译
 - 整集上下文从 `asr-result.json` 的 `result.text` 获取
-- Per-utterance 词典匹配：只在当前句命中时才注入 glossary 到 prompt
-- 条件性领域提示：只在当前句包含牌桌关键词时才注入赌博语境提示
+- Per-utterance 词典匹配：只在当前句命中时才注入 glossary
+
+**人名处理（NameGuard + DictLoader）**：
+- **NameGuard**：从中文文本中提取人名，替换为占位符 `<<NAME_0:平安>>` 后发给 LLM
+- **DictLoader**：管理 `dub/dict/` 下的词典文件
+  - `names.json`：人名映射（`{"平安": "Ping An"}`，简单 key-value 格式）
+  - `slang.json`：行话/术语词典
+- names.json 的 key 自动同步到 NameGuard 白名单，确保人工添加的人名一定被识别
+- LLM 自动补全未知人名（first-write-wins 策略，写入 names.json）
 
 **词典系统** (`dub/dict/slang.json`)：
 ```json
@@ -256,30 +295,26 @@ asr-result.json → extract_all_words (speaker_gender_map)
 }
 ```
 
-**问题与取舍**：
-- 早期设计用全局 glossary 注入（"MUST follow EXACTLY"），导致非牌桌台词被污染（"哈哈哈，师傅" → "Got your ace right here"）
-- 已修复为 per-utterance 匹配 + 条件领域提示，消除交叉污染
-- 原始设计有 `<sep>` 分隔符和 `<<NAME_i:原文>>` 占位符方案，实际实现简化为直接翻译
-
 ### 4.6 Align（时间轴对齐 + 重断句）
 
 | | |
 |---|---|
 | **输入** | `subs.subtitle_model`, `mt.mt_output`, `demux.audio` |
-| **输出** | `subs.subtitle_align` (derive/), `subs.en_srt` (render/), `dub.dub_manifest` (source/dub.model.json) |
+| **输出** | `subs.subtitle_align`, `subs.en_srt`, `dub.dub_manifest` |
 
 **核心职责**：
-1. 将英文翻译映射回原始中文时间轴
+1. 将英文翻译映射回原始中文时间轴（不修改时间边界）
 2. 计算 TTS 时长预算（`budget_ms = end_ms - start_ms`）
-3. 允许 `end_ms` 微延长（不超过 200ms，不与下一句重叠）
-4. 在 utterance 内重断句生成 en.srt 的字幕条
+3. 动态 `allow_extend_ms`（不与下一句重叠）
+4. 在 utterance 内重断句生成 en.srt
 5. 生成 `dub.model.json`（TTS 和 Mix 的输入合约）
+6. `audio_duration_ms` 通过 ffprobe 从实际音频获取（非推断）
 
 **DubManifest 结构**（`source/dub.model.json`）：
 
 ```json
 {
-  "audio_duration_ms": 167000,
+  "audio_duration_ms": 95480,
   "utterances": [
     {
       "utt_id": "utt_0001",
@@ -287,10 +322,10 @@ asr-result.json → extract_all_words (speaker_gender_map)
       "budget_ms": 1240,
       "text_zh": "坐牢十年，",
       "text_en": "Ten years in prison...",
-      "speaker": "spk_1",
+      "speaker": "pa",
       "gender": "male",
       "emotion": {"label": "sad", "confidence": 0.85, "intensity": "moderate"},
-      "tts_policy": {"max_rate": 1.3}
+      "tts_policy": {"max_rate": 1.3, "allow_extend_ms": 500}
     }
   ]
 }
@@ -300,24 +335,23 @@ asr-result.json → extract_all_words (speaker_gender_map)
 
 | | |
 |---|---|
-| **输入** | `dub.dub_manifest`, speaker_to_role.json, role_cast.json |
-| **输出** | `tts.segments_dir` (逐句 WAV), `tts.segments_index` (段索引), `tts.report`, `tts.voice_assignment` |
+| **输入** | `dub.dub_manifest`, `role_speakers.json` |
+| **输出** | `tts.segments_dir`, `tts.segments_index`, `tts.report`, `tts.voice_assignment` |
 | **服务** | 火山引擎 TTS (VolcEngine seed-tts-1.0) |
-| **API 文档** | https://www.volcengine.com/docs/6561/1257544?lang=zh |
-| **音色试听** | https://console.volcengine.com/speech/new/voices?projectName=default |
 
-**两层声线映射 + 性别兜底**：
+**声线映射（单文件 role_speakers.json）**：
 
+```json
+{
+  "roles":    { "PingAn": "en_male_hades_moon_bigtts", ... },
+  "default_roles": { "male": "LrNan1", "female": "LrNv1", "unknown": "LrNan1" },
+  "speakers": { "pa": "PingAn", "el": "ErLv", ... }
+}
 ```
-speaker_to_role.json                    role_cast.json              VolcEngine API
-  episodes.1.spk_1 → "Ping_An"     →    "ICL_en_male_zayne_tob"   → speaker 参数
-  episodes.1.spk_9 → ""(未标注)    →    default_roles[gender]     → 按性别兜底
-```
 
-1. `speaker_to_role.json`（剧级，按集分 key，人工填写）：`spk_1` → `"Ping_An"`
-2. `role_cast.json`（剧级，人工填写）：`"Ping_An"` → `"ICL_en_male_zayne_tob"`
-3. 未标注的 speaker 按性别走 `default_roles`（male/female/unknown → 对应角色 → voice_type）
-4. TTS 阶段 resolve：读两层映射，得到每个 speaker 的 voice_type
+解析链路：
+- 已标注：`speaker -> role_id -> voice_type`（如 `pa -> PingAn -> en_male_hades_moon_bigtts`）
+- 未标注：`speaker -> default_roles[gender] -> role_id -> voice_type`
 
 **合成流程**：
 - 并行逐句合成（默认 4 workers）
@@ -325,18 +359,14 @@ speaker_to_role.json                    role_cast.json              VolcEngine A
 - 语速调整：若 TTS 时长超过 budget，加速到 max_rate（1.3x）
 - Episode 级缓存：相同 text + voice 的 TTS 结果复用
 
-**产物说明**：
+**产物**：
 
 | 产物 | 路径 | 说明 |
 |------|------|------|
 | `tts.segments_dir` | `tts/segments/` | 逐句 WAV 文件 |
-| `tts.segments_index` | `tts/segments.json` | 段索引：`utt_id → { wav_path, voice_id, role_id, duration_ms, rate, hash }` |
-| `tts.voice_assignment` | `derive/voice-assignment.json` | 声线分配快照（resolved snapshot）：speaker → voice_type + role_id |
-| `tts.report` | `tts/tts_report.json` | 诊断报告：raw/trimmed/final 时长、rate、status |
-
-**问题与取舍**：
-- 原始设计用 Azure Neural TTS（8 条固定美式声线池），实际切换到火山引擎 TTS（成本更低、中文生态更好）
-- 原始设计用 pitch 检测自动判性别 → 实际采用人工指定 + 性别兜底（更准确、更可控）
+| `tts.segments_index` | `tts/segments.json` | 段索引：utt_id -> wav/voice/duration/hash |
+| `tts.voice_assignment` | `derive/voice-assignment.json` | 声线分配快照 |
+| `tts.report` | `tts/tts_report.json` | 诊断报告 |
 
 ### 4.8 Mix（混音）
 
@@ -348,167 +378,113 @@ speaker_to_role.json                    role_cast.json              VolcEngine A
 
 **Timeline-First 架构**：
 - 用 FFmpeg `adelay` 滤镜将每段 TTS 精确放置到时间轴位置
-- 不做全局拼接后拉伸（这是 v0 的致命 bug）
-- 伴奏轨 + TTS 轨混合，TTS 播放时伴奏自动压低（ducking）
+- 伴奏轨 + TTS 轨混合，TTS 播放时伴奏自动压低（ducking，10:1 压缩比）
 - `apad + atrim` 强制输出与原音频等长
-
-**问题与取舍**：
-- v0 用"全部 TTS concat → 全局 time-stretch"，导致字幕时间越来越偏
-- v1 改为逐段 adelay 精确放置，彻底解决对齐问题
-- 混音目标：-16 LUFS（短视频标准），True Peak -1.5 dB
+- 混音目标：-16 LUFS（EBU R128），True Peak -1.5 dB
 
 ### 4.9 Burn（字幕烧录）
 
 | | |
 |---|---|
 | **输入** | `mix.audio`, `subs.en_srt` |
-| **输出** | `burn.video` → 最终成片 mp4 |
+| **输出** | `burn.video` -> 最终成片 mp4 |
 | **实现** | FFmpeg subtitles 滤镜硬烧 |
 
-原视频画面 + 混音音频 + 英文字幕 → 成片。
-
 ---
 
-## 5. 外部服务依赖
+## 5. 人工校准层（asr.fix.json）
 
-| 服务 | 用途 | 环境变量 | 成本预估 |
-|------|------|---------|---------|
-| **豆包 ASR** | 中文语音识别 + 说话人分离 | `DOUBAO_APPID`, `DOUBAO_ACCESS_TOKEN` | ~¥0.05/分钟 |
-| **火山引擎 TOS** | 音频文件存储（ASR 需要） | `TOS_ACCESS_KEY_ID`, `TOS_SECRET_ACCESS_KEY` | 极低 |
-| **火山引擎 TTS** | 英文语音合成（[API 文档](https://www.volcengine.com/docs/6561/1257544?lang=zh) / [音色试听](https://console.volcengine.com/speech/new/voices?projectName=default)） | 同豆包 credentials | ~¥0.02/千字符 |
-| **OpenAI** | 翻译（GPT-4o / 4o-mini） | `OPENAI_API_KEY` | ~$0.003-0.01/集 |
-| **Gemini** | 翻译（备选引擎） | `GEMINI_API_KEY` | 类似 |
-| **Demucs** | 人声分离 | 本地 | 免费（CPU/GPU 计算） |
-| **FFmpeg** | 音频/视频处理 | 本地 | 免费 |
+`source/asr.fix.json` 是人工对 ASR 结果的校准文件，**不在 manifest 中**（从磁盘直接读取，修改不会触发 ASR 重跑）。
 
-单集总成本约 ¥0.3-0.5（不含计算资源）。
+**支持的时间格式**：
+- 整数毫秒：`40920`
+- MM:SS：`"00:40"`
+- MM:SS.frac：`"00:40.9"`
+- H:MM:SS：`"1:01:23"`
 
----
-
-## 6. 已解决的问题
-
-### 6.1 字幕时间对不上（v0 → v1）
-- **根因**：v0 将所有 TTS 段无缝 concat 后全局 time-stretch，gap 丢失导致越来越偏
-- **解决**：v1 Timeline-First 架构，用 adelay 逐段精确放置
-
-### 6.2 人物音色全乱（v0 → v1）
-- **根因**：v0 用 pitch 检测自动判性别，短剧场景（混响/情绪大）下 pyin 频繁失败
-- **解决**：v1 改为人工指定 speaker_to_role + role_cast + 性别兜底，100% 可控
-
-### 6.3 翻译污染（"师傅" → "Got your ace right here"）
-- **根因**：全局 glossary（"MUST follow EXACTLY"）+ 全局赌博领域提示污染所有句子
-- **解决**：per-utterance glossary 匹配 + 条件领域提示，只在命中时注入
-
-### 6.4 中文字幕标点丢失
-- **根因**：ASR word 级数据无标点，NormalizedUtterance.text 直接 join words 导致标点消失
-- **解决**：`_attach_trailing_punctuation()` 从 utterance 文本反推标点附加到对应 word
-
-### 6.5 手动编辑触发重跑
-- **根因**：should_run 检查输出文件指纹，手动编辑 → 指纹不匹配 → 阶段重跑覆盖编辑
-- **解决**：`vsd bless` 命令刷新 manifest 指纹
-
-### 6.6 Gender 丢失导致 TTS 兜底失败（v1.2 → v1.3）
-- **根因**：Utterance Normalization 会拆分/合并 utterance，导致时间边界与 raw response 不匹配，基于时间匹配回查 gender 失败（null）
-- **解决**：gender 作为 speaker 级属性，在 `extract_all_words_from_raw_response` 阶段一次性构建 `speaker_gender_map`，随 NormalizedUtterance 一路传递，不再依赖时间匹配
-
-### 6.7 不同 Speaker 的词被合并到同一 Utterance
-- **根因**：`_split_by_silence` 只按静音间隔拆分，不检查 speaker 变化，导致不同角色的台词混入同一 utterance
-- **解决**：speaker 变化作为硬边界，与静音拆分同级处理
-
----
-
-## 7. 当前限制与未来改进
-
-### 7.1 Speaker Diarization 准确率
-- **现状**：ASR diarization 偶有错误，需人工校验 subtitle.model.json
-- **改进方向**：
-  - Voiceprint 阶段（已有框架）：用声纹嵌入做 speaker re-identification
-  - 跨集 speaker 一致性：同一角色在不同集保持同一 speaker ID
-
-### 7.2 翻译质量
-- **现状**：逐句翻译，缺乏跨句上下文理解
-- **改进方向**：
-  - 滑动窗口：翻译时带入前后 N 句
-  - 术语自动抽取：从整集 ASR 文本自动构建 glossary
-  - 翻译一致性校验：同一人名/术语在全集中保持一致
-
-### 7.3 TTS 自然度
-- **现状**：声线池模式，不做原演员克隆
-- **改进方向**：
-  - Voice cloning（ICL 模式）：用原演员音频片段做参考
-  - 情绪控制：根据 ASR emotion 标签调整 TTS 情绪参数
-  - 语速自适应：根据原始语速动态调整 TTS 语速
-
-### 7.4 Pipeline 自动化
-- **现状**：需要人工填写 speaker_to_role.json 和 role_cast.json
-- **改进方向**：
-  - 自动性别检测 → 自动分配声线池
-  - Web UI：可视化编辑 speaker 映射和翻译结果
-  - 批量处理：整剧自动化（多集并行）
-
-### 7.5 性能
-- **现状**：Demucs 是瓶颈（CPU 模式下 2 分钟音频需 3-10 分钟）
-- **改进方向**：
-  - GPU 加速 Demucs
-  - TTS 缓存优化：跨集复用高频短句
-  - 并行化：多集同时处理
-
----
-
-## 8. 安装与配置
-
-### 8.1 依赖安装
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dub]"
+**示例**：
+```json
+{
+  "schema": {"name": "asr.fix", "version": "1.0"},
+  "utterances": [
+    {"idx": 0, "speaker": "pa", "text": "我弃牌。"},
+    {"idx": 1, "speaker": "wmz", "text": "白爷，他上了。"},
+    {"speaker": "by", "text": "内心独白", "start": "01:15", "end": "01:20"}
+  ]
+}
 ```
 
-### 8.2 环境变量 (.env)
-
-```bash
-# 豆包 ASR + TTS
-DOUBAO_APPID=your_appid
-DOUBAO_ACCESS_TOKEN=your_access_token
-
-# TOS 存储
-TOS_ACCESS_KEY_ID=your_key
-TOS_SECRET_ACCESS_KEY=your_secret
-TOS_REGION=cn-beijing
-TOS_BUCKET=pikppo-video
-
-# 翻译引擎（二选一或都配）
-OPENAI_API_KEY=sk-xxx
-GEMINI_API_KEY=xxx
-```
-
-### 8.3 剧级配置
-
-运行前需在 `videos/{剧名}/dub/` 下准备：
-
-1. `voices/role_cast.json`：角色 → voice_type 映射
-2. `dict/slang.json`：行话词典（可选）
-
-`voices/speaker_to_role.json` 由 sub 阶段自动生成（按集填充 speaker 列表），人工填写 speaker → 角色名。未标注的 speaker 按 `default_roles` 中的性别兜底。
+- 有 `start`/`end` 的条目自动视为**插入**（忽略 idx 值）
+- 同时支持 `start`/`end` 和 `start_ms`/`end_ms` 两种 key
 
 ---
 
-## 9. 典型工作流
+## 6. 外部服务依赖
+
+| 服务 | 用途 | 环境变量 |
+|------|------|---------|
+| **豆包 ASR** | 中文语音识别 + 说话人分离 | `DOUBAO_APPID`, `DOUBAO_ACCESS_TOKEN` |
+| **火山引擎 TOS** | 音频文件存储（ASR 需要） | `TOS_ACCESS_KEY_ID`, `TOS_SECRET_ACCESS_KEY` |
+| **火山引擎 TTS** | 英文语音合成 | 同豆包 credentials |
+| **OpenAI** | 翻译（GPT-4o-mini） | `OPENAI_API_KEY` |
+| **Gemini** | 翻译（Gemini 2.0 Flash，默认引擎） | `GEMINI_API_KEY` |
+| **Demucs** | 人声分离 | 本地 |
+| **FFmpeg** | 音频/视频处理 | 本地 |
+
+---
+
+## 7. 配置（PipelineConfig）
+
+```python
+@dataclass
+class PipelineConfig:
+    # ASR
+    doubao_asr_preset: str = "asr_spk_semantic"
+    doubao_hotwords: list[str] = ["平安", "平安哥", "于平安"]
+    asr_use_vocals: bool = False
+
+    # SUB（Utterance Normalization）
+    doubao_postprofile: str = "axis"
+    utt_norm_silence_split_threshold_ms: int = 450
+    utt_norm_min_duration_ms: int = 900
+    utt_norm_max_duration_ms: int = 8000
+    utt_norm_trailing_silence_cap_ms: int = 350
+
+    # MT
+    gemini_model: str = "gemini-2.0-flash"
+    openai_model: str = "gpt-4o-mini"
+    openai_temperature: float = 0.3
+
+    # TTS
+    tts_engine: str = "volcengine"
+    tts_max_workers: int = 4
+    tts_volume: float = 1.4
+    azure_tts_language: str = "en-US"
+
+    # MIX
+    dub_target_lufs: float = -16.0
+    dub_true_peak: float = -1.5
+```
+
+---
+
+## 8. 典型工作流
 
 ```bash
-# 1. 首次全流程（到 sub 暂停）
-vsd run videos/dbqsfy/1.mp4 --to sub
+# 1. 首次全流程（到 sub 暂停，检查 ASR 质量）
+vsd run videos/drama/1.mp4 --to sub
 
-# 2. 检查 source/subtitle.model.json，修正 speaker 错误
-#    检查 voices/speaker_to_role.json，填写角色名
+# 2. 人工校准
+#    - 编辑 source/asr.fix.json（修正 speaker、文本、插入遗漏台词）
+#    - 编辑 dict/role_speakers.json（分配角色声线）
+#    - 编辑 dict/names.json（人名映射）
 
-# 3. 刷新指纹
-vsd bless videos/dbqsfy/1.mp4 sub
+# 3. 从 sub 重跑（asr.fix.json 变更需要重跑 sub）
+vsd run videos/drama/1.mp4 --from sub --to burn
 
-# 4. 继续跑完
-vsd run videos/dbqsfy/1.mp4 --to burn
+# 4. 如果只改了翻译相关（names.json / slang.json），从 mt 重跑
+vsd run videos/drama/1.mp4 --from mt --to burn
 
-# 5. 如果翻译不满意，从 mt 重跑
-vsd run videos/dbqsfy/1.mp4 --from mt --to burn
+# 5. 批量处理
+vsd run videos/drama/1-79.mp4 --to burn
 ```

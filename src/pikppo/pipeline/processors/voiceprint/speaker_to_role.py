@@ -1,7 +1,7 @@
 """
-声线分配（统一 role_cast.json）
+声线分配（统一 role_speakers.json）
 
-数据结构（单文件 role_cast.json）：
+数据结构（单文件 role_speakers.json）：
 {
   "speakers": { "pa": "PingAn", "el": "ErLv", ... },
   "roles":    { "PingAn": "en_male_hades_moon_bigtts", ... },
@@ -23,8 +23,8 @@ from typing import Dict, List, Any, Optional
 from pikppo.utils.logger import info
 
 
-def _load_role_cast(file_path: str) -> Dict[str, Any]:
-    """加载 role_cast.json，返回完整数据。不存在则返回空骨架。"""
+def _load_role_speakers(file_path: str) -> Dict[str, Any]:
+    """加载 role_speakers.json，返回完整数据。不存在则返回空骨架。"""
     path = Path(file_path)
     if not path.exists():
         return {
@@ -41,7 +41,7 @@ def _load_role_cast(file_path: str) -> Dict[str, Any]:
     if isinstance(roles, list):
         data["roles"] = {e["role_id"]: e["voice_type"] for e in roles if e.get("role_id")}
 
-    # 兼容旧版无 speakers 字段（纯 role_cast 文件）
+    # 兼容旧版无 speakers 字段
     if "speakers" not in data:
         data["speakers"] = {}
     if "default_roles" not in data:
@@ -50,8 +50,8 @@ def _load_role_cast(file_path: str) -> Dict[str, Any]:
     return data
 
 
-def _save_role_cast(data: Dict[str, Any], file_path: str) -> None:
-    """原子写入 role_cast.json。"""
+def _save_role_speakers(data: Dict[str, Any], file_path: str) -> None:
+    """原子写入 role_speakers.json。"""
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -66,16 +66,16 @@ def update_speakers(
     episode_id: str = "",
 ) -> None:
     """
-    追加新 speaker 到 role_cast.json（只添加，不覆盖已有赋值）。
+    追加新 speaker 到 role_speakers.json（只添加，不覆盖已有赋值）。
 
     Sub 阶段完成后调用。
 
     Args:
         speakers: 本集发现的 speaker 列表
-        file_path: role_cast.json 路径
+        file_path: role_speakers.json 路径
         episode_id: 集编号（仅用于日志）
     """
-    data = _load_role_cast(file_path)
+    data = _load_role_speakers(file_path)
     speaker_map = data["speakers"]
 
     added = []
@@ -84,13 +84,13 @@ def update_speakers(
             speaker_map[spk] = ""
             added.append(spk)
 
-    _save_role_cast(data, file_path)
+    _save_role_speakers(data, file_path)
 
     tag = f"[ep={episode_id}]" if episode_id else ""
     if added:
-        info(f"role_cast{tag}: added {len(added)} new speakers: {added}")
+        info(f"role_speakers{tag}: added {len(added)} new speakers: {added}")
     else:
-        info(f"role_cast{tag}: no new speakers")
+        info(f"role_speakers{tag}: no new speakers")
 
 
 def resolve_voice_assignments(
@@ -98,16 +98,16 @@ def resolve_voice_assignments(
     speaker_genders: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
-    从 role_cast.json 解析 speaker → voice_type 映射。
+    从 role_speakers.json 解析 speaker → voice_type 映射。
 
     Args:
-        file_path: role_cast.json 路径
+        file_path: role_speakers.json 路径
         speaker_genders: speaker → gender 映射（"male"/"female"/"unknown"）
 
     Returns:
         { "pa": {"voice_type": "en_male_...", "role_id": "PingAn"}, ... }
     """
-    data = _load_role_cast(file_path)
+    data = _load_role_speakers(file_path)
     speaker_map = data.get("speakers", {})
     roles = data.get("roles", {})
     default_roles = data.get("default_roles", {})
@@ -123,12 +123,12 @@ def resolve_voice_assignments(
             role_id = default_roles.get(gender, default_roles.get("unknown", ""))
 
         if not role_id:
-            info(f"role_cast: speaker '{speaker}' has no role assigned, skipping")
+            info(f"role_speakers: speaker '{speaker}' has no role assigned, skipping")
             continue
 
         voice_type = roles.get(role_id)
         if not voice_type:
-            info(f"role_cast: role '{role_id}' not found in roles for speaker '{speaker}'")
+            info(f"role_speakers: role '{role_id}' not found in roles for speaker '{speaker}'")
             continue
 
         result[speaker] = {

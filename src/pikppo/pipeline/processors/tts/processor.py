@@ -3,10 +3,10 @@ TTS Processor: 语音合成（唯一对外入口）
 
 职责：
 - 接收 Phase 层的输入（dub_manifest）
-- 通过 role_cast.json 解析声线分配
+- 通过 role_speakers.json 解析声线分配
 - 合成语音并返回 ProcessorResult（不负责文件 IO）
 
-声线解析链路（单文件 role_cast.json）：
+声线解析链路（单文件 role_speakers.json）：
   speakers: pa → "PingAn"
   roles:    "PingAn" → voice_type
   未标注 → default_roles[gender] → voice_type
@@ -27,7 +27,7 @@ def run_per_segment(
     dub_manifest: DubManifest,
     segments_dir: str,
     *,
-    role_cast_path: Optional[str] = None,
+    role_speakers_path: Optional[str] = None,
     # VolcEngine parameters
     volcengine_app_id: Optional[str] = None,
     volcengine_access_key: Optional[str] = None,
@@ -45,7 +45,7 @@ def run_per_segment(
     Args:
         dub_manifest: DubManifest 对象
         segments_dir: 输出目录（per-segment WAVs）
-        role_cast_path: role_cast.json 路径
+        role_speakers_path: role_speakers.json 路径
     """
     from pathlib import Path
 
@@ -53,10 +53,10 @@ def run_per_segment(
     temp_path.mkdir(parents=True, exist_ok=True)
 
     # 1. 解析声线分配
-    if not role_cast_path or not Path(role_cast_path).exists():
+    if not role_speakers_path or not Path(role_speakers_path).exists():
         raise FileNotFoundError(
-            f"role_cast.json not found: {role_cast_path}. "
-            "Run sub phase first, then configure speakers/roles in role_cast.json."
+            f"role_speakers.json not found: {role_speakers_path}. "
+            "Run sub phase first, then configure speakers/roles in role_speakers.json."
         )
 
     speaker_genders: Dict[str, str] = {}
@@ -66,7 +66,7 @@ def run_per_segment(
             speaker_genders[spk] = utt.gender or "unknown"
 
     role_map = resolve_voice_assignments(
-        role_cast_path,
+        role_speakers_path,
         speaker_genders=speaker_genders,
     )
     voice_assignment = {"speakers": {}}
