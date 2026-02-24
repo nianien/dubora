@@ -14,6 +14,10 @@
 #
 # ============================================================================
 
+VENV := .venv
+PIP  := $(VENV)/bin/pip
+PY   := $(VENV)/bin/python
+
 .PHONY: help clean install install-dev install-dub install-full test lint full
 
 help:
@@ -66,24 +70,24 @@ clean:
 install:
 	@echo "📦 安装基础依赖（最小可运行版本）..."
 	@echo "   包含：核心功能、基础工具"
-	@pip install -e .
+	@$(PIP) install -e .
 
 install-dev:
 	@echo "📦 安装开发环境依赖..."
 	@echo "   包含：基础依赖 + 开发工具（pytest, black, ruff）"
-	@pip install -e ".[dev]"
+	@$(PIP) install -e ".[dev]"
 
 install-dub:
 	@echo "📦 安装配音功能依赖..."
 	@echo "   包含：基础依赖 + 配音相关（Demucs, Azure TTS, Google Speech, OpenAI）"
-	@pip install -e ".[dub,openai,terms]"
+	@$(PIP) install -e ".[dub,openai,terms]"
 
 install-full:
 	@echo "📦 安装功能完整版（所有可选功能）..."
 	@echo "   包含：基础依赖 + 配音 + 开发工具 + 所有可选功能"
 	@echo "   注意：此版本包含所有可选依赖，适合本地开发环境"
 	@echo "   某些依赖可能在某些环境（如 CI/无 GPU）下无法安装"
-	@pip install -e ".[dub,openai,terms,faster,dev]"
+	@$(PIP) install -e ".[dub,openai,terms,faster,dev]"
 
 # 别名：方便输入（make full 等同于 make install-full）
 full: install-full
@@ -94,11 +98,11 @@ full: install-full
 
 test:
 	@echo "🧪 运行测试套件..."
-	@python -m pytest tests/ -v
+	@$(PY) -m pytest tests/ -v
 
 lint:
 	@echo "🔍 代码检查（ruff）..."
-	@ruff check src/ tools/
+	@$(VENV)/bin/ruff check src/ tools/
 	@echo "✅ 代码检查完成"
 
 # ============================================================================

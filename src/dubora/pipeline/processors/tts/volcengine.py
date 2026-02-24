@@ -176,7 +176,7 @@ def _call_volcengine_tts(
     # Build request body
     body = {
         "user": {
-            "uid": kwargs.get("uid", "pikppo_user")
+            "uid": kwargs.get("uid", "dubora_user")  # 火山引擎 TTS 用户标识，仅用于日志追踪/计费归属
         },
         "req_params": {
             "text": text,
