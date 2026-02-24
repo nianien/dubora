@@ -41,7 +41,7 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from pikppo.config.settings import load_env_file
+from dubora.config.settings import load_env_file
 
 # 自动加载 .env 文件（如果存在）
 load_env_file()

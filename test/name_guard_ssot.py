@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from pikppo.pipeline.processors.mt.name_guard import NameGuard, load_config
+from dubora.pipeline.processors.mt.name_guard import NameGuard, load_config
 
 
 def load_subtitle_model(model_path: Path) -> Dict:

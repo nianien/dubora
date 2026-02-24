@@ -1,5 +1,5 @@
 [project]
-name = "pikppo"
+name = "dubora"
 version = "2.0.0"
 description = "Complete video dubbing pipeline: Chinese short drama -> English subtitles + English dubbing with multi-voice support"
 requires-python = ">=3.9"
@@ -17,8 +17,8 @@ dependencies = [
 ]
 
 [project.scripts]
-vsd = "pikppo.cli:main"
-vr = "pikppo.cli:main"
+vsd = "dubora.cli:main"
+vr = "dubora.cli:main"
 
 [project.optional-dependencies]
 dev = [

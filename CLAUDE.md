@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PIKPPO (Pik Pro Pipeline Orchestration) is a video dubbing pipeline that localizes Chinese short dramas into English-dubbed versions. It produces English audio dubbing with multi-character voice synthesis, hardburned English subtitles, and preserved background music.
+Dubora is a video dubbing pipeline that localizes Chinese short dramas into English-dubbed versions. It produces English audio dubbing with multi-character voice synthesis, hardburned English subtitles, and preserved background music.
 
 ## Common Commands
 

@@ -25,10 +25,10 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from pikppo import load_env_file
-from pikppo.pipeline.processors.asr import transcribe
-from pikppo.infra.storage.tos import TosStorage
-from pikppo.utils.logger import info, success, error
+from dubora import load_env_file
+from dubora.pipeline.processors.asr import transcribe
+from dubora.infra.storage.tos import TosStorage
+from dubora.utils.logger import info, success, error
 
 
 def main():
@@ -125,7 +125,7 @@ def main():
             sys.exit(1)
     else:
         # 获取所有可用预设
-        from pikppo.models.doubao import get_presets
+        from dubora.models.doubao import get_presets
         presets = sorted(get_presets().keys())
         info(f"未指定预设，将执行所有预设: {', '.join(presets)}")
 

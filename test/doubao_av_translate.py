@@ -46,10 +46,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 # 加载 .env 文件（如果存在）
-from pikppo.config.settings import load_env_file
+from dubora.config.settings import load_env_file
 load_env_file()  # 自动查找项目根目录的 .env 文件
 
-from pikppo.infra.storage.tos import TosStorage  # 使用 TOS_* 环境变量生成预签名 URL
+from dubora.infra.storage.tos import TosStorage  # 使用 TOS_* 环境变量生成预签名 URL
 
 
 def load_keys() -> tuple[str, str]:

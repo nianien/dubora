@@ -1,7 +1,7 @@
 """测试 request_types 的校验功能"""
 import pytest
 
-from pikppo.models.doubao.request_types import (
+from dubora.models.doubao.request_types import (
     DoubaoASRRequest,
     AudioConfig,
     RequestConfig,
