@@ -134,7 +134,6 @@ class MTPhase(Phase):
                 "speaker": {
                     "id": seg.speaker,
                     "gender": seg.gender,
-                    "speech_rate": {"zh_tps": seg.speech_rate or 0.0},
                 },
             })
 
@@ -317,10 +316,6 @@ class MTPhase(Phase):
             utt_id = utterance.get("utt_id", "")
             start_ms = utterance.get("start_ms", 0)
             end_ms = utterance.get("end_ms", 0)
-            speaker_obj = utterance.get("speaker", {})
-            speech_rate = speaker_obj.get("speech_rate", {})
-            zh_tps = speech_rate.get("zh_tps", 0.0)
-            
             # 直接使用 utterance 的 text 字段（dub.json SSOT）
             zh_text = utterance.get("text", "").strip()
             if not zh_text:
@@ -348,12 +343,14 @@ class MTPhase(Phase):
                     annotated_placeholder = f"<<{placeholder[2:-2]}:{src_name}>>"  # <<NAME_0>> -> <<NAME_0:平安>>
                     zh_text = zh_text.replace(placeholder, annotated_placeholder)
             
-            # 计算预算
+            # 实时计算 zh_tps（中文字数 / 秒）
             window_ms = end_ms - start_ms
+            zh_char_count = sum(1 for c in zh_text if '\u4e00' <= c <= '\u9fff')
+            zh_tps = zh_char_count / (window_ms / 1000.0) if window_ms > 0 else 0.0
             from dubora.pipeline.processors.mt.utterance_translate import pick_k
             k = pick_k(zh_tps)
             budget_ms = window_ms * k
-            
+
             mt_input_lines.append({
                 "utt_id": utt_id,
                 "source": {

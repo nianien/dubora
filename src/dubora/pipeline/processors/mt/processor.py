@@ -48,7 +48,6 @@ def run(
             - utt_id: Utterance ID
             - start_ms: 开始时间（毫秒）
             - end_ms: 结束时间（毫秒）
-            - speech_rate: {"zh_tps": float}
             - cues: [{"start_ms": int, "end_ms": int, "source": {"text": str}, ...}]
         cues: Cue 列表（向后兼容，来自 Subtitle Model），每个包含：
             - 注意：v1.3 已移除 cue_id，使用 utterance 内的索引即可

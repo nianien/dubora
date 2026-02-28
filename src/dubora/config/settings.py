@@ -115,6 +115,12 @@ class PipelineConfig:
     utt_norm_trailing_silence_cap_ms: int = 350  # 尾部静音上限 (200-500)
     utt_norm_keep_gap_as_field: bool = True  # 保留 gap 为独立字段
 
+    # ── RESEG 配置 ──
+    reseg_enabled: bool = True              # 是否启用 LLM 断句
+    reseg_min_chars: int = 6                # 拆分后每段最少中文字数（防止碎片；原句超标时自动放宽到 3）
+    reseg_max_chars_trigger: int = 25       # 触发拆分的字数阈值
+    reseg_max_duration_trigger: int = 6000  # 触发拆分的时长阈值（ms）
+
     # ── MT 配置 ──
     gemini_model: str = "gemini-2.0-flash"
     openai_model: str = "gpt-4o-mini"

@@ -53,7 +53,7 @@ class _LazyPhase:
 # Gate 不是 phase，不参与执行，只影响自动推进流程。
 
 GATES = [
-    {"key": "source_review",      "after": "parse", "label": "校准"},
+    {"key": "source_review",      "after": "reseg", "label": "校准"},
     {"key": "translation_review", "after": "align", "label": "审阅"},
 ]
 
@@ -67,7 +67,7 @@ GATE_AFTER = {g["after"]: g for g in GATES}
 
 STAGES = [
     {"key": "extract",     "label": "提取", "phases": ["extract"]},
-    {"key": "recognize",   "label": "识别", "phases": ["asr", "parse"]},
+    {"key": "recognize",   "label": "识别", "phases": ["asr", "parse", "reseg"]},
     {"key": "translate",   "label": "翻译", "phases": ["mt", "align"]},
     {"key": "dub",         "label": "配音", "phases": ["tts", "mix"]},
     {"key": "compose",     "label": "合成", "phases": ["burn"]},
@@ -102,6 +102,13 @@ def build_phases(config=None) -> list:
             name="parse", version="1.1.0",
             requires=["asr.asr_result"], provides=["dub.dub_manifest"],
             label="生成字幕",
+        ),
+        _LazyPhase(
+            "dubora.pipeline.phases.reseg", "ResegPhase",
+            name="reseg", version="1.0.0",
+            requires=["dub.dub_manifest", "asr.asr_result"],
+            provides=["dub.dub_manifest"],
+            label="断句优化",
         ),
         # ← Gate: source_review (校准)
         _LazyPhase(

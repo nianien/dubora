@@ -542,7 +542,6 @@ def translate_utterance(
             - utt_id: Utterance ID
             - start_ms: 开始时间（毫秒）
             - end_ms: 结束时间（毫秒）
-            - speech_rate: {"zh_tps": float}
             - cues: [{"start_ms": int, "end_ms": int, "source": {"text": str}, ...}]
             - 注意：v1.3 已移除 cue_id，使用索引即可
         next_utterance: 下一个 utterance（用于计算不重叠扩展），None 表示没有下一句
@@ -574,8 +573,6 @@ def translate_utterance(
     utt_id = utterance.get("utt_id", "")
     start_ms = utterance.get("start_ms", 0)
     end_ms = utterance.get("end_ms", 0)
-    speech_rate = utterance.get("speech_rate", {})
-    zh_tps = speech_rate.get("zh_tps", 0.0)
     cues = utterance.get("cues", [])
 
     # 1. 合并中文文本
@@ -586,7 +583,7 @@ def translate_utterance(
             "end_ms_final": end_ms,
             "segments": [],
             "metrics": {
-                "zh_tps": zh_tps,
+                "zh_tps": 0.0,
                 "k": 0.0,
                 "budget_ms": 0.0,
                 "en_est_ms": 0.0,
@@ -595,8 +592,10 @@ def translate_utterance(
             },
         }
 
-    # 2. 计算 k 值和时间预算
+    # 2. 实时计算 zh_tps 和时间预算
     window_ms = end_ms - start_ms
+    zh_char_count = sum(1 for c in zh_merged if '\u4e00' <= c <= '\u9fff')
+    zh_tps = zh_char_count / (window_ms / 1000.0) if window_ms > 0 else 0.0
     k = pick_k(zh_tps)
     budget_ms = window_ms * k
 

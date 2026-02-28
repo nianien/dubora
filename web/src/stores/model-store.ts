@@ -22,8 +22,8 @@ interface ModelState {
   // roles (voice mapping)
   roles: Roles | null
 
-  // emotions config: [{name, value, lang}, ...]
-  emotions: { name: string; value: string; lang: string[] }[]
+  // emotions config: [{key, name, lang, disabled?}, ...]
+  emotions: { key: string; name: string; lang: string[]; disabled?: boolean }[]
 
   // actions
   loadEpisodes: () => Promise<void>
@@ -139,12 +139,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
 
   loadEmotions: async () => {
     try {
-      const emotions = await fetchJson<{ name: string; value: string; lang: string[] }[]>('/emotions')
-      set({ emotions })
+      const all = await fetchJson<{ key: string; name: string; lang: string[]; disabled?: boolean }[]>('/emotions')
+      set({ emotions: all.filter(e => !e.disabled) })
     } catch {
       set({ emotions: [
-        { name: '中性', value: 'neutral', lang: ['zh', 'en'] },
-        { name: '开心', value: 'happy', lang: ['zh', 'en'] },
+        { key: 'neutral', name: '中性', lang: ['zh', 'en'] },
+        { key: 'happy', name: '开心', lang: ['zh', 'en'] },
       ] })
     }
   },

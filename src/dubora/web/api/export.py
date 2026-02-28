@@ -96,7 +96,6 @@ def _subtitle_model_to_dict(model) -> dict:
         speaker_dict = {
             "id": utt.speaker.id,
             "gender": utt.speaker.gender,
-            "speech_rate": {"zh_tps": utt.speaker.speech_rate.zh_tps},
         }
         if utt.speaker.emotion:
             speaker_dict["emotion"] = {

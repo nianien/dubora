@@ -76,7 +76,10 @@ def run(
     
     if accompaniment_size == 0:
         raise RuntimeError(f"Vocal separation failed: {accompaniment_output_path} is empty")
-    
+
+    # 清理临时目录
+    shutil.rmtree(temp_output_dir, ignore_errors=True)
+
     return ProcessorResult(
         outputs=[],  # 由 Phase 声明 outputs，processor 只负责业务处理
         data={

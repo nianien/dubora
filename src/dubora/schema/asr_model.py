@@ -52,7 +52,6 @@ class AsrSegment:
     - emotion: 情绪标签（可编辑）
     - type: 段落类型（speech=对话, singing=唱歌）
     - gender: 性别（voice selection fallback）
-    - speech_rate: zh_tps（MT budget 计算）
     - tts_policy: TTS 策略（align 阶段写入）
     - flags: 段落标记
     """
@@ -65,7 +64,6 @@ class AsrSegment:
     emotion: str = "neutral"
     type: str = "speech"
     gender: Optional[str] = None
-    speech_rate: Optional[float] = None
     tts_policy: Optional[dict] = None
     flags: AsrSegmentFlags = field(default_factory=AsrSegmentFlags)
 
@@ -76,14 +74,8 @@ class AsrMediaInfo:
     媒体元信息。
 
     字段：
-    - video: 视频文件名
-    - audio: 音频文件名（可选）
-    - fps: 帧率（可选）
     - duration_ms: 总时长（毫秒）
     """
-    video: str = ""
-    audio: str = ""
-    fps: Optional[float] = None
     duration_ms: int = 0
 
 
@@ -140,9 +132,6 @@ class AsrModel:
         return {
             "schema": self.schema,
             "media": {
-                "video": self.media.video,
-                "audio": self.media.audio,
-                "fps": self.media.fps,
                 "duration_ms": self.media.duration_ms,
             },
             "segments": [
@@ -156,7 +145,6 @@ class AsrModel:
                     "emotion": seg.emotion,
                     "type": seg.type,
                     "gender": seg.gender,
-                    "speech_rate": seg.speech_rate,
                     **({"tts_policy": seg.tts_policy} if seg.tts_policy else {}),
                     "flags": {
                         "overlap": seg.flags.overlap,
@@ -182,9 +170,6 @@ class AsrModel:
         """从字典反序列化（向后兼容：忽略旧数据中的 speakers/emotions）。"""
         media_data = data.get("media", {})
         media = AsrMediaInfo(
-            video=media_data.get("video", ""),
-            audio=media_data.get("audio", ""),
-            fps=media_data.get("fps"),
             duration_ms=media_data.get("duration_ms", 0),
         )
 
@@ -206,7 +191,6 @@ class AsrModel:
                 emotion=seg_data.get("emotion", "neutral"),
                 type=seg_data.get("type", "speech"),
                 gender=seg_data.get("gender"),
-                speech_rate=seg_data.get("speech_rate"),
                 tts_policy=seg_data.get("tts_policy"),
                 flags=flags,
             ))

@@ -52,7 +52,7 @@ def build_emotion_info(
     """构建 EmotionInfo 对象。"""
     if not emotion_label:
         return None
-    
+
     return EmotionInfo(
         label=str(emotion_label),
         confidence=float(emotion_score) if emotion_score is not None else None,

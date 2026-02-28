@@ -132,7 +132,8 @@ def _call_volcengine_tts(
     resource_id: str = DEFAULT_RESOURCE_ID,
     format: str = DEFAULT_FORMAT,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
-    speech_rate: float = 0.0,  # -50 to 100, 0 = normal
+    speech_rate: float = 0.0,  # deprecated, use speed_ratio
+    speed_ratio: float = 1.0,  # 0.1~2.0, 1.0 = normal
     emotion: Optional[str] = None,
     emotion_scale: int = 4,  # 1-5
     enable_timestamp: bool = False,  # TTS1.0 支持
@@ -151,7 +152,8 @@ def _call_volcengine_tts(
         resource_id: Resource ID (e.g., "seed-tts-1.0", "seed-tts-2.0", "seed-tts-icl-2.0")
         format: Audio format (mp3/ogg_opus/pcm)
         sample_rate: Sample rate
-        speech_rate: Speech rate (-50 to 100, 0 = normal)
+        speech_rate: (deprecated) Speech rate (-50 to 100, 0 = normal)
+        speed_ratio: Speed ratio (0.1~2.0, 1.0 = normal)
         emotion: Emotion label (optional)
         emotion_scale: Emotion scale (1-5, default 4)
         reference_audio: Path to reference audio for ICL voice cloning (optional).
@@ -192,8 +194,11 @@ def _call_volcengine_tts(
     if ref_audio_b64:
         body["req_params"]["reference_audio"] = ref_audio_b64
 
-    # Add speech rate if specified
-    if speech_rate != 0.0:
+    # Add speed_ratio if not default
+    if speed_ratio != 1.0:
+        body["req_params"]["audio_params"]["speed_ratio"] = speed_ratio
+    # Legacy speech_rate fallback
+    elif speech_rate != 0.0:
         body["req_params"]["audio_params"]["speech_rate"] = speech_rate
 
     # Add emotion if specified
@@ -664,6 +669,30 @@ def synthesize_tts(
     return str(tts_output), all_sentences
 
 
+def _pick_speed_ratio(estimated_natural_ms: int, budget_ms: int) -> float:
+    """
+    分层语速策略：根据预估自然时长和 budget 选择离散 speed_ratio 档位。
+
+    返回 VolcEngine speed_ratio（0.1~2.0，1.0=正常，保留一位小数）。
+
+    离散档位（保证缓存命中率）：
+    - 慢：0.7, 0.8, 0.9
+    - 正常：1.0
+    - 快：1.1, 1.2, 1.3
+
+    策略：让 TTS 原生控制语速，atempo 只做 ±8% 微调。
+    """
+    if budget_ms <= 0 or estimated_natural_ms <= 0:
+        return 1.0
+    # 目标 ratio：自然时长 / budget（>1 需要加速，<1 需要减速）
+    ratio = estimated_natural_ms / budget_ms
+    # 取整到 0.1 档位
+    speed_ratio = round(ratio, 1)
+    # 限制在合理范围
+    speed_ratio = max(0.7, min(1.3, speed_ratio))
+    return speed_ratio
+
+
 def synthesize_tts_per_segment(
     dub_manifest: DubManifest,
     voice_assignment: Dict[str, Any],
@@ -743,9 +772,13 @@ def synthesize_tts_per_segment(
         voice_info = voice_assignment["speakers"].get(speaker, {})
         voice_id = voice_info.get("voice_type", "zh_female_shuangkuaisisi_moon_bigtts")
         params = voice_info.get("params", {})
+        # emotion / speed_ratio 暂不传给 TTS API，保持原有行为
+        # TODO: emotion 需要按目标语言过滤（emotions.json 的 lang 字段），未过滤直接传会导致 API 报错
+        # TODO: speed_ratio 需要两次试探（先 1.0 合成量测，再决定是否重新合成）
 
-        # Generate cache key (voice_type + text，不含 speed/pitch 因为不传给 API)
-        cache_key = _generate_cache_key(text, voice_id, {}, language)
+        # Generate cache key（与改动前一致：prosody={}）
+        prosody = {}
+        cache_key = _generate_cache_key(text, voice_id, prosody, language)
         cache_file = cache_dir / f"{cache_key}.wav"
 
         try:
@@ -754,8 +787,6 @@ def synthesize_tts_per_segment(
                 shutil.copy2(cache_file, segment_file_raw)
                 print(f"  💾 [{utt_id}] Cache hit")
             else:
-                # Synthesize — 不传 speech_rate，让声音按自然语速合成
-                # budget fitting 由 post-processing (trim → rate adjust → pad) 处理
                 audio_bytes, _ = _call_volcengine_tts(
                     text=text,
                     speaker=voice_id,

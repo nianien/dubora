@@ -51,7 +51,7 @@ const defaultPhases: PhaseStatus[] = PHASE_NAMES.map(name => ({
 const defaultGates: GateStatus[] = []
 const defaultStages: StageInfo[] = [
   { key: 'extract',   label: '提取', phases: ['extract'],        status: 'pending' },
-  { key: 'recognize', label: '识别', phases: ['asr', 'parse'],   status: 'pending' },
+  { key: 'recognize', label: '识别', phases: ['asr', 'parse', 'reseg'], status: 'pending' },
   { key: 'translate', label: '翻译', phases: ['mt', 'align'],    status: 'pending' },
   { key: 'dub',       label: '配音', phases: ['tts', 'mix'],     status: 'pending' },
   { key: 'compose',   label: '合成', phases: ['burn'],           status: 'pending' },

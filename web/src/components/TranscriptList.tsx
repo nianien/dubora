@@ -596,7 +596,7 @@ function SpeakerBadge({ seg, badgeColor, roles, isOpen, onToggle, onClose }: {
 function EmotionBadge({ seg, emoColor, emotions, isOpen, onToggle, onSelect, onClose }: {
   seg: AsrSegment
   emoColor: { bg: string; text: string }
-  emotions: { name: string; value: string; lang: string[] }[]
+  emotions: { key: string; name: string; lang: string[]; disabled?: boolean }[]
   isOpen: boolean
   onToggle: () => void
   onSelect: (emo: string) => void
@@ -623,7 +623,7 @@ function EmotionBadge({ seg, emoColor, emotions, isOpen, onToggle, onSelect, onC
         className="text-xs px-1.5 py-0.5 rounded hover:brightness-125 flex items-center gap-0.5"
         title="Change emotion"
       >
-        {emotions.find(e => e.value === seg.emotion)?.name ?? seg.emotion}
+        {emotions.find(e => e.key === seg.emotion)?.name ?? seg.emotion}
         <span className="text-[10px] opacity-60">▾</span>
       </button>
       {isOpen && (
@@ -642,7 +642,7 @@ function EmotionBadge({ seg, emoColor, emotions, isOpen, onToggle, onSelect, onC
                 setHighlightIdx(prev => (prev - 1 + emotions.length) % emotions.length)
               } else if (e.key === 'Enter' && highlightIdx >= 0) {
                 e.preventDefault()
-                onSelect(emotions[highlightIdx].value)
+                onSelect(emotions[highlightIdx].key)
                 setHighlightIdx(-1)
               } else if (e.key === 'Escape') {
                 onClose()
@@ -651,15 +651,15 @@ function EmotionBadge({ seg, emoColor, emotions, isOpen, onToggle, onSelect, onC
             }}
           >
             {emotions.map((emo, i) => {
-              const ec = emotionColor(emo.value)
+              const ec = emotionColor(emo.key)
               return (
                 <button
-                  key={emo.value}
-                  onClick={e => { e.stopPropagation(); onSelect(emo.value) }}
+                  key={emo.key}
+                  onClick={e => { e.stopPropagation(); onSelect(emo.key) }}
                   onMouseEnter={() => setHighlightIdx(i)}
                   className={`block w-full text-left px-2 py-1 ${
                     i === highlightIdx ? 'bg-gray-600' : 'hover:bg-gray-700'
-                  } ${seg.emotion === emo.value ? 'font-medium' : ''}`}
+                  } ${seg.emotion === emo.key ? 'font-medium' : ''}`}
                   style={{ color: ec.text }}
                 >
                   <span

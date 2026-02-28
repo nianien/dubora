@@ -20,15 +20,11 @@ export interface AsrSegment {
   emotion: string
   type: 'speech' | 'singing'
   gender?: string | null
-  speech_rate?: number | null
   tts_policy?: TTSPolicy | null
   flags: AsrSegmentFlags
 }
 
 export interface AsrMediaInfo {
-  video: string
-  audio: string
-  fps: number | null
   duration_ms: number
 }
 

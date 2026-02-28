@@ -24,6 +24,7 @@ from dubora.pipeline.core.phase import Phase
 from dubora.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora.pipeline.processors.srt import run as srt_run
 from dubora.schema.asr_model import AsrModel, AsrSegment, AsrMediaInfo, AsrHistory, AsrFingerprint
+from dubora.config import resolve_emotion
 from dubora.utils.logger import info
 
 
@@ -157,9 +158,8 @@ class ParsePhase(Phase):
                     end_ms=utt.end_ms,
                     text="".join(cue.source.text for cue in utt.cues),
                     speaker=utt.speaker.id,
-                    emotion=utt.speaker.emotion.label if utt.speaker.emotion else "neutral",
+                    emotion=resolve_emotion(utt.speaker.emotion.label) if utt.speaker.emotion else "neutral",
                     gender=utt.speaker.gender,
-                    speech_rate=utt.speaker.speech_rate.zh_tps,
                 ))
 
             now = datetime.now(timezone.utc).isoformat()

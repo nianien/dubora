@@ -94,6 +94,8 @@ class BurnPhase(Phase):
                 "-c:a", "aac",
                 "-map", "0:v:0",
                 "-map", "1:a:0",
+                "-metadata:s:v", "rotate=0",
+                "-movflags", "+faststart",
                 "-y",
                 str(output_video_path),
             ]

@@ -30,13 +30,13 @@ vsd phases                                 # List all phases
 
 ## Architecture
 
-### 8-Phase Pipeline with Gates and Stages
+### 9-Phase Pipeline with Gates and Stages
 
 ```
-Stage:  提取      识别          [校准]  翻译          [审阅]  配音        合成
-Phase:  extract   asr → parse          mt → align            tts → mix   burn
-Gate:                           ↑                      ↑
-                        source_review          translation_review
+Stage:  提取      识别                    [校准]  翻译          [审阅]  配音        合成
+Phase:  extract   asr → parse → reseg            mt → align            tts → mix   burn
+Gate:                                     ↑                      ↑
+                                  source_review          translation_review
 ```
 
 | Phase | What it does | Technology |
@@ -44,6 +44,7 @@ Gate:                           ↑                      ↑
 | extract | Extract audio + separate vocals/accompaniment | FFmpeg + Demucs v4 |
 | asr | Speech recognition with speaker diarization | Doubao ASR (ByteDance) |
 | parse | Generate dub manifest from ASR output | Local post-processing |
+| reseg | LLM-based sentence segmentation for long utterances | OpenAI GPT-4o or Google Gemini |
 | mt | Translate Chinese → English | OpenAI GPT-4o or Google Gemini |
 | align | Timeline alignment + re-segmentation | Local alignment |
 | tts | Voice synthesis per segment | VolcEngine seed-tts-1.0 |

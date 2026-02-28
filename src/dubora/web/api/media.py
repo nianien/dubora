@@ -49,7 +49,7 @@ def _needs_faststart(file_path: Path) -> bool:
     return False
 
 
-def _ensure_faststart(file_path: Path) -> Path:
+def _ensure_faststart(file_path: Path, videos_dir: Path) -> Path:
     """
     如果 MP4 非 faststart，用 ffmpeg remux 到 .faststart.mp4 缓存文件。
     只 copy stream 不重编码，耗时极短。返回可直接服务的文件路径。
@@ -60,8 +60,10 @@ def _ensure_faststart(file_path: Path) -> Path:
     if not _needs_faststart(file_path):
         return file_path
 
-    # 缓存到 dub/.cache/ 目录，避免污染视频目录
-    cache_dir = file_path.parent / "dub" / ".cache"
+    # 缓存到 videos/{drama}/dub/.cache/ 目录
+    rel = file_path.relative_to(videos_dir)
+    drama = rel.parts[0]
+    cache_dir = videos_dir / drama / "dub" / ".cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_path = cache_dir / f"{file_path.stem}.faststart.mp4"
     if cache_path.is_file() and cache_path.stat().st_mtime >= file_path.stat().st_mtime:
@@ -120,7 +122,7 @@ async def serve_media(request: Request, path: str):
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
 
     # 对 MP4 自动 faststart
-    file_path = _ensure_faststart(file_path)
+    file_path = _ensure_faststart(file_path, videos_dir)
 
     # 检测 MIME 类型
     mime_type, _ = mimetypes.guess_type(str(file_path))
