@@ -18,11 +18,11 @@ VENV := .venv
 PIP  := $(VENV)/bin/pip
 PY   := $(VENV)/bin/python
 
-.PHONY: help clean install install-dev install-dub install-full test lint full
+.PHONY: help clean install install-dev install-web install-dub install-full test lint full
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "Video Remix - 可用命令"
+	@echo "Dubora - 可用命令"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "📦 安装命令（按使用场景选择）："
@@ -77,6 +77,11 @@ install-dev:
 	@echo "   包含：基础依赖 + 开发工具（pytest, black, ruff）"
 	@$(PIP) install -e ".[dev]"
 
+install-web:
+	@echo "📦 安装 ASR Calibration IDE 依赖..."
+	@echo "   包含：基础依赖 + FastAPI + Uvicorn"
+	@$(PIP) install -e ".[web]"
+
 install-dub:
 	@echo "📦 安装配音功能依赖..."
 	@echo "   包含：基础依赖 + 配音相关（Demucs, Azure TTS, Google Speech, OpenAI）"
@@ -87,7 +92,7 @@ install-full:
 	@echo "   包含：基础依赖 + 配音 + 开发工具 + 所有可选功能"
 	@echo "   注意：此版本包含所有可选依赖，适合本地开发环境"
 	@echo "   某些依赖可能在某些环境（如 CI/无 GPU）下无法安装"
-	@$(PIP) install -e ".[dub,openai,terms,faster,dev]"
+	@$(PIP) install -e ".[dub,openai,terms,faster,dev,web]"
 
 # 别名：方便输入（make full 等同于 make install-full）
 full: install-full
@@ -98,7 +103,7 @@ full: install-full
 
 test:
 	@echo "🧪 运行测试套件..."
-	@$(PY) -m pytest tests/ -v
+	@$(PY) -m pytest test/ -v
 
 lint:
 	@echo "🔍 代码检查（ruff）..."

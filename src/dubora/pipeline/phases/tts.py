@@ -1,13 +1,13 @@
 """
 TTS Phase: 语音合成（Timeline-First Architecture）
 
-输入: dub.model.json (from Align phase)
+输入: tts.manifest.json (from Align phase)
 输出:
   - tts.segments_dir: Per-segment WAV files
   - tts.report: TTS synthesis report (JSON)
   - tts.voice_assignment: Speaker -> voice mapping
 
-声线分配通过 role_speakers.json 解析（speakers/roles/default_roles 统一管理）。
+声线分配通过 roles.json 解析（roles/default_roles 统一管理）。
 """
 import json
 import os
@@ -17,7 +17,8 @@ from typing import Dict
 from dubora.pipeline.core.phase import Phase
 from dubora.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora.pipeline.processors.tts import run_per_segment as tts_run_per_segment
-from dubora.schema.dub_manifest import dub_manifest_from_dict
+from dubora.schema.asr_model import AsrModel
+from dubora.schema.dub_manifest import dub_manifest_from_asr_model
 from dubora.schema.tts_report import tts_report_to_dict
 from dubora.utils.logger import info, warning
 
@@ -26,7 +27,7 @@ class TTSPhase(Phase):
     """语音合成 Phase。"""
 
     name = "tts"
-    version = "1.0.0"
+    version = "1.1.0"
 
     def requires(self) -> list[str]:
         """需要 dub.dub_manifest（SSOT for dubbing）。"""
@@ -46,12 +47,12 @@ class TTSPhase(Phase):
         执行 TTS Phase (Timeline-First Architecture)。
 
         流程：
-        1. 读取 dub.model.json (SSOT for dubbing)
-        2. 通过 role_speakers.json 解析声线分配
+        1. 读取 tts.manifest.json (SSOT for dubbing)
+        2. 通过 roles.json 解析声线分配
         3. TTS per-segment 合成 (VolcEngine)
         4. 生成 tts_report.json
         """
-        # 获取输入 (dub.model.json)
+        # 获取输入 (tts.manifest.json)
         dub_manifest_artifact = inputs.get("dub.dub_manifest")
         if not dub_manifest_artifact:
             return PhaseResult(
@@ -111,11 +112,11 @@ class TTSPhase(Phase):
             )
 
         try:
-            # 读取 dub.model.json
+            # 读取 dub.json (AsrModel) 并通过适配器转换为 DubManifest
             with open(dub_manifest_path, "r", encoding="utf-8") as f:
-                manifest_data = json.load(f)
+                asr_model = AsrModel.from_dict(json.load(f))
 
-            dub_manifest = dub_manifest_from_dict(manifest_data)
+            dub_manifest = dub_manifest_from_asr_model(asr_model)
             info(f"Loaded dub manifest: {len(dub_manifest.utterances)} utterances, audio_duration_ms={dub_manifest.audio_duration_ms}")
 
             if not dub_manifest.utterances:
@@ -123,13 +124,13 @@ class TTSPhase(Phase):
                     status="failed",
                     error=ErrorInfo(
                         type="ValueError",
-                        message="No utterances found in dub.model.json.",
+                        message="No utterances found in tts.manifest.json.",
                     ),
                 )
 
             # 声线映射文件路径
             dict_dir = workspace_path.parent / "dict"
-            role_speakers_path = str(dict_dir / "role_speakers.json")
+            roles_path = str(dict_dir / "roles.json")
 
             # 输出路径
             segments_dir = outputs.get("tts.segments_dir")
@@ -143,7 +144,7 @@ class TTSPhase(Phase):
             result = tts_run_per_segment(
                 dub_manifest=dub_manifest,
                 segments_dir=str(segments_dir),
-                role_speakers_path=role_speakers_path,
+                roles_path=roles_path,
                 volcengine_app_id=volcengine_app_id,
                 volcengine_access_key=volcengine_access_key,
                 volcengine_resource_id=volcengine_resource_id,

@@ -6,11 +6,9 @@ ASR Phase: 语音识别（只做识别，不负责字幕后处理）
 - 上传到 TOS（如果需要）
 - 调用 ASR API
 - 保存原始 ASR 响应（asr.asr_result，SSOT）
-- 自动生成 asr.fix.json（人工校准层）
 
-产出设计：
+产出：
 - asr.asr_result：SSOT（原始响应，包含完整语义信息，emotion/gender/score/degree）
-- asr.asr_fix：人工校准层（可编辑 speaker/text/emotion/gender）
 
 不负责：
 - 字幕后处理（由 Subtitle Phase 负责）
@@ -28,7 +26,6 @@ from dubora.pipeline.core.phase import Phase
 from dubora.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora.pipeline.processors.asr import run as asr_run
 from dubora.infra.storage.tos import TosStorage
-from dubora.schema.asr_fix import AsrFix
 from dubora.utils.logger import info
 
 
@@ -153,19 +150,7 @@ class ASRPhase(Phase):
 
             info(f"Saved raw ASR response (SSOT) to: {raw_response_path}")
 
-            # 4. 自动生成 asr.fix.json（人工校准层，初始状态与 raw response 一致）
-            # 注意：asr.fix.json 不在 provides/outputs 中，是 side-effect
-            # ASR 重跑意味着音频/配置变了，旧的校准已无意义，所以直接覆盖
-            asr_fix = AsrFix.from_raw_response(raw_response)
-            asr_fix_path = raw_response_path.parent / "asr.fix.json"
-            asr_fix_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(asr_fix_path, "w", encoding="utf-8") as f:
-                json.dump(asr_fix.to_dict(), f, indent=2, ensure_ascii=False)
-
-            info(f"Saved ASR fix (human-editable) to: {asr_fix_path}")
-
-            # 返回 PhaseResult：只声明 asr_result
-            # asr.fix.json 不声明，避免人工编辑触发 ASR 重跑
+            # 返回 PhaseResult
             return PhaseResult(
                 status="succeeded",
                 outputs=[

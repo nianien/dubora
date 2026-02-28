@@ -111,7 +111,7 @@ class PipelineConfig:
     # Utterance Normalization（speech + silence 重建 utterance 边界）
     utt_norm_silence_split_threshold_ms: int = 450  # 静音切分阈值 (300-600)
     utt_norm_min_duration_ms: int = 900  # 最小 utterance 时长 (500-1500)
-    utt_norm_max_duration_ms: int = 8000  # 最大 utterance 时长 (5000-12000)
+    utt_norm_max_duration_ms: int = 5000  # 最大 utterance 时长 (5000-12000)
     utt_norm_trailing_silence_cap_ms: int = 350  # 尾部静音上限 (200-500)
     utt_norm_keep_gap_as_field: bool = True  # 保留 gap 为独立字段
 

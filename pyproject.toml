@@ -35,6 +35,10 @@ terms = [
 faster = [
   "faster-whisper>=1.0.0",
 ]
+web = [
+  "fastapi>=0.110.0",
+  "uvicorn[standard]>=0.27.0",
+]
 dub = [
   "demucs>=4.0.0",
   "google-cloud-speech>=2.21.0",

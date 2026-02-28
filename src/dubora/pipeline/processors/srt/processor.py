@@ -24,14 +24,12 @@ from typing import Any, Dict, Optional
 from .._types import ProcessorResult
 from .build_subtitle_model import build_subtitle_model
 from .profiles import POSTPROFILES
-from dubora.schema.asr_fix import AsrFix
 from dubora.schema.subtitle_model import SubtitleModel
 
 
 def run(
     raw_response: Dict[str, Any],
     *,
-    asr_fix: Optional[AsrFix] = None,
     postprofile: str = "axis",
     audio_duration_ms: Optional[int] = None,
     # Utterance Normalization 配置（从 PipelineConfig 传入）
@@ -75,10 +73,8 @@ def run(
 
     # 从 raw_response 构建 Subtitle Model v1.3 (SSOT)
     # 使用 Utterance Normalization 重建 utterance 边界
-    # 如果有 asr_fix，用校准后的 speaker/text 驱动
     subtitle_model = build_subtitle_model(
         raw_response=raw_response,
-        asr_fix=asr_fix,
         source_lang="zh",  # 默认源语言为中文
         audio_duration_ms=audio_duration_ms,
         max_chars=max_chars,

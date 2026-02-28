@@ -93,7 +93,7 @@ videos/{剧名}/                  # 剧级目录
 +-- 1.mp4                      # 原视频
 +-- dub/
     +-- dict/                           # 剧级词典 + 声线配置
-    |   +-- role_speakers.json          #   统一声线映射（speakers + roles + default_roles）
+    |   +-- roles.json                  #   统一声线映射（roles + default_roles）
     |   +-- slang.json                  #   行话词典
     |   +-- names.json                  #   人名词典（中文 -> 英文）
     +-- 1/                              # 集级 workspace
@@ -263,7 +263,7 @@ Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU），
 - 最大时长约束（默认 8000ms）
 - 附加标点：从 utterance 文本反推附加到 word
 
-**副作用**：Sub 阶段完成后会自动更新 `role_speakers.json` 的 `speakers` 字段，收集本集出现的所有 speaker。
+**注意**：Sub 阶段不再自动注册 speaker。角色由用户在 IDE 中编辑 `dub.json` 的 speaker 字段后，手动在 `roles.json` 中配置声线。
 
 ### 4.5 MT（机器翻译）
 
@@ -335,23 +335,24 @@ Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU），
 
 | | |
 |---|---|
-| **输入** | `dub.dub_manifest`, `role_speakers.json` |
+| **输入** | `dub.dub_manifest`, `roles.json` |
 | **输出** | `tts.segments_dir`, `tts.segments_index`, `tts.report`, `tts.voice_assignment` |
 | **服务** | 火山引擎 TTS (VolcEngine seed-tts-1.0) |
+| **API 文档** | https://www.volcengine.com/docs/6561/1257544?lang=zh |
+| **音色试听** | https://console.volcengine.com/speech/new/voices?projectName=default |
 
-**声线映射（单文件 role_speakers.json）**：
+**声线映射（单文件 roles.json）**：
 
 ```json
 {
-  "roles":    { "PingAn": "en_male_hades_moon_bigtts", ... },
-  "default_roles": { "male": "LrNan1", "female": "LrNv1", "unknown": "LrNan1" },
-  "speakers": { "pa": "PingAn", "el": "ErLv", ... }
+  "roles":         { "PingAn": "en_male_hades_moon_bigtts", ... },
+  "default_roles": { "male": "LrNan1", "female": "LrNv1", "unknown": "LrNan1" }
 }
 ```
 
 解析链路：
-- 已标注：`speaker -> role_id -> voice_type`（如 `pa -> PingAn -> en_male_hades_moon_bigtts`）
-- 未标注：`speaker -> default_roles[gender] -> role_id -> voice_type`
+- 已标注：`role_id -> voice_type`（如 `PingAn -> en_male_hades_moon_bigtts`）
+- 未标注：`default_roles[gender] -> voice_type`
 
 **合成流程**：
 - 并行逐句合成（默认 4 workers）
@@ -476,7 +477,7 @@ vsd run videos/drama/1.mp4 --to sub
 
 # 2. 人工校准
 #    - 编辑 source/asr.fix.json（修正 speaker、文本、插入遗漏台词）
-#    - 编辑 dict/role_speakers.json（分配角色声线）
+#    - 编辑 dict/roles.json（分配角色声线）
 #    - 编辑 dict/names.json（人名映射）
 
 # 3. 从 sub 重跑（asr.fix.json 变更需要重跑 sub）

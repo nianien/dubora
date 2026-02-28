@@ -177,34 +177,6 @@ def bless_one(video_path: Path, phase_name: str):
     return True
 
 
-def fix_one(video_path: Path, phase_name: str):
-    """对单个视频执行 fix。"""
-    workdir = get_workdir(video_path)
-
-    if phase_name == "asr":
-        result_path = workdir / "source" / "asr-result.json"
-        if not result_path.exists():
-            error(f"[{video_path.name}] asr-result.json not found: {result_path}")
-            return False
-
-        import json
-        from dubora.schema.asr_fix import AsrFix
-
-        with open(result_path, "r", encoding="utf-8") as f:
-            raw_response = json.load(f)
-
-        asr_fix = AsrFix.from_raw_response(raw_response)
-        fix_path = workdir / "source" / "asr.fix.json"
-        with open(fix_path, "w", encoding="utf-8") as f:
-            json.dump(asr_fix.to_dict(), f, indent=2, ensure_ascii=False)
-
-        success(f"[{video_path.name}] Regenerated {fix_path}")
-        return True
-    else:
-        error(f"Phase '{phase_name}' does not support fix")
-        return False
-
-
 # ── 主入口 ──────────────────────────────────────────────────
 
 def main():
@@ -222,7 +194,6 @@ Examples:
   vsd run videos/drama/4-70.mp4 --to burn             # Batch: episodes 4-70
   vsd run videos/drama/1-10.mp4 --from mt --to tts    # Batch: re-run MT to TTS
   vsd bless videos/drama/1-10.mp4 sub                 # Batch bless
-  vsd fix videos/drama/1-10.mp4 asr                   # Batch fix
         """
     )
 
@@ -254,15 +225,14 @@ Examples:
     bless_parser.add_argument("video", type=str, help="Input video file path (supports N-M range, e.g. 4-70.mp4)")
     bless_parser.add_argument("phase", type=str, choices=phase_names, help="Phase whose outputs to re-fingerprint")
 
-    # fix command
-    fix_parser = subparsers.add_parser(
-        "fix", help="Regenerate human-editable fix files from source",
-    )
-    fix_parser.add_argument("video", type=str, help="Input video file path (supports N-M range, e.g. 4-70.mp4)")
-    fix_parser.add_argument("phase", type=str, choices=phase_names, help="Phase whose fix file to regenerate")
-
     # phases command
     subparsers.add_parser("phases", help="List available phases")
+
+    # ide command
+    ide_parser = subparsers.add_parser("ide", help="Launch ASR Calibration IDE web server")
+    ide_parser.add_argument("--port", type=int, default=8765, help="Server port (default: 8765)")
+    ide_parser.add_argument("--videos", type=str, default="./videos", help="Videos directory (default: ./videos)")
+    ide_parser.add_argument("--dev", action="store_true", help="Development mode (no static files, use Vite dev server)")
 
     args = parser.parse_args()
 
@@ -276,6 +246,10 @@ Examples:
         info("Available phases:")
         for phase in ALL_PHASES:
             info(f"  - {phase.name} (v{phase.version}): requires={phase.requires()}, provides={phase.provides()}")
+        return
+
+    if args.command == "ide":
+        _run_ide(args)
         return
 
     # ── 展开批量模式 ──
@@ -316,13 +290,6 @@ Examples:
             if not bless_one(video_path, args.phase):
                 failed.append(video_path.name)
 
-    elif args.command == "fix":
-        for i, video_path in enumerate(video_paths):
-            if is_batch:
-                info(f"--- [{i+1}/{len(video_paths)}] {video_path.name} ---")
-            if not fix_one(video_path, args.phase):
-                failed.append(video_path.name)
-
     # ── 批量汇总 ──
     if is_batch:
         ok_count = len(video_paths) - len(failed)
@@ -330,6 +297,77 @@ Examples:
         if failed:
             error(f"Failed: {', '.join(failed)}")
             sys.exit(1)
+
+
+def _run_ide(args):
+    """启动 ASR Calibration IDE web server。"""
+    try:
+        import uvicorn
+        from dubora.web.server import create_app
+    except ImportError:
+        error("IDE dependencies not installed. Run: make install-web")
+        sys.exit(1)
+
+    videos_dir = args.videos
+    static_dir = None
+    if not args.dev:
+        import dubora
+        pkg_dir = Path(dubora.__file__).parent
+        # 查找 web 源码目录（用于自动 build）
+        web_dir = None
+        for candidate in [
+            Path("web"),
+            pkg_dir.parent.parent.parent / "web",
+        ]:
+            if (candidate / "package.json").is_file():
+                web_dir = candidate.resolve()
+                break
+
+        # 查找已构建的前端
+        dist_dir = web_dir / "dist" if web_dir else None
+        needs_build = False
+        if dist_dir and dist_dir.is_dir():
+            # 检查 src 是否比 dist 更新
+            src_dir = web_dir / "src"
+            if src_dir.is_dir():
+                src_mtime = max(f.stat().st_mtime for f in src_dir.rglob("*") if f.is_file())
+                dist_mtime = max(f.stat().st_mtime for f in dist_dir.rglob("*") if f.is_file())
+                if src_mtime > dist_mtime:
+                    needs_build = True
+                    info("Frontend source changed, rebuilding...")
+            static_dir = str(dist_dir)
+        elif web_dir:
+            needs_build = True
+            info("No frontend build found, building...")
+
+        if needs_build and web_dir:
+            import subprocess
+            result = subprocess.run(
+                ["npm", "run", "build"],
+                cwd=str(web_dir),
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                # tsc writes errors to stdout, npm/vite may use stderr
+                build_output = (result.stdout or "") + (result.stderr or "")
+                error(f"Frontend build failed:\n{build_output}")
+                sys.exit(1)
+            static_dir = str(web_dir / "dist")
+            info("Frontend build complete")
+
+    app = create_app(videos_dir=videos_dir, static_dir=static_dir)
+
+    info(f"ASR Calibration IDE starting on http://localhost:{args.port}")
+    info(f"Videos directory: {Path(videos_dir).resolve()}")
+    if args.dev:
+        info("Dev mode: use 'cd web && npm run dev' for frontend")
+    elif static_dir:
+        info(f"Serving frontend from: {static_dir}")
+    else:
+        info("No frontend found. Run 'cd web && npm run build' or use --dev mode")
+
+    uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="info")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 Mix Phase: 混音 (Timeline-First Architecture)
 
 输入:
-  - dub.dub_manifest: Timeline SSOT (source/dub.model.json)
+  - dub.dub_manifest: Timeline SSOT (source/tts.manifest.json)
   - tts.segments_dir: Per-segment WAV files
   - tts.report: TTS synthesis report
 
@@ -18,7 +18,8 @@ from typing import Dict, Optional
 from dubora.pipeline.core.phase import Phase
 from dubora.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora.pipeline.processors.mix import run_timeline as mix_run_timeline
-from dubora.schema.dub_manifest import dub_manifest_from_dict
+from dubora.schema.asr_model import AsrModel
+from dubora.schema.dub_manifest import dub_manifest_from_asr_model
 from dubora.schema.tts_report import tts_report_from_dict
 from dubora.utils.logger import info, warning
 import json
@@ -28,7 +29,7 @@ class MixPhase(Phase):
     """混音 Phase (Timeline-First Architecture)。"""
 
     name = "mix"
-    version = "2.0.0"
+    version = "2.1.0"
 
     def requires(self) -> list[str]:
         """需要 dub_manifest, segments_dir, report, 和可选的 sep outputs。"""
@@ -48,7 +49,7 @@ class MixPhase(Phase):
         执行 Mix Phase (Timeline-First Architecture)。
 
         流程：
-        1. 读取 dub.model.json (timeline SSOT)
+        1. 读取 tts.manifest.json (timeline SSOT)
         2. 读取 tts_report.json (per-segment info)
         3. 使用 adelay 进行 timeline placement
         4. 混合 BGM + TTS
@@ -93,9 +94,17 @@ class MixPhase(Phase):
                 ),
             )
 
-        # Load manifest and report
+        # Load dub.json (AsrModel) and convert via adapter
         with open(dub_manifest_path, "r", encoding="utf-8") as f:
-            dub_manifest = dub_manifest_from_dict(json.load(f))
+            asr_model = AsrModel.from_dict(json.load(f))
+        dub_manifest = dub_manifest_from_asr_model(asr_model)
+
+        # Extract singing segments (keep original vocals for these time windows)
+        singing_segments = [
+            (seg.start_ms, seg.end_ms)
+            for seg in asr_model.segments
+            if seg.type == "singing"
+        ]
 
         with open(tts_report_path, "r", encoding="utf-8") as f:
             tts_report = tts_report_from_dict(json.load(f))
@@ -174,6 +183,7 @@ class MixPhase(Phase):
                 true_peak=true_peak,
                 output_path=str(mix_path),
                 duration_tolerance_ms=duration_tolerance_ms,
+                singing_segments=singing_segments,
             )
 
             if not mix_path.exists():

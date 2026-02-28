@@ -59,11 +59,11 @@ class MTPhase(Phase):
     """机器翻译 Phase（只调模型）。"""
     
     name = "mt"
-    version = "1.0.0"
+    version = "1.1.0"
     
     def requires(self) -> list[str]:
-        """需要 subs.subtitle_model（SSOT）和 asr.asr_result（用于整集上下文）。"""
-        return ["subs.subtitle_model", "asr.asr_result"]
+        """需要 dub.dub_manifest（dub.json SSOT）。"""
+        return ["dub.dub_manifest"]
     
     def provides(self) -> list[str]:
         """生成 mt.mt_input, mt.mt_output。"""
@@ -77,66 +77,66 @@ class MTPhase(Phase):
     ) -> PhaseResult:
         """
         执行 MT Phase。
-        
+
         流程：
-        1. 读取 subtitle.model.json（SSOT）
+        1. 读取 dub.json（AsrModel SSOT）
         2. 生成 mt_input.jsonl（包含约束信息）
         3. 调用翻译模型
         4. 生成 mt_output.jsonl（只包含英文整段文本）
         """
-        # 获取输入（Subtitle Model SSOT 和 ASR Result）
-        subtitle_model_artifact = inputs["subs.subtitle_model"]
-        subtitle_model_path = Path(ctx.workspace) / subtitle_model_artifact.relpath
-        
-        if not subtitle_model_path.exists():
+        # 获取输入（dub.json AsrModel SSOT）
+        dub_manifest_artifact = inputs["dub.dub_manifest"]
+        dub_manifest_path = Path(ctx.workspace) / dub_manifest_artifact.relpath
+
+        if not dub_manifest_path.exists():
             return PhaseResult(
                 status="failed",
                 error=ErrorInfo(
                     type="FileNotFoundError",
-                    message=f"Subtitle Model file not found: {subtitle_model_path}",
+                    message=f"dub.json not found: {dub_manifest_path}",
                 ),
             )
-        
-        # 读取 ASR Result（用于整集上下文）
-        asr_result_artifact = inputs["asr.asr_result"]
-        asr_result_path = Path(ctx.workspace) / asr_result_artifact.relpath
-        
-        if not asr_result_path.exists():
-            return PhaseResult(
-                status="failed",
-                error=ErrorInfo(
-                    type="FileNotFoundError",
-                    message=f"ASR Result file not found: {asr_result_path}",
-                ),
-            )
-        
-        # 读取 ASR Result 获取整集上下文
-        with open(asr_result_path, "r", encoding="utf-8") as f:
-            asr_data = json.load(f)
-        
-        # 提取整集上下文：episode_context_text = asr.result.text
-        episode_context_text = ""
-        if "result" in asr_data and "text" in asr_data["result"]:
-            episode_context_text = asr_data["result"]["text"]
-            info(f"Loaded episode context: {len(episode_context_text)} characters")
-        else:
-            warning("ASR result.text not found, proceeding without episode context")
-        
-        # 读取 Subtitle Model v1.2
-        with open(subtitle_model_path, "r", encoding="utf-8") as f:
-            model_data = json.load(f)
-        
-        utterances = model_data.get("utterances", [])
-        
-        if not utterances:
+
+        # 读取 dub.json (AsrModel)
+        from dubora.schema.asr_model import AsrModel
+        with open(dub_manifest_path, "r", encoding="utf-8") as f:
+            asr_model = AsrModel.from_dict(json.load(f))
+
+        segments = asr_model.segments
+
+        if not segments:
             return PhaseResult(
                 status="failed",
                 error=ErrorInfo(
                     type="ValueError",
-                    message="No utterances found in Subtitle Model",
+                    message="No segments found in dub.json",
                 ),
             )
-        
+
+        # 构建 utterances 兼容格式（供下游逻辑使用）
+        utterances = []
+        for seg in segments:
+            utterances.append({
+                "utt_id": seg.id,
+                "start_ms": seg.start_ms,
+                "end_ms": seg.end_ms,
+                "text": seg.text,
+                "speaker": {
+                    "id": seg.speaker,
+                    "gender": seg.gender,
+                    "speech_rate": {"zh_tps": seg.speech_rate or 0.0},
+                },
+            })
+
+        # 从 dub.json 构建整集上下文
+        episode_context_text = " ".join(
+            seg.text for seg in segments if seg.text.strip()
+        )
+        if episode_context_text:
+            info(f"Built episode context from dub.json: {len(episode_context_text)} characters")
+        else:
+            warning("No text found in dub.json segments, proceeding without episode context")
+
         # 获取配置
         phase_config = ctx.config.get("phases", {}).get("mt", {})
         

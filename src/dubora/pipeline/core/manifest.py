@@ -223,7 +223,7 @@ class Manifest:
             },
             "asr": {
                 "asr_result": "source/asr-result.json",
-                "asr_fix": "source/asr.fix.json",
+                "asr_model": "source/dub.json",
             },
             "subs": {
                 "subtitle_model": "source/subtitle.model.json",
@@ -248,7 +248,7 @@ class Manifest:
                 "reference_clips": "derive/voiceprint/refs",
             },
             "dub": {
-                "dub_manifest": "source/dub.model.json",
+                "dub_manifest": "source/dub.json",
             },
             "mix": {
                 "audio": "audio/{episode_stem}-mix.wav",

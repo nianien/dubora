@@ -140,6 +140,39 @@ def dub_manifest_to_dict(manifest: DubManifest) -> dict:
     }
 
 
+def dub_manifest_from_asr_model(model: "AsrModel") -> DubManifest:
+    """AsrModel -> DubManifest adapter for TTS/Mix processor consumption."""
+    utterances = []
+    for seg in model.segments:
+        if seg.type == "singing":
+            continue
+        if not seg.text_en or not seg.text_en.strip():
+            continue
+        budget_ms = seg.end_ms - seg.start_ms
+        if budget_ms <= 0:
+            continue
+        policy = seg.tts_policy or {}
+        utterances.append(DubUtterance(
+            utt_id=seg.id,
+            start_ms=seg.start_ms,
+            end_ms=seg.end_ms,
+            budget_ms=budget_ms,
+            text_zh=seg.text,
+            text_en=seg.text_en,
+            speaker=seg.speaker,
+            tts_policy=TTSPolicy(
+                max_rate=policy.get("max_rate", 1.3),
+                allow_extend_ms=policy.get("allow_extend_ms", 0),
+            ),
+            emotion=seg.emotion if seg.emotion != "neutral" else None,
+            gender=seg.gender,
+        ))
+    duration_ms = model.media.duration_ms
+    if duration_ms <= 0 and utterances:
+        duration_ms = utterances[-1].end_ms
+    return DubManifest(audio_duration_ms=duration_ms, utterances=utterances)
+
+
 def dub_manifest_from_dict(data: dict) -> DubManifest:
     """Deserialize DubManifest from dict (JSON input)."""
     utterances = []

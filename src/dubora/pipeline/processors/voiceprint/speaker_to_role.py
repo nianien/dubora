@@ -1,34 +1,31 @@
 """
-声线分配（统一 role_speakers.json）
+声线分配（统一 roles.json）
 
-数据结构（单文件 role_speakers.json）：
+数据结构（单文件 roles.json）：
 {
-  "speakers": { "pa": "PingAn", "el": "ErLv", ... },
   "roles":    { "PingAn": "en_male_hades_moon_bigtts", ... },
   "default_roles": { "male": "LrNan1", "female": "LrNv1", "unknown": "LrNan1" }
 }
 
 解析链路：
-  已标注: speaker → role_id → voice_type
-  未标注: speaker → default_roles[gender] → voice_type
+  已标注: role_id → voice_type
+  未标注: default_roles[gender] → voice_type
 
-提供两个核心函数：
-- update_speakers(): Sub 阶段追加新 speaker
+核心函数：
 - resolve_voice_assignments(): TTS 阶段解析 speaker → voice_type
 """
 import json
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 
 from dubora.utils.logger import info
 
 
-def _load_role_speakers(file_path: str) -> Dict[str, Any]:
-    """加载 role_speakers.json，返回完整数据。不存在则返回空骨架。"""
+def _load_roles(file_path: str) -> Dict[str, Any]:
+    """加载 roles.json，返回完整数据。不存在则返回空骨架。"""
     path = Path(file_path)
     if not path.exists():
         return {
-            "speakers": {},
             "roles": {},
             "default_roles": {"male": "", "female": "", "unknown": ""},
         }
@@ -41,56 +38,21 @@ def _load_role_speakers(file_path: str) -> Dict[str, Any]:
     if isinstance(roles, list):
         data["roles"] = {e["role_id"]: e["voice_type"] for e in roles if e.get("role_id")}
 
-    # 兼容旧版无 speakers 字段
-    if "speakers" not in data:
-        data["speakers"] = {}
     if "default_roles" not in data:
         data["default_roles"] = {}
 
     return data
 
 
-def _save_role_speakers(data: Dict[str, Any], file_path: str) -> None:
-    """原子写入 role_speakers.json。"""
+def _save_roles(data: Dict[str, Any], file_path: str) -> None:
+    """原子写入 roles.json。"""
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    out = {"roles": data.get("roles", {}), "default_roles": data.get("default_roles", {})}
     tmp = path.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        json.dump(out, f, indent=2, ensure_ascii=False)
     tmp.replace(path)
-
-
-def update_speakers(
-    speakers: List[str],
-    file_path: str,
-    episode_id: str = "",
-) -> None:
-    """
-    追加新 speaker 到 role_speakers.json（只添加，不覆盖已有赋值）。
-
-    Sub 阶段完成后调用。
-
-    Args:
-        speakers: 本集发现的 speaker 列表
-        file_path: role_speakers.json 路径
-        episode_id: 集编号（仅用于日志）
-    """
-    data = _load_role_speakers(file_path)
-    speaker_map = data["speakers"]
-
-    added = []
-    for spk in speakers:
-        if spk not in speaker_map:
-            speaker_map[spk] = ""
-            added.append(spk)
-
-    _save_role_speakers(data, file_path)
-
-    tag = f"[ep={episode_id}]" if episode_id else ""
-    if added:
-        info(f"role_speakers{tag}: added {len(added)} new speakers: {added}")
-    else:
-        info(f"role_speakers{tag}: no new speakers")
 
 
 def resolve_voice_assignments(
@@ -98,40 +60,39 @@ def resolve_voice_assignments(
     speaker_genders: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
-    从 role_speakers.json 解析 speaker → voice_type 映射。
+    从 roles.json 解析 role_id → voice_type 映射。
+
+    segment.speaker 现在直接存角色 ID，所以 role_id 就是 speaker。
 
     Args:
-        file_path: role_speakers.json 路径
-        speaker_genders: speaker → gender 映射（"male"/"female"/"unknown"）
+        file_path: roles.json 路径
+        speaker_genders: role_id → gender 映射（"male"/"female"/"unknown"），用于 fallback
 
     Returns:
-        { "pa": {"voice_type": "en_male_...", "role_id": "PingAn"}, ... }
+        { "PingAn": {"voice_type": "en_male_...", "role_id": "PingAn"}, ... }
     """
-    data = _load_role_speakers(file_path)
-    speaker_map = data.get("speakers", {})
+    data = _load_roles(file_path)
     roles = data.get("roles", {})
     default_roles = data.get("default_roles", {})
     genders = speaker_genders or {}
 
-    if not speaker_map:
+    if not roles:
         return {}
 
     result: Dict[str, Dict[str, Any]] = {}
-    for speaker, role_id in speaker_map.items():
-        if not role_id:
-            gender = genders.get(speaker, "unknown")
-            role_id = default_roles.get(gender, default_roles.get("unknown", ""))
-
-        if not role_id:
-            info(f"role_speakers: speaker '{speaker}' has no role assigned, skipping")
-            continue
-
-        voice_type = roles.get(role_id)
+    for role_id, voice_type in roles.items():
         if not voice_type:
-            info(f"role_speakers: role '{role_id}' not found in roles for speaker '{speaker}'")
+            # fallback to default by gender
+            gender = genders.get(role_id, "unknown")
+            fallback_role = default_roles.get(gender, default_roles.get("unknown", ""))
+            if fallback_role and fallback_role in roles:
+                voice_type = roles[fallback_role]
+
+        if not voice_type:
+            info(f"roles: role '{role_id}' has no voice_type assigned, skipping")
             continue
 
-        result[speaker] = {
+        result[role_id] = {
             "voice_type": voice_type,
             "role_id": role_id,
         }
