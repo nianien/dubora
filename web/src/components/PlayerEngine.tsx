@@ -1,23 +1,60 @@
-/** Video player with native timeupdate sync + subtitle overlay */
-import { useRef, useEffect, useMemo } from 'react'
+/** Video player with native timeupdate sync + subtitle overlay + dubbed toggle */
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useModelStore } from '../stores/model-store'
 import { useEditorStore } from '../stores/editor-store'
+import { usePipelineStore } from '../stores/pipeline-store'
 
 export function PlayerEngine() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const seekingExternalRef = useRef(false)
 
   const videoFile = useModelStore(s => s.videoFile)
+  const currentDrama = useModelStore(s => s.currentDrama)
+  const currentEpisode = useModelStore(s => s.currentEpisode)
   const model = useModelStore(s => s.model)
   const currentTime = useEditorStore(s => s.currentTime)
+  const stages = usePipelineStore(s => s.stages)
   const segments = model?.segments ?? []
+
+  // Dubbed video toggle
+  const [showDubbed, setShowDubbed] = useState(false)
+
+  // Check if dubbed video exists (compose stage succeeded)
+  const hasDubbed = stages.find(s => s.key === 'compose')?.status === 'succeeded'
+
+  // Reset toggle when switching episodes or when dubbed becomes unavailable
+  useEffect(() => {
+    setShowDubbed(false)
+  }, [currentDrama, currentEpisode])
+
+  // Derive video sources
+  const originalSrc = videoFile ? `/api/media/${videoFile}` : null
+  const dubbedSrc = (currentDrama && currentEpisode)
+    ? `/api/media/${encodeURIComponent(currentDrama)}/dub/${encodeURIComponent(currentEpisode)}/output/${encodeURIComponent(currentEpisode)}-dubbed.mp4`
+    : null
+
+  const videoSrc = (showDubbed && dubbedSrc) ? dubbedSrc : originalSrc
 
   // Find the segment that covers the current playback time
   const currentSub = useMemo(() => {
     return segments.find(s => s.start_ms <= currentTime && currentTime < s.end_ms) ?? null
   }, [segments, currentTime])
 
-  const videoSrc = videoFile ? `/api/media/${videoFile}` : null
+  // Preserve playback position when toggling
+  const handleToggle = useCallback(() => {
+    const v = videoRef.current
+    const wasPlaying = v && !v.paused
+    const pos = v ? v.currentTime : 0
+    setShowDubbed(prev => !prev)
+    // Restore position after src change
+    requestAnimationFrame(() => {
+      const v2 = videoRef.current
+      if (v2) {
+        v2.currentTime = pos
+        if (wasPlaying) v2.play()
+      }
+    })
+  }, [])
 
   // Bind all video events — use getState() to avoid subscribing to store changes
   useEffect(() => {
@@ -82,7 +119,7 @@ export function PlayerEngine() {
     return unsub
   }, [])
 
-  if (!videoSrc) {
+  if (!originalSrc) {
     return (
       <div className="flex items-center justify-center h-full bg-gray-900 text-gray-500">
         {model ? 'Video file not found' : 'No video loaded'}
@@ -94,7 +131,7 @@ export function PlayerEngine() {
     <div className="relative h-full bg-black flex items-center justify-center">
       <video
         ref={videoRef}
-        src={videoSrc}
+        src={videoSrc ?? undefined}
         className="max-w-full max-h-full cursor-pointer"
         onClick={() => {
           const v = videoRef.current
@@ -102,7 +139,9 @@ export function PlayerEngine() {
         }}
         preload="auto"
       />
-      {currentSub && (
+
+      {/* Subtitle overlay (only for original video) */}
+      {!showDubbed && currentSub && (
         <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none px-4">
           <span
             className="text-white px-3 py-1 rounded max-w-[90%] text-center"
@@ -114,6 +153,22 @@ export function PlayerEngine() {
             )}
           </span>
         </div>
+      )}
+
+      {/* Dubbed toggle button */}
+      {hasDubbed && (
+        <button
+          onClick={handleToggle}
+          className={`
+            absolute top-2 right-2 px-2 py-1 rounded text-xs font-mono
+            ${showDubbed
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-700/80 text-gray-300 hover:bg-gray-600/80'}
+          `}
+          title={showDubbed ? 'Playing dubbed video (click for original)' : 'Play dubbed video'}
+        >
+          {showDubbed ? 'Dubbed' : 'Original'}
+        </button>
       )}
     </div>
   )
