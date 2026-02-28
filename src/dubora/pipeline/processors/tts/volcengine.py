@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import requests
 
+from dubora.config import emotion_supports_lang
 from dubora.schema.dub_manifest import DubManifest
 from dubora.schema.tts_report import TTSReport, TTSSegmentReport, TTSSegmentStatus
 
@@ -772,12 +773,18 @@ def synthesize_tts_per_segment(
         voice_info = voice_assignment["speakers"].get(speaker, {})
         voice_id = voice_info.get("voice_type", "zh_female_shuangkuaisisi_moon_bigtts")
         params = voice_info.get("params", {})
-        # emotion / speed_ratio 暂不传给 TTS API，保持原有行为
-        # TODO: emotion 需要按目标语言过滤（emotions.json 的 lang 字段），未过滤直接传会导致 API 报错
-        # TODO: speed_ratio 需要两次试探（先 1.0 合成量测，再决定是否重新合成）
+        # emotion：只传目标语言支持的（emotions.json 的 lang 字段）
+        # 不支持的（如 coldness/hate 只有 zh）不传，走默认语气，避免 API 报错
+        raw_emotion = utt.emotion
+        tts_lang = "en" if language.startswith("en") else "zh"
+        emotion = raw_emotion if raw_emotion and emotion_supports_lang(raw_emotion, tts_lang) else None
 
-        # Generate cache key（与改动前一致：prosody={}）
+        # speed_ratio 暂不传：需要两次试探（先 1.0 合成量测，再决定是否重新合成）
+
+        # cache key: emotion 参与（不同情绪产出不同音频），不支持的 emotion 已被过滤为 None
         prosody = {}
+        if emotion:
+            prosody["emotion"] = emotion
         cache_key = _generate_cache_key(text, voice_id, prosody, language)
         cache_file = cache_dir / f"{cache_key}.wav"
 
@@ -795,6 +802,7 @@ def synthesize_tts_per_segment(
                     resource_id=resource_id,
                     format=format,
                     sample_rate=sample_rate,
+                    emotion=emotion,
                 )
 
                 # Convert to WAV
