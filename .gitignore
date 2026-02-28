@@ -57,6 +57,13 @@ logs/
 Thumbs.db
 
 # =========================
+# Frontend (web/)
+# =========================
+web/node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo
+
+# =========================
 # Misc
 # =========================
 .cache/
