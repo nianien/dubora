@@ -187,11 +187,7 @@ export function TranscriptList() {
 
   const handleTextCommit = useCallback((id: string) => {
     const trimmed = editText.trim()
-    if (editingField === 'text') {
-      if (trimmed) updateSegment(id, { text: trimmed })
-    } else {
-      updateSegment(id, { text_en: trimmed })
-    }
+    updateSegment(id, { [editingField]: trimmed })
     setEditingId(null)
   }, [editText, editingField, updateSegment])
 
@@ -271,6 +267,8 @@ export function TranscriptList() {
           const newSeg = makeEmptySeg(newStart, seg.start_ms, seg.speaker)
           insertSegment(idx, newSeg)
           selectSegment(newSeg.id)
+          // 自动进入中文文本编辑模式
+          setTimeout(() => handleDoubleClick(newSeg, 'text'), 50)
         },
       },
       {
@@ -280,6 +278,8 @@ export function TranscriptList() {
           const newSeg = makeEmptySeg(seg.end_ms, newEnd, seg.speaker)
           insertSegment(idx + 1, newSeg)
           selectSegment(newSeg.id)
+          // 自动进入中文文本编辑模式
+          setTimeout(() => handleDoubleClick(newSeg, 'text'), 50)
         },
       },
       {
@@ -406,16 +406,17 @@ export function TranscriptList() {
                     onChange={e => setEditText(e.target.value)}
                     onBlur={() => handleTextCommit(seg.id)}
                     onKeyDown={e => handleTextKeyDown(e, seg.id)}
-                    className="w-full bg-gray-800 text-gray-100 px-2 py-0.5 rounded text-sm outline-none ring-1 ring-blue-400"
+                    className="w-full bg-gray-800 text-gray-100 px-2 py-1 rounded text-sm outline-none ring-1 ring-blue-400"
+                    placeholder="输入中文原文..."
                     autoFocus
                   />
                 ) : (
-                  <span
-                    className={`text-sm truncate block ${isPlayingNow ? 'text-green-100 font-medium' : ''}`}
+                  <div
+                    className={`text-sm truncate px-1 py-0.5 rounded cursor-text hover:bg-gray-700/50 ${seg.text ? (isPlayingNow ? 'text-green-100 font-medium' : '') : 'text-gray-600 italic'}`}
                     onDoubleClick={e => { e.stopPropagation(); handleDoubleClick(seg, 'text') }}
                   >
-                    {seg.text}
-                  </span>
+                    {seg.text || '(空)'}
+                  </div>
                 )}
                 {isEditing && editingField === 'text_en' ? (
                   <input
@@ -424,17 +425,17 @@ export function TranscriptList() {
                     onChange={e => setEditText(e.target.value)}
                     onBlur={() => handleTextCommit(seg.id)}
                     onKeyDown={e => handleTextKeyDown(e, seg.id)}
-                    className="w-full bg-gray-800 text-gray-400 px-2 py-0.5 rounded text-xs outline-none ring-1 ring-blue-400 mt-0.5"
+                    className="w-full bg-gray-800 text-gray-400 px-2 py-1 rounded text-xs outline-none ring-1 ring-blue-400 mt-0.5"
                     placeholder="English translation..."
                     autoFocus
                   />
                 ) : (
-                  <span
-                    className="text-xs text-gray-500 truncate block cursor-text mt-0.5"
+                  <div
+                    className="text-xs text-gray-500 truncate px-1 py-0.5 rounded cursor-text hover:bg-gray-700/50 mt-0.5 min-h-[20px] leading-[20px]"
                     onDoubleClick={e => { e.stopPropagation(); handleDoubleClick(seg, 'text_en') }}
                   >
                     {seg.text_en || '\u00A0'}
-                  </span>
+                  </div>
                 )}
               </div>
 

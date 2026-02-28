@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Literal, Optional, Set
 
 Status = Literal["pending", "running", "succeeded", "failed", "skipped"]
 
+GateStatus = Literal["pending", "awaiting", "passed"]
+
 
 @dataclass(frozen=True)
 class Artifact:

@@ -68,12 +68,12 @@ class AlignPhase(Phase):
     version = "1.1.0"
 
     def requires(self) -> list[str]:
-        """需要 mt.mt_output 和 demux.audio。
+        """需要 mt.mt_output 和 extract.audio。
 
         注意：dub.json 直接从磁盘读取（不通过 manifest requires），
         因为 align 既读又写 dub.json，如果声明为 requires 会造成指纹循环。
         """
-        return ["mt.mt_output", "demux.audio"]
+        return ["mt.mt_output", "extract.audio"]
 
     def provides(self) -> list[str]:
         """生成 subs.en_srt, dub.dub_manifest (updated dub.json)。"""
@@ -96,7 +96,7 @@ class AlignPhase(Phase):
         5. 写回更新后的 dub.json
         """
         # 直接从磁盘读取 dub.json（不通过 inputs，避免指纹循环）
-        dub_json_path = Path(ctx.workspace) / "source" / "dub.json"
+        dub_json_path = Path(ctx.workspace) / "state" / "dub.json"
         if not dub_json_path.exists():
             return PhaseResult(
                 status="failed",
@@ -118,8 +118,8 @@ class AlignPhase(Phase):
                 ),
             )
 
-        # Probe audio duration from demux.audio (SSOT for total duration)
-        audio_artifact = inputs["demux.audio"]
+        # Probe audio duration from extract.audio (SSOT for total duration)
+        audio_artifact = inputs["extract.audio"]
         audio_path = Path(ctx.workspace) / audio_artifact.relpath
         if not audio_path.exists():
             return PhaseResult(

@@ -30,8 +30,8 @@ async def get_asr_model(request: Request, drama: str, ep: str) -> dict:
     如果不存在，自动从 asr-result.json 导入并创建。
     """
     workdir = _get_workdir(request, drama, ep)
-    source_dir = workdir / "source"
-    model_path = source_dir / "dub.json"
+    state_dir = workdir / "state"
+    model_path = state_dir / "dub.json"
 
     if model_path.is_file():
         with open(model_path, "r", encoding="utf-8") as f:
@@ -39,7 +39,8 @@ async def get_asr_model(request: Request, drama: str, ep: str) -> dict:
         return data
 
     # 自动从 asr-result.json 导入
-    asr_result_path = source_dir / "asr-result.json"
+    input_dir = workdir / "input"
+    asr_result_path = input_dir / "asr-result.json"
     if not asr_result_path.is_file():
         raise HTTPException(
             status_code=404,
@@ -64,7 +65,7 @@ async def get_asr_model(request: Request, drama: str, ep: str) -> dict:
 
     # 保存（原子写入）
     content = json.dumps(model.to_dict(), indent=2, ensure_ascii=False)
-    source_dir.mkdir(parents=True, exist_ok=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
     atomic_write(content, model_path)
 
     return model.to_dict()
@@ -76,8 +77,8 @@ async def put_asr_model(request: Request, drama: str, ep: str) -> dict:
     保存 dub.json（rev+1, 重算 fingerprint, atomic write）。
     """
     workdir = _get_workdir(request, drama, ep)
-    source_dir = workdir / "source"
-    model_path = source_dir / "dub.json"
+    state_dir = workdir / "state"
+    model_path = state_dir / "dub.json"
 
     body = await request.json()
     model = AsrModel.from_dict(body)
@@ -88,7 +89,7 @@ async def put_asr_model(request: Request, drama: str, ep: str) -> dict:
     model.update_fingerprint()
 
     content = json.dumps(model.to_dict(), indent=2, ensure_ascii=False)
-    source_dir.mkdir(parents=True, exist_ok=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
     atomic_write(content, model_path)
 
     return model.to_dict()

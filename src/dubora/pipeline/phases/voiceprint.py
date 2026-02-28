@@ -2,7 +2,7 @@
 Voiceprint Phase: 声纹识别（Sub 之后、MT 之前）
 
 输入:
-  - sep.vocals: 分离后的人声音频
+  - extract.vocals: 分离后的人声音频
   - asr.asr_result: ASR 原始结果（含 speaker 分段）
 
 输出:
@@ -34,8 +34,8 @@ class VoiceprintPhase(Phase):
     version = "1.0.0"
 
     def requires(self) -> list[str]:
-        """需要 sep.vocals（人声音频）和 asr.asr_result（ASR 结果）。"""
-        return ["sep.vocals", "asr.asr_result"]
+        """需要 extract.vocals（人声音频）和 asr.asr_result（ASR 结果）。"""
+        return ["extract.vocals", "asr.asr_result"]
 
     def provides(self) -> list[str]:
         """生成 speaker_map 和参考音频片段。"""
@@ -57,13 +57,13 @@ class VoiceprintPhase(Phase):
         4. 保存 speaker_map.json 和参考音频
         """
         # 获取输入
-        vocals_artifact = inputs.get("sep.vocals")
+        vocals_artifact = inputs.get("extract.vocals")
         if not vocals_artifact:
             return PhaseResult(
                 status="failed",
                 error=ErrorInfo(
                     type="ValueError",
-                    message="sep.vocals artifact not found. Make sure sep phase completed.",
+                    message="extract.vocals artifact not found. Make sure sep phase completed.",
                 ),
             )
 

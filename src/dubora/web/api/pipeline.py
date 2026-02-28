@@ -6,7 +6,6 @@ dub.json 是 pipeline 唯一 SSOT，不再需要 export/sync/merge 中间步骤�
 import asyncio
 import json
 import logging
-import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -14,12 +13,14 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from dubora.pipeline.phases import ALL_PHASES, GATES, STAGES
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# 9-phase ordered list
-PHASE_NAMES = ["demux", "sep", "asr", "sub", "mt", "align", "tts", "mix", "burn"]
+# Phase metadata from backend registry
+PHASES_META = [{"name": p.name, "label": p.label} for p in ALL_PHASES]
 
 # In-memory lock: one running pipeline per episode
 _running: dict[str, asyncio.subprocess.Process] = {}
@@ -38,7 +39,7 @@ def _find_video(videos_dir: Path, drama: str, ep: str) -> Optional[Path]:
 
 
 def _read_manifest_phases(workdir: Path) -> list[dict]:
-    """Read manifest.json and return phase status summary for all 9 phases."""
+    """Read manifest.json and return phase status summary for all 8 phases."""
     manifest_path = workdir / "manifest.json"
     phases_data: dict = {}
     if manifest_path.is_file():
@@ -47,11 +48,12 @@ def _read_manifest_phases(workdir: Path) -> list[dict]:
         phases_data = data.get("phases", {})
 
     result = []
-    for name in PHASE_NAMES:
-        pd = phases_data.get(name)
+    for meta in PHASES_META:
+        pd = phases_data.get(meta["name"])
         if pd:
             result.append({
-                "name": name,
+                "name": meta["name"],
+                "label": meta["label"],
                 "status": pd.get("status", "pending"),
                 "started_at": pd.get("started_at"),
                 "finished_at": pd.get("finished_at"),
@@ -61,7 +63,8 @@ def _read_manifest_phases(workdir: Path) -> list[dict]:
             })
         else:
             result.append({
-                "name": name,
+                "name": meta["name"],
+                "label": meta["label"],
                 "status": "pending",
                 "started_at": None,
                 "finished_at": None,
@@ -69,6 +72,50 @@ def _read_manifest_phases(workdir: Path) -> list[dict]:
                 "metrics": {},
                 "error": None,
             })
+    return result
+
+
+def _derive_stages(phases: list[dict]) -> list[dict]:
+    """Derive stage status from phase statuses."""
+    phase_map = {p["name"]: p for p in phases}
+    result = []
+    for stage_def in STAGES:
+        child_phases = [phase_map.get(pn) for pn in stage_def["phases"] if phase_map.get(pn)]
+        if any(p["status"] == "failed" for p in child_phases):
+            status = "failed"
+        elif any(p["status"] == "running" for p in child_phases):
+            status = "running"
+        elif all(p["status"] in ("succeeded", "skipped") for p in child_phases):
+            status = "succeeded"
+        else:
+            status = "pending"
+        result.append({
+            "key": stage_def["key"],
+            "label": stage_def["label"],
+            "phases": stage_def["phases"],
+            "status": status,
+        })
+    return result
+
+
+def _read_manifest_gates(workdir: Path) -> list[dict]:
+    """Read manifest.json and return gate status for all gates."""
+    manifest_path = workdir / "manifest.json"
+    gates_data: dict = {}
+    if manifest_path.is_file():
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        gates_data = data.get("gates", {})
+
+    result = []
+    for gate_def in GATES:
+        gd = gates_data.get(gate_def["key"])
+        result.append({
+            "key": gate_def["key"],
+            "after": gate_def["after"],
+            "label": gate_def["label"],
+            "status": gd.get("status", "pending") if gd else "pending",
+        })
     return result
 
 
@@ -83,9 +130,12 @@ async def pipeline_status(request: Request, drama: str, ep: str) -> dict:
     workdir = _workdir(videos_dir, drama, ep)
     manifest_path = workdir / "manifest.json"
 
+    phases = _read_manifest_phases(workdir)
     return {
         "has_manifest": manifest_path.is_file(),
-        "phases": _read_manifest_phases(workdir),
+        "phases": phases,
+        "gates": _read_manifest_gates(workdir),
+        "stages": _derive_stages(phases),
     }
 
 
@@ -119,8 +169,8 @@ async def run_pipeline_stream(request: Request, drama: str, ep: str):
         raise HTTPException(status_code=404, detail=f"Video file not found for {drama}/{ep}")
 
     body = await request.json() if await request.body() else {}
-    from_phase = body.get("from_phase", "mt")
-    to_phase = body.get("to_phase", "burn")
+    from_phase = body.get("from_phase")
+    to_phase = body.get("to_phase")
 
     async def event_stream():
         def sse(event: str, data: dict) -> str:
@@ -131,11 +181,14 @@ async def run_pipeline_stream(request: Request, drama: str, ep: str):
         cmd = [
             sys.executable, "-m", "dubora.cli",
             "run", str(video_path),
-            "--from", from_phase,
-            "--to", to_phase,
         ]
+        if from_phase:
+            cmd += ["--from", from_phase]
+        if to_phase:
+            cmd += ["--to", to_phase]
 
-        yield sse("log", {"line": f"Pipeline started: --from {from_phase} --to {to_phase}"})
+        desc = f"--from {from_phase} --to {to_phase}" if from_phase or to_phase else "auto-advance"
+        yield sse("log", {"line": f"Pipeline started: {desc}"})
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -154,9 +207,9 @@ async def run_pipeline_stream(request: Request, drama: str, ep: str):
 
                 # Detect phase transitions from log output
                 line_lower = line.lower()
-                for pname in PHASE_NAMES:
-                    if pname in line_lower and ("phase" in line_lower or "running" in line_lower):
-                        yield sse("phase", {"name": pname})
+                for meta in PHASES_META:
+                    if meta["name"] in line_lower and ("phase" in line_lower or "running" in line_lower):
+                        yield sse("phase", {"name": meta["name"]})
                         break
 
             returncode = await proc.wait()
@@ -183,22 +236,6 @@ async def run_pipeline_stream(request: Request, drama: str, ep: str):
 
 
 # --------------------------------------------------------------------------- #
-# Deprecated endpoints (kept to avoid frontend 404s)
-# --------------------------------------------------------------------------- #
-
-@router.post("/episodes/{drama}/{ep}/pipeline/merge-translations")
-async def merge_translations_endpoint(request: Request, drama: str, ep: str) -> dict:
-    """Deprecated: dub.json is now the single SSOT, no merge needed."""
-    return {"status": "ok", "updated": 0, "deprecated": True}
-
-
-@router.post("/episodes/{drama}/{ep}/pipeline/sync-translations")
-async def sync_translations_endpoint(request: Request, drama: str, ep: str) -> dict:
-    """Deprecated: dub.json is now the single SSOT, no sync needed."""
-    return {"status": "ok", "updated": 0, "deprecated": True}
-
-
-# --------------------------------------------------------------------------- #
 # POST /episodes/{drama}/{ep}/pipeline/cancel
 # --------------------------------------------------------------------------- #
 
@@ -217,55 +254,3 @@ async def cancel_pipeline(request: Request, drama: str, ep: str) -> dict:
     _running.pop(lock_key, None)
 
     return {"status": "cancelled"}
-
-
-# --------------------------------------------------------------------------- #
-# POST /episodes/{drama}/{ep}/pipeline/run  (legacy blocking)
-# --------------------------------------------------------------------------- #
-
-@router.post("/episodes/{drama}/{ep}/pipeline/run")
-async def run_pipeline(request: Request, drama: str, ep: str) -> dict:
-    """
-    Legacy blocking pipeline execution (subprocess).
-    Kept for backward compatibility.
-    """
-    videos_dir: Path = request.app.state.videos_dir
-
-    video_path = _find_video(videos_dir, drama, ep)
-    if not video_path:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Video file not found for {drama}/{ep}",
-        )
-
-    body = await request.json() if await request.body() else {}
-    from_phase = body.get("from_phase", "mt")
-    to_phase = body.get("to_phase", "burn")
-
-    cmd = [
-        sys.executable, "-m", "dubora.cli",
-        "run", str(video_path),
-        "--from", from_phase,
-        "--to", to_phase,
-    ]
-
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600,  # 10 minutes
-        )
-        return {
-            "status": "ok" if result.returncode == 0 else "error",
-            "returncode": result.returncode,
-            "stdout": result.stdout[-2000:] if result.stdout else "",
-            "stderr": result.stderr[-2000:] if result.stderr else "",
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "status": "timeout",
-            "returncode": -1,
-            "stdout": "",
-            "stderr": "Pipeline execution timed out (10 min)",
-        }

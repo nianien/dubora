@@ -180,9 +180,9 @@ def compute_config_fingerprint(
     phase_config = config.get("phases", {}).get(phase_name, {})
     
     # 提取 phase 需要的全局配置
-    # 目前已知：demux, mix, burn 需要 video_path
+    # 目前已知：extract, mix, burn 需要 video_path
     global_config_keys = []
-    if phase_name in ("demux", "mix", "burn"):
+    if phase_name in ("extract", "mix", "burn"):
         if "video_path" in config:
             global_config_keys.append("video_path")
     

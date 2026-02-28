@@ -119,12 +119,12 @@ class MixPhase(Phase):
             from dubora.pipeline.core.manifest import Manifest
             manifest_path = workspace_path / "manifest.json"
             manifest = Manifest(manifest_path)
-            accompaniment_artifact = manifest.get_artifact("sep.accompaniment", required_by=None)
+            accompaniment_artifact = manifest.get_artifact("extract.accompaniment", required_by=None)
             accompaniment_path = workspace_path / accompaniment_artifact.relpath
             if not accompaniment_path.exists():
                 accompaniment_path = None
 
-            vocals_artifact = manifest.get_artifact("sep.vocals", required_by=None)
+            vocals_artifact = manifest.get_artifact("extract.vocals", required_by=None)
             vocals_path = workspace_path / vocals_artifact.relpath
             if not vocals_path.exists():
                 vocals_path = None

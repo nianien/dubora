@@ -27,10 +27,10 @@ def do_export(videos_dir: Path, drama: str, ep: str) -> dict:
         FileNotFoundError: dub.json 不存在
     """
     workdir = videos_dir / drama / "dub" / ep
-    source_dir = workdir / "source"
-    render_dir = workdir / "render"
+    state_dir = workdir / "state"
+    output_dir = workdir / "output"
 
-    model_path = source_dir / "dub.json"
+    model_path = state_dir / "dub.json"
     if not model_path.is_file():
         raise FileNotFoundError("dub.json not found")
 
@@ -47,7 +47,7 @@ def do_export(videos_dir: Path, drama: str, ep: str) -> dict:
     # 1. Export subtitle.model.json
     sub_model = export_subtitle_model(asr_model, roles_data=roles_data)
     sub_dict = _subtitle_model_to_dict(sub_model)
-    sub_path = source_dir / "subtitle.model.json"
+    sub_path = state_dir / "subtitle.model.json"
     atomic_write(
         json.dumps(sub_dict, indent=2, ensure_ascii=False),
         sub_path,
@@ -55,9 +55,9 @@ def do_export(videos_dir: Path, drama: str, ep: str) -> dict:
     exported_files.append(str(sub_path.relative_to(workdir)))
 
     # 2. Export zh.srt
-    render_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     srt_content = _build_zh_srt(sub_model)
-    srt_path = render_dir / "zh.srt"
+    srt_path = output_dir / "zh.srt"
     atomic_write(srt_content, srt_path)
     exported_files.append(str(srt_path.relative_to(workdir)))
 

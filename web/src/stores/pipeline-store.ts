@@ -1,143 +1,46 @@
-/** Pipeline Store: phase status, SSE run, log streaming, workflow derivation */
+/** Pipeline Store: phase status, gate status, SSE run, log streaming */
 import { create } from 'zustand'
-import type { PhaseStatus, PipelineStatusResponse, WorkflowStep, StepStatus } from '../types/pipeline'
-import { PHASE_NAMES, WORKFLOW_STEPS_DEF } from '../types/pipeline'
+import type { PhaseStatus, GateStatus, StageInfo, PipelineStatusResponse } from '../types/pipeline'
+import { PHASE_NAMES } from '../types/pipeline'
 import { fetchJson } from '../utils/api'
 
-// ---- Workflow derivation ----
-
-function deriveStepStatus(
-  stepDef: typeof WORKFLOW_STEPS_DEF[number],
-  stepIndex: number,
-  phases: PhaseStatus[],
-  allStepDefs: typeof WORKFLOW_STEPS_DEF,
-): StepStatus {
-  const phaseMap = new Map(phases.map(p => [p.name, p]))
-
-  if (stepDef.isCalibration) {
-    // Find the previous non-calibration step
-    let prevDone = false
-    for (let i = stepIndex - 1; i >= 0; i--) {
-      const prev = allStepDefs[i]
-      if (!prev.isCalibration && prev.phases.length > 0) {
-        prevDone = prev.phases.every(pn => {
-          const p = phaseMap.get(pn)
-          return p && (p.status === 'succeeded' || p.status === 'skipped')
-        })
-        break
-      }
-    }
-
-    // Find the next non-calibration step
-    let nextStarted = false
-    for (let i = stepIndex + 1; i < allStepDefs.length; i++) {
-      const next = allStepDefs[i]
-      if (!next.isCalibration && next.phases.length > 0) {
-        nextStarted = next.phases.some(pn => {
-          const p = phaseMap.get(pn)
-          return p && p.status !== 'pending'
-        })
-        break
-      }
-    }
-
-    if (prevDone && !nextStarted) return 'calibrating'
-    if (prevDone && nextStarted) return 'done'
-    return 'pending'
-  }
-
-  // Non-calibration step
-  const stepPhases = stepDef.phases.map(pn => phaseMap.get(pn)).filter(Boolean) as PhaseStatus[]
-  if (stepPhases.length === 0) return 'pending'
-
-  if (stepPhases.some(p => p.status === 'failed')) return 'failed'
-  if (stepPhases.some(p => p.status === 'running')) return 'running'
-  if (stepPhases.every(p => p.status === 'succeeded' || p.status === 'skipped')) return 'done'
-  return 'pending'
-}
-
-function deriveWorkflowSteps(phases: PhaseStatus[]): WorkflowStep[] {
-  return WORKFLOW_STEPS_DEF.map((def, i) => ({
-    ...def,
-    status: deriveStepStatus(def, i, phases, WORKFLOW_STEPS_DEF),
-  }))
-}
+// ---- Action derivation ----
 
 export interface WorkflowAction {
   label: string
-  fromPhase: string
-  toPhase: string
 }
 
-function deriveAction(steps: WorkflowStep[]): WorkflowAction | null {
-  // If any step is running, action is cancel (handled separately via isRunning)
-  if (steps.some(s => s.status === 'running')) return null
-
-  // All done
-  if (steps.every(s => s.status === 'done')) return null
-
-  // If all pending -> "开始" (demux->sub)
-  if (steps.every(s => s.status === 'pending')) {
-    return { label: '开始', fromPhase: 'demux', toPhase: 'sub' }
-  }
-
-  // calib1 calibrating -> "继续" (mt->align)
-  const calib1 = steps.find(s => s.key === 'calib1')
-  if (calib1?.status === 'calibrating') {
-    return { label: '继续', fromPhase: 'mt', toPhase: 'align' }
-  }
-
-  // calib2 calibrating -> "继续" (tts->burn)
-  const calib2 = steps.find(s => s.key === 'calib2')
-  if (calib2?.status === 'calibrating') {
-    return { label: '继续', fromPhase: 'tts', toPhase: 'burn' }
-  }
-
-  // If any step failed, allow re-run from that step to end of its segment
-  const failedStep = steps.find(s => s.status === 'failed' && !s.isCalibration)
-  if (failedStep && failedStep.phases.length > 0) {
-    const failedIdx = steps.indexOf(failedStep)
-    // Find last phase before next calibration point (or end)
-    let toPhase = failedStep.phases[failedStep.phases.length - 1]
-    for (let i = failedIdx + 1; i < steps.length; i++) {
-      if (steps[i].isCalibration) break
-      if (steps[i].phases.length > 0) {
-        toPhase = steps[i].phases[steps[i].phases.length - 1]
-      }
-    }
-    return { label: '重试', fromPhase: failedStep.phases[0], toPhase }
-  }
-
-  return null
+function deriveAction(phases: PhaseStatus[], gates: GateStatus[]): WorkflowAction | null {
+  if (phases.some(p => p.status === 'running')) return null
+  if (phases.every(p => p.status === 'succeeded' || p.status === 'skipped')
+      && gates.every(g => g.status === 'passed')) return null
+  if (gates.some(g => g.status === 'awaiting')) return { label: '继续' }
+  if (phases.some(p => p.status === 'failed')) return { label: '重试' }
+  return { label: '开始' }
 }
 
 // ---- Store ----
 
 interface PipelineState {
   phases: PhaseStatus[]
+  gates: GateStatus[]
+  stages: StageInfo[]
   isRunning: boolean
   logs: string[]
   runError: string | null
-
-  // Workflow derivations
-  steps: WorkflowStep[]
   currentAction: WorkflowAction | null
-  selectedStepKey: string | null
 
   // Actions
   loadStatus: (drama: string, ep: string) => Promise<void>
-  runPipeline: (drama: string, ep: string, opts: {
-    from_phase: string
-    to_phase: string
-  }) => Promise<void>
+  runPipeline: (drama: string, ep: string, fromPhase?: string) => Promise<void>
   cancelRun: () => void
   clearLogs: () => void
-  selectStep: (stepKey: string) => void
 }
 
 const defaultPhases: PhaseStatus[] = PHASE_NAMES.map(name => ({
   name,
-  status: 'pending',
+  label: '',
+  status: 'pending' as const,
   started_at: null,
   finished_at: null,
   skipped: false,
@@ -145,7 +48,14 @@ const defaultPhases: PhaseStatus[] = PHASE_NAMES.map(name => ({
   error: null,
 }))
 
-const defaultSteps = deriveWorkflowSteps(defaultPhases)
+const defaultGates: GateStatus[] = []
+const defaultStages: StageInfo[] = [
+  { key: 'extract',   label: '提取', phases: ['extract'],        status: 'pending' },
+  { key: 'recognize', label: '识别', phases: ['asr', 'parse'],   status: 'pending' },
+  { key: 'translate', label: '翻译', phases: ['mt', 'align'],    status: 'pending' },
+  { key: 'dub',       label: '配音', phases: ['tts', 'mix'],     status: 'pending' },
+  { key: 'compose',   label: '合成', phases: ['burn'],           status: 'pending' },
+]
 
 // AbortController for current SSE connection
 let _abortController: AbortController | null = null
@@ -155,47 +65,59 @@ let _currentEp = ''
 
 export const usePipelineStore = create<PipelineState>((set, get) => ({
   phases: defaultPhases,
+  gates: defaultGates,
+  stages: defaultStages,
   isRunning: false,
   logs: [],
   runError: null,
-  steps: defaultSteps,
-  currentAction: deriveAction(defaultSteps),
-  selectedStepKey: null,
+  currentAction: deriveAction(defaultPhases, defaultGates),
 
   loadStatus: async (drama, ep) => {
     _currentDrama = drama
     _currentEp = ep
+    // Reset to all-pending to prevent stale action when switching episodes
+    set({
+      phases: defaultPhases,
+      gates: defaultGates,
+      stages: defaultStages,
+      currentAction: deriveAction(defaultPhases, defaultGates),
+    })
     try {
       const data = await fetchJson<PipelineStatusResponse>(
         `/episodes/${encodeURIComponent(drama)}/${encodeURIComponent(ep)}/pipeline/status`,
       )
-      const steps = deriveWorkflowSteps(data.phases)
+      const gates = data.gates ?? []
+      const stages = data.stages ?? []
       set({
         phases: data.phases,
-        steps,
-        currentAction: deriveAction(steps),
-        selectedStepKey: null,
+        gates,
+        stages,
+        currentAction: deriveAction(data.phases, gates),
       })
     } catch {
       set({
         phases: defaultPhases,
-        steps: defaultSteps,
-        currentAction: deriveAction(defaultSteps),
+        gates: defaultGates,
+        stages: defaultStages,
+        currentAction: deriveAction(defaultPhases, defaultGates),
       })
     }
   },
 
-  runPipeline: async (drama, ep, opts) => {
+  runPipeline: async (drama, ep, fromPhase?) => {
     // Cancel any existing run
     get().cancelRun()
 
     _currentDrama = drama
     _currentEp = ep
 
-    set({ isRunning: true, logs: [], runError: null, selectedStepKey: null })
+    set({ isRunning: true, logs: [], runError: null })
 
     _abortController = new AbortController()
     const { signal } = _abortController
+
+    const body: Record<string, string> = {}
+    if (fromPhase) body.from_phase = fromPhase
 
     try {
       const res = await fetch(
@@ -203,10 +125,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from_phase: opts.from_phase,
-            to_phase: opts.to_phase,
-          }),
+          body: JSON.stringify(body),
           signal,
         },
       )
@@ -305,29 +224,4 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   clearLogs: () => set({ logs: [], runError: null }),
-
-  selectStep: (stepKey: string) => {
-    const steps = get().steps
-    const step = steps.find(s => s.key === stepKey)
-    if (!step || step.status !== 'done') return
-
-    if (step.isCalibration) {
-      // Calibration step: re-enter calibration, run from next execution step to end
-      const stepIndex = steps.indexOf(step)
-      const newSteps = steps.map((s, i) =>
-        i === stepIndex ? { ...s, status: 'calibrating' as StepStatus } : s
-      )
-      set({
-        steps: newSteps,
-        currentAction: deriveAction(newSteps),
-        selectedStepKey: stepKey,
-      })
-    } else {
-      // Execution step: re-run from this step's first phase to burn
-      set({
-        selectedStepKey: stepKey,
-        currentAction: { label: '重新执行', fromPhase: step.phases[0], toPhase: 'burn' },
-      })
-    }
-  },
 }))

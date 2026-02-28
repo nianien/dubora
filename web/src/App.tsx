@@ -21,7 +21,8 @@ export default function App() {
   } = useModelStore()
 
   const pipelineIsRunning = usePipelineStore(s => s.isRunning)
-  const pipelineSteps = usePipelineStore(s => s.steps)
+  const pipelinePhases = usePipelineStore(s => s.phases)
+  const pipelineGates = usePipelineStore(s => s.gates)
 
   useEffect(() => {
     loadEpisodes()
@@ -97,18 +98,18 @@ export default function App() {
 
         {/* Workflow status indicator */}
         {pipelineIsRunning && (() => {
-          const runningStep = pipelineSteps.find(s => s.status === 'running')
+          const runningPhase = pipelinePhases.find(p => p.status === 'running')
           return (
             <span className="text-xs text-blue-400 animate-pulse">
-              {runningStep?.label ?? '...'}
+              {runningPhase?.label ?? '...'}
             </span>
           )
         })()}
         {!pipelineIsRunning && (() => {
-          const calibStep = pipelineSteps.find(s => s.status === 'calibrating')
-          return calibStep ? (
+          const awaitingGate = pipelineGates.find(g => g.status === 'awaiting')
+          return awaitingGate ? (
             <span className="text-xs text-yellow-400">
-              {calibStep.label}
+              {awaitingGate.label}
             </span>
           ) : null
         })()}

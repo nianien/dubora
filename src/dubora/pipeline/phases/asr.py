@@ -36,8 +36,8 @@ class ASRPhase(Phase):
     version = "1.0.0"
 
     def requires(self) -> list[str]:
-        """需要 demux.audio 或 sep.vocals（由 _LazyPhase 根据 config 动态决定）。"""
-        return ["demux.audio"]
+        """需要 extract.audio 或 extract.vocals（由 _LazyPhase 根据 config 动态决定）。"""
+        return ["extract.audio"]
 
     def provides(self) -> list[str]:
         """生成 asr.asr_result（SSOT）。
@@ -65,8 +65,8 @@ class ASRPhase(Phase):
         5. 保存 IR 和 raw response
         6. 自动生成 asr.fix.json
         """
-        # 获取输入音频（根据 asr_use_vocals 配置，可能是 sep.vocals 或 demux.audio）
-        audio_artifact = inputs.get("sep.vocals") or inputs["demux.audio"]
+        # 获取输入音频（根据 asr_use_vocals 配置，可能是 extract.vocals 或 extract.audio）
+        audio_artifact = inputs.get("extract.vocals") or inputs["extract.audio"]
         audio_path = Path(ctx.workspace) / audio_artifact.relpath
 
         if not audio_path.exists():

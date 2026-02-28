@@ -53,7 +53,9 @@ async def list_episodes(request: Request) -> List[dict]:
 
         # 按数字排序
         for ep_name in sorted(known_eps, key=_numeric_sort_key):
-            source_dir = dub_dir / ep_name / "source" if dub_dir.is_dir() else drama_dir / "dub" / ep_name / "source"
+            ep_workdir = dub_dir / ep_name if dub_dir.is_dir() else drama_dir / "dub" / ep_name
+            input_dir = ep_workdir / "input"
+            state_dir = ep_workdir / "state"
 
             # 查找视频文件
             video_file = ""
@@ -67,9 +69,9 @@ async def list_episodes(request: Request) -> List[dict]:
                 "drama": drama_dir.name,
                 "episode": ep_name,
                 "video_file": video_file,
-                "has_asr_result": source_dir.is_dir() and (source_dir / "asr-result.json").is_file(),
-                "has_asr_model": source_dir.is_dir() and (source_dir / "dub.json").is_file(),
-                "has_subtitle_model": source_dir.is_dir() and (source_dir / "subtitle.model.json").is_file(),
+                "has_asr_result": input_dir.is_dir() and (input_dir / "asr-result.json").is_file(),
+                "has_asr_model": state_dir.is_dir() and (state_dir / "dub.json").is_file(),
+                "has_subtitle_model": state_dir.is_dir() and (state_dir / "subtitle.model.json").is_file(),
             })
 
     return episodes

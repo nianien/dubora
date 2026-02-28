@@ -1,5 +1,5 @@
 """
-Sub Phase: 字幕后处理（从 ASR raw-response 生成 dub.json）
+Parse Phase: 字幕后处理（从 ASR raw-response 生成 dub.json）
 
 职责：
 - 读取 ASR raw response（asr.asr_result，SSOT）
@@ -27,10 +27,10 @@ from dubora.schema.asr_model import AsrModel, AsrSegment, AsrMediaInfo, AsrHisto
 from dubora.utils.logger import info
 
 
-class SubtitlePhase(Phase):
+class ParsePhase(Phase):
     """字幕后处理 Phase。"""
 
-    name = "sub"
+    name = "parse"
     version = "1.1.0"
 
     def requires(self) -> list[str]:
@@ -48,7 +48,7 @@ class SubtitlePhase(Phase):
         outputs: ResolvedOutputs,
     ) -> PhaseResult:
         """
-        执行 Subtitle Phase。
+        执行 Parse Phase。
 
         流程：
         1. 读取 ASR raw response（asr.asr_result，SSOT）
@@ -101,7 +101,7 @@ class SubtitlePhase(Phase):
         # 获取配置
         workspace_path = Path(ctx.workspace)
 
-        phase_config = ctx.config.get("phases", {}).get("sub", {})
+        phase_config = ctx.config.get("phases", {}).get("parse", {})
         postprofile = phase_config.get("postprofile", ctx.config.get("doubao_postprofile", "axis"))
 
         # 获取 Utterance Normalization 配置

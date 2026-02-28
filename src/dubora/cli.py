@@ -3,7 +3,7 @@ CLI entry point for dubora pipeline (Pipeline Framework v1)
 
 支持批量操作：
   vsd run videos/drama/[4-70].mp4 --to burn
-  vsd bless videos/drama/[1-10].mp4 sub
+  vsd bless videos/drama/[1-10].mp4 parse
   vsd fix videos/drama/[1-10].mp4 asr
 """
 import argparse
@@ -11,7 +11,7 @@ import re
 import sys
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from dubora.config.settings import PipelineConfig, load_env_file
 from dubora.pipeline.phases import ALL_PHASES, build_phases
@@ -21,7 +21,7 @@ from dubora.pipeline.core.types import RunContext
 from dubora.utils.logger import info, error, success
 
 
-def get_workdir(video_path: Path, output_dir: Optional[Path] = None) -> Path:
+def get_workdir(video_path: Path) -> Path:
     """
     根据 video_path 确定 workdir。
 
@@ -96,7 +96,7 @@ def expand_video_pattern(pattern: str) -> List[Path]:
 
 def run_one(video_path: Path, args, config: PipelineConfig):
     """对单个视频执行 pipeline run。"""
-    workdir = get_workdir(video_path, Path(args.output_dir))
+    workdir = get_workdir(video_path)
     manifest_path = workdir / "manifest.json"
     manifest = Manifest(manifest_path)
 
@@ -190,10 +190,11 @@ def main():
 Phases: {' -> '.join(phase_names)}
 
 Examples:
-  vsd run video.mp4 --to asr                          # Single file
+  vsd run video.mp4                                    # Auto-advance mode
+  vsd run video.mp4 --to asr                          # Single file, run to asr
   vsd run videos/drama/4-70.mp4 --to burn             # Batch: episodes 4-70
   vsd run videos/drama/1-10.mp4 --from mt --to tts    # Batch: re-run MT to TTS
-  vsd bless videos/drama/1-10.mp4 sub                 # Batch bless
+  vsd bless videos/drama/1-10.mp4 parse                # Batch bless
         """
     )
 
@@ -203,21 +204,13 @@ Examples:
     run_parser = subparsers.add_parser("run", help="Run pipeline phases")
     run_parser.add_argument("video", type=str, help="Input video file path (supports N-M range, e.g. 4-70.mp4)")
     run_parser.add_argument(
-        "--to", type=str, required=True, choices=phase_names,
-        help="Target phase to run up to",
+        "--to", type=str, choices=phase_names,
+        help="Target phase to run up to (omit for auto-advance)",
     )
     run_parser.add_argument(
         "--from", type=str, dest="from_phase", choices=phase_names,
         help="Force refresh from this phase (inclusive)",
     )
-    run_parser.add_argument(
-        "--output-dir", type=str, default="runs",
-        help="Output directory (default: runs)",
-    )
-    run_parser.add_argument(
-        "--config", type=str, help="Path to config file (optional)",
-    )
-
     # bless command
     bless_parser = subparsers.add_parser(
         "bless", help="Accept manual edits: re-fingerprint a phase's output artifacts",
@@ -243,9 +236,13 @@ Examples:
     load_env_file()
 
     if args.command == "phases":
+        from dubora.pipeline.phases import GATE_AFTER
         info("Available phases:")
         for phase in ALL_PHASES:
-            info(f"  - {phase.name} (v{phase.version}): requires={phase.requires()}, provides={phase.provides()}")
+            info(f"  - {phase.name} ({phase.label}) v{phase.version}: requires={phase.requires()}, provides={phase.provides()}")
+            gate = GATE_AFTER.get(phase.name)
+            if gate:
+                info(f"    [Gate: {gate['key']} - {gate['label']}]")
         return
 
     if args.command == "ide":
@@ -267,9 +264,6 @@ Examples:
 
     if args.command == "run":
         config = PipelineConfig()
-        if args.config:
-            pass  # TODO: Load from config file if needed
-
         for i, video_path in enumerate(video_paths):
             if is_batch:
                 info(f"--- [{i+1}/{len(video_paths)}] {video_path.name} ---")

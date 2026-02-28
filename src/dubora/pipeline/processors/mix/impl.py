@@ -39,7 +39,7 @@ def mix_audio(
     Args:
         tts_path: TTS 音频文件路径
         accompaniment_path: 伴奏音频文件路径（可选）
-        vocals_path: 原声人声（sep.vocals，优先用于压制；可选）
+        vocals_path: 原声人声（extract.vocals，优先用于压制；可选）
         video_path: 原始视频文件路径
         output_path: 输出视频文件路径
         mix_mode: 混音模式：ducking（侧链压制原声，推荐）或 simple（固定压低原声）
@@ -107,7 +107,7 @@ def mix_audio(
             vocals_input_idx = 3 if has_accomp else 2
             orig_chain = f"[{vocals_input_idx}:a]volume={vocals_volume}[orig]"
         else:
-            # 没有 sep.vocals，只能用视频原声做 orig
+            # 没有 extract.vocals，只能用视频原声做 orig
             orig_chain = f"[0:a]volume={vocals_volume}[orig]"
 
         filter_parts.append(orig_chain)

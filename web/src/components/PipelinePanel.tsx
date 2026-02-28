@@ -1,67 +1,135 @@
-/** PipelinePanel: wizard-style 7-step workflow with StepBar + ActionButton + LogViewer */
-import { useRef, useEffect, useCallback } from 'react'
+/** PipelinePanel: stage-based workflow with StageBar + Gate indicators + ActionButton + LogViewer */
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useModelStore } from '../stores/model-store'
 import { usePipelineStore } from '../stores/pipeline-store'
-import type { WorkflowStep, StepStatus } from '../types/pipeline'
+import type { GateStatus, StageInfo } from '../types/pipeline'
 
-// ---- Step chip styles ----
+// ---- Stage chip styles ----
 
-const stepChipStyles: Record<StepStatus, string> = {
-  pending:      'bg-gray-700 text-gray-500',
-  running:      'bg-blue-600 text-white animate-pulse',
-  done:         'bg-green-800 text-green-300',
-  failed:       'bg-red-800 text-red-300',
-  calibrating:  'bg-yellow-700 text-yellow-200',
+const stageChipStyles: Record<StageInfo['status'], string> = {
+  pending:   'bg-gray-700 text-gray-500',
+  running:   'bg-blue-600 text-white animate-pulse',
+  succeeded: 'bg-green-800 text-green-300',
+  failed:    'bg-red-800 text-red-300',
 }
 
-const stepChipBorder: Record<StepStatus, string> = {
-  pending:      'ring-0',
-  running:      'ring-2 ring-blue-400',
-  done:         'ring-0',
-  failed:       'ring-2 ring-red-400',
-  calibrating:  'ring-2 ring-yellow-400',
+const stageChipBorder: Record<StageInfo['status'], string> = {
+  pending:   'ring-0',
+  running:   'ring-2 ring-blue-400',
+  succeeded: 'ring-0',
+  failed:    'ring-2 ring-red-400',
 }
 
-// ---- StepBar ----
+// ---- Gate indicator styles ----
 
-function StepBar({
-  steps,
-  selectedStepKey,
-  onClickStep,
+const gateStyles: Record<GateStatus['status'], string> = {
+  pending:  'bg-gray-600 text-gray-500',
+  awaiting: 'bg-yellow-700 text-yellow-200 ring-2 ring-yellow-400',
+  passed:   'bg-green-900 text-green-400',
+}
+
+// Gate sits between stages: after "recognize" and after "translate"
+const GATE_AFTER_STAGE: Record<string, string> = {
+  source_review: 'recognize',
+  translation_review: 'translate',
+}
+
+// ---- Context Menu ----
+
+interface ContextMenuState {
+  x: number
+  y: number
+  stage: StageInfo
+}
+
+function ContextMenu({
+  menu, onRerun, onClose,
 }: {
-  steps: WorkflowStep[]
-  selectedStepKey: string | null
-  onClickStep: (stepKey: string) => void
+  menu: ContextMenuState
+  onRerun: (fromPhase: string) => void
+  onClose: () => void
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  const firstPhase = menu.stage.phases[0]
+
+  return (
+    <div
+      ref={ref}
+      className="fixed z-50 bg-gray-700 border border-gray-600 rounded shadow-lg py-1 min-w-[120px]"
+      style={{ left: menu.x, top: menu.y }}
+    >
+      <button
+        className="w-full text-left px-3 py-1 text-xs text-gray-200 hover:bg-gray-600"
+        onClick={() => { onRerun(firstPhase); onClose() }}
+      >
+        从「{menu.stage.label}」重跑
+      </button>
+    </div>
+  )
+}
+
+// ---- StageBar ----
+
+function StageBar({
+  stages, gates, onContextMenu,
+}: {
+  stages: StageInfo[]
+  gates: GateStatus[]
+  onContextMenu: (e: React.MouseEvent, stage: StageInfo) => void
+}) {
+  const gateAfterStage = useMemo(() => {
+    const map = new Map<string, GateStatus>()
+    for (const g of gates) {
+      const stageKey = GATE_AFTER_STAGE[g.key]
+      if (stageKey) map.set(stageKey, g)
+    }
+    return map
+  }, [gates])
+
   return (
     <div className="flex items-center gap-0.5 flex-wrap">
-      {steps.map((step, i) => {
-        const clickable = step.status === 'done'
-        const selected = step.key === selectedStepKey
+      {stages.map((stage, i) => {
+        const gate = gateAfterStage.get(stage.key)
         return (
-          <div key={step.key} className="flex items-center">
+          <div key={stage.key} className="flex items-center">
             {i > 0 && (
               <span className="text-gray-600 text-[10px] mx-0.5">{'\u2192'}</span>
             )}
-            <button
-              onClick={() => clickable && onClickStep(step.key)}
-              disabled={!clickable}
+            <span
               className={`
-                px-2 py-0.5 rounded text-[10px] font-mono
-                ${stepChipStyles[step.status]}
-                ${selected ? 'ring-2 ring-yellow-400' : stepChipBorder[step.status]}
-                ${clickable ? 'cursor-pointer hover:ring-2 hover:ring-yellow-400' : ''}
-                disabled:cursor-default
-                transition-all
+                px-2 py-0.5 rounded text-[10px] font-mono cursor-context-menu select-none
+                ${stageChipStyles[stage.status]}
+                ${stageChipBorder[stage.status]}
               `}
-              title={
-                clickable
-                  ? `${step.label} (${step.status}) - click to re-run`
-                  : `${step.label} (${step.status})`
-              }
+              title={`${stage.label} [${stage.phases.join(', ')}] (${stage.status})`}
+              onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, stage) }}
             >
-              {step.label}
-            </button>
+              {stage.label}
+            </span>
+            {/* Gate indicator after this stage */}
+            {gate && (
+              <>
+                <span className="text-gray-600 text-[10px] mx-0.5">{'\u2192'}</span>
+                <span
+                  className={`
+                    px-1.5 py-0.5 rounded text-[9px] font-mono
+                    ${gateStyles[gate.status]}
+                  `}
+                  title={`${gate.label} (${gate.status})`}
+                >
+                  {gate.label}
+                </span>
+              </>
+            )}
           </div>
         )
       })}
@@ -101,18 +169,21 @@ function LogViewer({ logs, runError }: { logs: string[]; runError: string | null
 export function PipelinePanel() {
   const { currentDrama, currentEpisode, dirty, saveModel, loadModel } = useModelStore()
   const {
-    steps, currentAction, isRunning,
-    logs, runError, selectedStepKey,
-    runPipeline, cancelRun, selectStep,
+    phases, gates, stages, currentAction, isRunning,
+    logs, runError,
+    runPipeline, cancelRun,
   } = usePipelineStore()
 
   const hasEpisode = !!(currentDrama && currentEpisode)
+
+  // Context menu state
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null)
 
   // Track previous isRunning to detect completion
   const prevRunningRef = useRef(isRunning)
   useEffect(() => {
     if (prevRunningRef.current && !isRunning && currentDrama && currentEpisode) {
-      // Pipeline just finished - reload model to pick up new data (e.g. text_en after merge)
+      // Pipeline just finished - reload model to pick up new data
       loadModel(currentDrama, currentEpisode)
     }
     prevRunningRef.current = isRunning
@@ -126,41 +197,49 @@ export function PipelinePanel() {
       await saveModel()
     }
 
-    runPipeline(currentDrama, currentEpisode, {
-      from_phase: currentAction.fromPhase,
-      to_phase: currentAction.toPhase,
-    })
+    runPipeline(currentDrama, currentEpisode)
   }, [currentDrama, currentEpisode, dirty, saveModel, runPipeline, currentAction])
+
+  const handleRerun = useCallback(async (fromPhase: string) => {
+    if (!currentDrama || !currentEpisode || isRunning) return
+
+    if (dirty) {
+      await saveModel()
+    }
+
+    runPipeline(currentDrama, currentEpisode, fromPhase)
+  }, [currentDrama, currentEpisode, isRunning, dirty, saveModel, runPipeline])
 
   const handleCancel = useCallback(() => {
     cancelRun()
   }, [cancelRun])
 
-  const handleSelectStep = useCallback((stepKey: string) => {
-    selectStep(stepKey)
-  }, [selectStep])
+  const handleStageContextMenu = useCallback((e: React.MouseEvent, stage: StageInfo) => {
+    if (!hasEpisode || isRunning) return
+    setCtxMenu({ x: e.clientX, y: e.clientY, stage })
+  }, [hasEpisode, isRunning])
 
-  // Find current status text for header
-  const calibratingStep = steps.find(s => s.status === 'calibrating')
-  const runningStep = steps.find(s => s.status === 'running')
+  // Find status indicators
+  const awaitingGate = gates.find(g => g.status === 'awaiting')
+  const runningPhase = phases.find(p => p.status === 'running')
 
   return (
     <div className="bg-gray-800">
-      {/* Step bar + action button */}
+      {/* Stage bar + action button */}
       <div className="flex items-center gap-3 px-3 py-1.5">
-        <StepBar steps={steps} selectedStepKey={selectedStepKey} onClickStep={handleSelectStep} />
+        <StageBar stages={stages} gates={gates} onContextMenu={handleStageContextMenu} />
 
         <div className="flex-1" />
 
         {/* Status indicator */}
-        {runningStep && (
+        {runningPhase && (
           <span className="text-[10px] text-blue-400 animate-pulse shrink-0">
-            {runningStep.label}...
+            {runningPhase.label}...
           </span>
         )}
-        {calibratingStep && !isRunning && (
+        {awaitingGate && !isRunning && (
           <span className="text-[10px] text-yellow-400 shrink-0">
-            {calibratingStep.label}
+            {awaitingGate.label}
           </span>
         )}
 
@@ -188,6 +267,15 @@ export function PipelinePanel() {
         <div className="px-3 pb-2 border-t border-gray-700">
           <LogViewer logs={logs} runError={runError} />
         </div>
+      )}
+
+      {/* Context menu */}
+      {ctxMenu && (
+        <ContextMenu
+          menu={ctxMenu}
+          onRerun={handleRerun}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
     </div>
   )

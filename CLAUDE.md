@@ -24,24 +24,26 @@ make clean            # Remove __pycache__, .pytest_cache, etc.
 vsd run video.mp4 --to burn                # Full pipeline
 vsd run video.mp4 --to asr                 # Run up to ASR phase only
 vsd run video.mp4 --from mt --to tts       # Force re-run from MT through TTS
-vsd bless video.mp4 sub                    # Accept manual edits to sub phase outputs
+vsd bless video.mp4 parse                  # Accept manual edits to parse phase outputs
 vsd phases                                 # List all phases
 ```
 
 ## Architecture
 
-### 9-Phase Linear Pipeline
+### 8-Phase Pipeline with Gates and Stages
 
 ```
-demux → sep → asr → sub → [human review] → mt → align → tts → mix → burn
+Stage:  提取      识别          [校准]  翻译          [审阅]  配音        合成
+Phase:  extract   asr → parse          mt → align            tts → mix   burn
+Gate:                           ↑                      ↑
+                        source_review          translation_review
 ```
 
 | Phase | What it does | Technology |
 |-------|-------------|------------|
-| demux | Extract audio from video | FFmpeg |
-| sep | Separate vocals from accompaniment | Demucs v4 (local) |
+| extract | Extract audio + separate vocals/accompaniment | FFmpeg + Demucs v4 |
 | asr | Speech recognition with speaker diarization | Doubao ASR (ByteDance) |
-| sub | Generate subtitle model from ASR output | Local post-processing |
+| parse | Generate dub manifest from ASR output | Local post-processing |
 | mt | Translate Chinese → English | OpenAI GPT-4o or Google Gemini |
 | align | Timeline alignment + re-segmentation | Local alignment |
 | tts | Voice synthesis per segment | VolcEngine seed-tts-1.0 |
@@ -57,8 +59,8 @@ demux → sep → asr → sub → [human review] → mt → align → tts → mi
 
 | Model | File | Produced by | Consumed by |
 |-------|------|------------|-------------|
-| ASR Result | `asr-result.json` | asr phase | sub phase |
-| Subtitle Model v1.3 | `subtitle.model.json` | sub phase | mt, align phases |
+| ASR Result | `asr-result.json` | asr phase | parse phase |
+| Subtitle Model v1.3 | `subtitle.model.json` | parse phase | mt, align phases |
 | Dub Manifest | `dub.model.json` | align phase | tts, mix phases |
 
 ### Pipeline Framework (`pipeline/core/`)
@@ -80,7 +82,12 @@ Located at `{drama_dir}/dub/dict/roles.json`. Human-filled for role assignment.
 
 ### Workspace Layout
 
-Videos are organized as `{path}/{drama}/dub/{episode}/` with subdirectories: `source/` (human-editable SSOT), `derive/` (recomputable), `mt/` (LLM outputs), `tts/`, `audio/`, `render/` (final deliverables).
+Videos are organized as `{path}/{drama}/dub/{episode}/` with subdirectories organized by asset lifecycle:
+- `input/` — immutable after creation (extracted audio, vocals, accompaniment, ASR result)
+- `state/` — SSOT, human-editable (dub.json, subtitle.model.json)
+- `derived/` — recomputable intermediates (mt/, tts/, voiceprint/, mixed audio)
+- `output/` — final deliverables (dubbed video, SRT subtitles)
+- `.cache/` — internal optimization cache (hidden)
 
 ## External Services
 

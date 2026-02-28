@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from dubora.pipeline.core.types import Artifact, ErrorInfo, Status
+from dubora.pipeline.core.types import Artifact, ErrorInfo, GateStatus, Status
 from dubora.pipeline.core.atomic import atomic_write, atomic_copy
 from dubora.pipeline.core.fingerprints import hash_file
 
@@ -24,6 +24,7 @@ class Manifest:
             "job": {},
             "artifacts": {},
             "phases": {},
+            "gates": {},
         }
         self._load()
     
@@ -32,6 +33,9 @@ class Manifest:
         if self.manifest_path.exists():
             with open(self.manifest_path, "r", encoding="utf-8") as f:
                 self.data = json.load(f)
+            # 兼容旧版 manifest（无 gates 段）
+            if "gates" not in self.data:
+                self.data["gates"] = {}
         else:
             # 初始化新 manifest
             self.data = {
@@ -39,6 +43,7 @@ class Manifest:
                 "job": {},
                 "artifacts": {},
                 "phases": {},
+                "gates": {},
             }
     
     def save(self) -> None:
@@ -178,6 +183,36 @@ class Manifest:
     def get_phase_data(self, phase_name: str) -> Optional[Dict[str, Any]]:
         """获取 phase 数据。"""
         return self.data["phases"].get(phase_name)
+
+    # ── Gate 方法 ──────────────────────────────────────────────
+
+    def get_gate_status(self, gate_key: str) -> Optional[GateStatus]:
+        """获取 gate 状态。"""
+        gate_data = self.data["gates"].get(gate_key)
+        if gate_data is None:
+            return None
+        return gate_data.get("status")
+
+    def update_gate(
+        self,
+        gate_key: str,
+        *,
+        status: GateStatus,
+        started_at: Optional[str] = None,
+        finished_at: Optional[str] = None,
+    ) -> None:
+        """更新 gate 记录。"""
+        if gate_key not in self.data["gates"]:
+            self.data["gates"][gate_key] = {}
+
+        gate_data = self.data["gates"][gate_key]
+        gate_data["key"] = gate_key
+        gate_data["status"] = status
+
+        if started_at:
+            gate_data["started_at"] = started_at
+        if finished_at:
+            gate_data["finished_at"] = finished_at
     
     def get_all_artifacts(self) -> Dict[str, Artifact]:
         """获取所有 artifacts。"""
@@ -206,55 +241,51 @@ class Manifest:
             obj = key
         
         # 路径映射规则（workspace-relative）
-        # 按语义角色分层：
-        #   source/  — SSOT，人工可编辑
-        #   derive/  — 确定性派生，可重算
-        #   mt/      — LLM 不稳定产物
-        #   tts/     — TTS 合成产物
-        #   audio/   — 声学工程
-        #   render/  — 最终交付物
+        # 按资产生命周期分层：
+        #   input/   — 不可变，创建后不修改
+        #   state/   — SSOT，人工可编辑
+        #   derived/ — 可重算的中间产物
+        #   output/  — 最终交付物
         path_map = {
-            "demux": {
-                "audio": "audio/{episode_stem}.wav",
-            },
-            "sep": {
-                "vocals": "audio/{episode_stem}-vocals.wav",
-                "accompaniment": "audio/{episode_stem}-accompaniment.wav",
+            "extract": {
+                "audio": "input/{episode_stem}.wav",
+                "vocals": "input/{episode_stem}-vocals.wav",
+                "accompaniment": "input/{episode_stem}-accompaniment.wav",
             },
             "asr": {
-                "asr_result": "source/asr-result.json",
-                "asr_model": "source/dub.json",
+                "asr_result": "input/asr-result.json",
+                "asr_model": "state/dub.json",
             },
             "subs": {
-                "subtitle_model": "source/subtitle.model.json",
-                "subtitle_align": "derive/subtitle.align.json",
-                "zh_srt": "render/zh.srt",
-                "en_srt": "render/en.srt",
+                "subtitle_model": "state/subtitle.model.json",
+                "subtitle_align": "derived/subtitle.align.json",
+                "zh_srt": "output/zh.srt",
+                "en_srt": "output/en.srt",
             },
             "mt": {
-                "mt_input": "mt/mt_input.jsonl",
-                "mt_output": "mt/mt_output.jsonl",
+                "mt_input": "derived/mt/input.jsonl",
+                "mt_output": "derived/mt/output.jsonl",
             },
             "tts": {
-                "audio": "audio/{episode_stem}-tts.wav",
-                "voice_assignment": "derive/voice-assignment.json",
-                "sentence": "tts/sentence.json",
-                "segments_dir": "tts/segments",
-                "segments_index": "tts/segments.json",
-                "report": "tts/tts_report.json",
+                "audio": "derived/{episode_stem}-tts.wav",
+                "voice_assignment": "derived/voice-assignment.json",
+                "sentence": "derived/tts/sentence.json",
+                "segments_dir": "derived/tts/segments",
+                "segments_index": "derived/tts/segments.json",
+                "report": "derived/tts/report.json",
             },
             "voiceprint": {
-                "speaker_map": "derive/voiceprint/speaker_map.json",
-                "reference_clips": "derive/voiceprint/refs",
+                "speaker_map": "derived/voiceprint/speaker_map.json",
+                "reference_clips": "derived/voiceprint/refs",
             },
             "dub": {
-                "dub_manifest": "source/dub.json",
+                "dub_manifest": "state/dub.json",
             },
             "mix": {
-                "audio": "audio/{episode_stem}-mix.wav",
+                "audio": "derived/{episode_stem}-mix.wav",
             },
             "burn": {
-                "video": "render/{episode_stem}-dubbed.mp4",
+                "video": "output/{episode_stem}-dubbed.mp4",
             },
         }
         

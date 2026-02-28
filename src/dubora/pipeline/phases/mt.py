@@ -113,6 +113,16 @@ class MTPhase(Phase):
                 ),
             )
 
+        # 数据校验：检查 text/text_en 字段是否错位
+        for seg in segments:
+            if not seg.text.strip() and seg.text_en and re.search(r'[\u4e00-\u9fff]', seg.text_en):
+                warning(
+                    f"  {seg.id}: text 为空但 text_en 含中文 '{seg.text_en}'，"
+                    f"疑似字段错位，自动修正 text←text_en"
+                )
+                seg.text = seg.text_en
+                seg.text_en = ""
+
         # 构建 utterances 兼容格式（供下游逻辑使用）
         utterances = []
         for seg in segments:
@@ -311,10 +321,9 @@ class MTPhase(Phase):
             speech_rate = speaker_obj.get("speech_rate", {})
             zh_tps = speech_rate.get("zh_tps", 0.0)
             
-            # 直接使用 utterance 的 text 字段（从 asr-result.json 获取，与 subtitle.model.json 对齐）
+            # 直接使用 utterance 的 text 字段（dub.json SSOT）
             zh_text = utterance.get("text", "").strip()
             if not zh_text:
-                # 如果 utterance.text 不存在，跳过该 utterance
                 warning(f"  {utt_id}: utterance.text 为空，跳过")
                 continue
             
