@@ -10,6 +10,7 @@ import { ToolBar } from './components/ToolBar'
 import { PipelinePanel } from './components/PipelinePanel'
 import { StatusBar } from './components/StatusBar'
 import { useKeyboard } from './hooks/useKeyboard'
+import { VoicePreview } from './components/VoicePreview'
 import type { Episode } from './types/asr-model'
 
 export default function App() {
@@ -19,6 +20,8 @@ export default function App() {
     loadEpisodes, selectEpisode, saveModel,
     loadEmotions,
   } = useModelStore()
+
+  const [view, setView] = useState<'ide' | 'voice-preview'>('ide')
 
   const pipelineIsRunning = usePipelineStore(s => s.isRunning)
   const pipelinePhases = usePipelineStore(s => s.phases)
@@ -55,100 +58,119 @@ export default function App() {
     dramaGroups[ep.drama].push(ep)
   }
 
+  const dramas = Object.keys(dramaGroups)
+
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-gray-100">
-      {/* Header */}
-      <header className="flex items-center gap-4 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0">
-        <h1 className="text-sm font-bold text-gray-300">ASR IDE</h1>
+      {view === 'voice-preview' ? (
+        <VoicePreview
+          onBack={() => setView('ide')}
+          dramas={dramas}
+          initialDrama={selectedDrama}
+        />
+      ) : (
+        <>
+        {/* Header */}
+        <header className="flex items-center gap-4 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0">
+          <h1 className="text-sm font-bold text-gray-300">ASR IDE</h1>
 
-        <select
-          value={selectedDrama}
-          onChange={handleDramaChange}
-          className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none"
-        >
-          <option value="">Select drama...</option>
-          {Object.keys(dramaGroups).map(drama => (
-            <option key={drama} value={drama}>{drama} ({dramaGroups[drama].length})</option>
-          ))}
-        </select>
+          <select
+            value={selectedDrama}
+            onChange={handleDramaChange}
+            className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none"
+          >
+            <option value="">Select drama...</option>
+            {dramas.map(drama => (
+              <option key={drama} value={drama}>{drama} ({dramaGroups[drama].length})</option>
+            ))}
+          </select>
 
-        <select
-          value={currentDrama === selectedDrama ? currentEpisode : ''}
-          onChange={handleEpisodeChange}
-          disabled={!selectedDrama}
-          className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none disabled:opacity-40"
-        >
-          <option value="">Select episode...</option>
-          {(dramaGroups[selectedDrama] ?? []).map(ep => (
-            <option key={ep.episode} value={ep.episode}>
-              Ep {ep.episode}
-            </option>
-          ))}
-        </select>
+          <select
+            value={currentDrama === selectedDrama ? currentEpisode : ''}
+            onChange={handleEpisodeChange}
+            disabled={!selectedDrama}
+            className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none disabled:opacity-40"
+          >
+            <option value="">Select episode...</option>
+            {(dramaGroups[selectedDrama] ?? []).map(ep => (
+              <option key={ep.episode} value={ep.episode}>
+                Ep {ep.episode}
+              </option>
+            ))}
+          </select>
 
-        <div className="flex-1" />
+          <div className="flex-1" />
 
-        <button
-          onClick={saveModel}
-          disabled={!dirty || loading}
-          className="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Save
-        </button>
+          <button
+            onClick={() => setView('voice-preview')}
+            className="px-3 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600"
+          >
+            Voice Casting
+          </button>
 
-        {/* Workflow status indicator */}
-        {pipelineIsRunning && (() => {
-          const runningPhase = pipelinePhases.find(p => p.status === 'running')
-          return (
-            <span className="text-xs text-blue-400 animate-pulse">
-              {runningPhase?.label ?? '...'}
-            </span>
-          )
-        })()}
-        {!pipelineIsRunning && (() => {
-          const awaitingGate = pipelineGates.find(g => g.status === 'awaiting')
-          return awaitingGate ? (
-            <span className="text-xs text-yellow-400">
-              {awaitingGate.label}
-            </span>
-          ) : null
-        })()}
-        {error && (
-          <span className="text-xs text-red-400">{error}</span>
-        )}
-      </header>
+          <button
+            onClick={saveModel}
+            disabled={!dirty || loading}
+            className="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Save
+          </button>
 
-      {/* Main content: transcript left, video+toolbar right */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Transcript list */}
-        <div className="w-1/2 flex flex-col border-r border-gray-700">
-          <div className="flex-1 min-h-0">
-            <TranscriptList />
+          {/* Workflow status indicator */}
+          {pipelineIsRunning && (() => {
+            const runningPhase = pipelinePhases.find(p => p.status === 'running')
+            return (
+              <span className="text-xs text-blue-400 animate-pulse">
+                {runningPhase?.label ?? '...'}
+              </span>
+            )
+          })()}
+          {!pipelineIsRunning && (() => {
+            const awaitingGate = pipelineGates.find(g => g.status === 'awaiting')
+            return awaitingGate ? (
+              <span className="text-xs text-yellow-400">
+                {awaitingGate.label}
+              </span>
+            ) : null
+          })()}
+          {error && (
+            <span className="text-xs text-red-400">{error}</span>
+          )}
+        </header>
+
+          {/* Main content: transcript left, video+toolbar right */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left: Transcript list */}
+            <div className="w-1/2 flex flex-col border-r border-gray-700">
+              <div className="flex-1 min-h-0">
+                <TranscriptList />
+              </div>
+            </div>
+
+            {/* Right: Video + ToolBar + PipelinePanel */}
+            <div className="w-1/2 flex flex-col">
+              <div className="flex-1 min-h-0">
+                <PlayerEngine />
+              </div>
+              <div className="shrink-0 border-t border-gray-700">
+                <ToolBar />
+              </div>
+              <div className="shrink-0 border-t border-gray-700">
+                <PipelinePanel />
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Right: Video + ToolBar + PipelinePanel */}
-        <div className="w-1/2 flex flex-col">
-          <div className="flex-1 min-h-0">
-            <PlayerEngine />
+          {/* Bottom: Playback controls + Timeline */}
+          <div className="shrink-0">
+            <PlaybackControls />
+            <TimelineView />
           </div>
-          <div className="shrink-0 border-t border-gray-700">
-            <ToolBar />
-          </div>
-          <div className="shrink-0 border-t border-gray-700">
-            <PipelinePanel />
-          </div>
-        </div>
-      </div>
 
-      {/* Bottom: Playback controls + Timeline */}
-      <div className="shrink-0">
-        <PlaybackControls />
-        <TimelineView />
-      </div>
-
-      {/* Status bar */}
-      <StatusBar />
+          {/* Status bar */}
+          <StatusBar />
+        </>
+      )}
     </div>
   )
 }

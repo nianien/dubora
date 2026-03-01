@@ -18,6 +18,7 @@ from dubora.web.api.export import router as export_router
 from dubora.web.api.media import router as media_router
 from dubora.web.api.pipeline import router as pipeline_router
 from dubora.web.api.roles import router as roles_router
+from dubora.web.api.voices import router as voices_router
 
 
 def create_app(
@@ -56,6 +57,7 @@ def create_app(
     app.include_router(media_router, prefix="/api")
     app.include_router(pipeline_router, prefix="/api")
     app.include_router(roles_router, prefix="/api")
+    app.include_router(voices_router, prefix="/api")
 
     # 挂载前端静态文件（生产模式）
     if static_dir and Path(static_dir).is_dir():
