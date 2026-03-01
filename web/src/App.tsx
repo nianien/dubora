@@ -70,73 +70,73 @@ export default function App() {
         />
       ) : (
         <>
-        {/* Header */}
-        <header className="flex items-center gap-4 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0">
-          <h1 className="text-sm font-bold text-gray-300">ASR IDE</h1>
+          {/* Header */}
+          <header className="flex items-center gap-4 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0">
+            <h1 className="text-sm font-bold text-gray-300">ASR IDE</h1>
 
-          <select
-            value={selectedDrama}
-            onChange={handleDramaChange}
-            className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none"
-          >
-            <option value="">Select drama...</option>
-            {dramas.map(drama => (
-              <option key={drama} value={drama}>{drama} ({dramaGroups[drama].length})</option>
-            ))}
-          </select>
+            <select
+              value={selectedDrama}
+              onChange={handleDramaChange}
+              className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none"
+            >
+              <option value="">Select drama...</option>
+              {dramas.map(drama => (
+                <option key={drama} value={drama}>{drama} ({dramaGroups[drama].length})</option>
+              ))}
+            </select>
 
-          <select
-            value={currentDrama === selectedDrama ? currentEpisode : ''}
-            onChange={handleEpisodeChange}
-            disabled={!selectedDrama}
-            className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none disabled:opacity-40"
-          >
-            <option value="">Select episode...</option>
-            {(dramaGroups[selectedDrama] ?? []).map(ep => (
-              <option key={ep.episode} value={ep.episode}>
-                Ep {ep.episode}
-              </option>
-            ))}
-          </select>
+            <select
+              value={currentDrama === selectedDrama ? currentEpisode : ''}
+              onChange={handleEpisodeChange}
+              disabled={!selectedDrama}
+              className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none disabled:opacity-40"
+            >
+              <option value="">Select episode...</option>
+              {(dramaGroups[selectedDrama] ?? []).map(ep => (
+                <option key={ep.episode} value={ep.episode}>
+                  Ep {ep.episode}
+                </option>
+              ))}
+            </select>
 
-          <div className="flex-1" />
+            <div className="flex-1" />
 
-          <button
-            onClick={() => setView('voice-preview')}
-            className="px-3 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600"
-          >
-            Voice Casting
-          </button>
+            <button
+              onClick={() => setView('voice-preview')}
+              className="px-3 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600"
+            >
+              Voice Casting
+            </button>
 
-          <button
-            onClick={saveModel}
-            disabled={!dirty || loading}
-            className="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Save
-          </button>
+            <button
+              onClick={saveModel}
+              disabled={!dirty || loading}
+              className="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Save
+            </button>
 
-          {/* Workflow status indicator */}
-          {pipelineIsRunning && (() => {
-            const runningPhase = pipelinePhases.find(p => p.status === 'running')
-            return (
-              <span className="text-xs text-blue-400 animate-pulse">
-                {runningPhase?.label ?? '...'}
-              </span>
-            )
-          })()}
-          {!pipelineIsRunning && (() => {
-            const awaitingGate = pipelineGates.find(g => g.status === 'awaiting')
-            return awaitingGate ? (
-              <span className="text-xs text-yellow-400">
-                {awaitingGate.label}
-              </span>
-            ) : null
-          })()}
-          {error && (
-            <span className="text-xs text-red-400">{error}</span>
-          )}
-        </header>
+            {/* Workflow status indicator */}
+            {pipelineIsRunning && (() => {
+              const runningPhase = pipelinePhases.find(p => p.status === 'running')
+              return (
+                <span className="text-xs text-blue-400 animate-pulse">
+                  {runningPhase?.label ?? '...'}
+                </span>
+              )
+            })()}
+            {!pipelineIsRunning && (() => {
+              const awaitingGate = pipelineGates.find(g => g.status === 'awaiting')
+              return awaitingGate ? (
+                <span className="text-xs text-yellow-400">
+                  {awaitingGate.label}
+                </span>
+              ) : null
+            })()}
+            {error && (
+              <span className="text-xs text-red-400">{error}</span>
+            )}
+          </header>
 
           {/* Main content: transcript left, video+toolbar right */}
           <div className="flex-1 flex overflow-hidden">

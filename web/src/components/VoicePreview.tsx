@@ -146,8 +146,9 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
     return null
   }, [roles, selectedRole, editingDefault])
 
-  // sync emotion when expanded voice changes
+  // sync emotion + clear error when expanded voice changes
   useEffect(() => {
+    setSynthError('')
     if (!expandedVoice) return
     const voice = voiceMap[expandedVoice]
     const emotions = voice?.emotions ?? []
@@ -168,7 +169,7 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
     setTimeout(() => {
       document.getElementById(`voice-${targetId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 50)
-  }, [assignedVoiceId])
+  }, [selectedRole, editingDefault])
 
   // ── play helper ───────────────────────────────────────────────────────
 
@@ -273,7 +274,7 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
         text: text.trim(),
         created_at: new Date().toISOString(),
       }
-      setHistory(prev => [newEntry, ...prev])
+      setHistory(prev => prev.some(h => h.key === data.key) ? prev : [newEntry, ...prev])
     } catch (e: any) {
       setSynthError(e.message ?? String(e))
     } finally {
@@ -456,7 +457,6 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
               {filteredVoices.map(v => {
                 const isAssigned = hasSelection && assignedVoiceId === v.voice_id
                 const isExpanded = expandedVoice === v.voice_id
-                const voiceEmotions = v.emotions
                 const voiceHistory = history.filter(h => h.voice_id === v.voice_id)
                 return (
                   <div key={v.voice_id} id={`voice-${v.voice_id}`}>
@@ -535,11 +535,11 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
                             <select
                               value={selectedEmotion}
                               onChange={e => setSelectedEmotion(e.target.value)}
-                              disabled={voiceEmotions.length === 0}
+                              disabled={v.emotions.length === 0}
                               className="bg-gray-700 text-gray-200 text-xs rounded px-2 py-1 outline-none disabled:opacity-40"
                             >
-                              {voiceEmotions.length === 0 && <option value="">(none)</option>}
-                              {voiceEmotions.map(em => (
+                              {v.emotions.length === 0 && <option value="">(none)</option>}
+                              {v.emotions.map(em => (
                                 <option key={em.value} value={em.value}>{em.icon} {em.label}</option>
                               ))}
                             </select>
