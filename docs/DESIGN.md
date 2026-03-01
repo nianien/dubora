@@ -354,6 +354,30 @@ Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU），
 - 已标注：`role_id -> voice_type`（如 `PingAn -> en_male_hades_moon_bigtts`）
 - 未标注：`default_roles[gender] -> voice_type`
 
+**Voice Casting UI**（Web）：
+
+IDE 内置 Voice Casting 页面，用于可视化管理 `roles.json`。入口在主界面右上角 "Voice Casting" 按钮，进入后主界面完全切换（独立 header，不显示剧集选择）。
+
+- **左栏**：角色列表（来自 `roles.json` 的 `roles` + `default_roles`），选中角色后右栏高亮已分配音色
+- **右栏**：音色目录（来自 `resources/voices.json`），支持按 Category / Gender 筛选
+- **分配**：选中左栏角色 → 点击右栏音色卡片即完成分配 → Save 写回 `roles.json`
+- **试听**：每个音色卡片有 ▶ 按钮播放官方 trial 音频
+- **自定义合成**：每个音色卡片有 "Try" 按钮，展开内联面板（Emotion 下拉 + 文本输入 + Synthesize），调用 TTS API 即时合成试听，合成历史按音色分组显示
+- **自动滚动**：选中已绑定音色的角色时，右栏自动滚动到对应音色卡片居中
+
+注意：`roles.json` 是**剧级别**配置，Voice Casting 页面只需选择剧名，不涉及剧集。
+
+**Voices API**（`src/dubora/web/api/voices.py`）：
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/voices` | GET | 返回音色目录（解析 `resources/voices.json`） |
+| `/api/voices/synthesize` | POST | 调用 VolcEngine TTS 合成，结果缓存在 `.cache/voice-preview/` |
+| `/api/voices/history` | GET | 返回合成历史（来自缓存 manifest） |
+| `/api/voices/audio/{key}` | GET | 提供缓存的 WAV 文件 |
+
+合成结果基于 `SHA256(voice_id|text|emotion)` 去重缓存，避免重复调用 TTS API。
+
 **合成流程**：
 - 并行逐句合成（默认 4 workers）
 - 静音裁剪（trim silence）
