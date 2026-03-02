@@ -89,12 +89,8 @@ async def get_voices() -> List[Dict[str, Any]]:
         if not voice_id:
             continue
 
-        # flatten categories
-        categories: List[str] = []
-        for cg in v.get("Categories", []):
-            for c in cg.get("Categories", []):
-                if c not in categories:
-                    categories.append(c)
+        # categories (flat array)
+        categories: List[str] = v.get("Categories", [])
 
         # structured emotions → [{value, label, icon}]
         emotions = [

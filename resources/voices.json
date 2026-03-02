@@ -1,78 +1,197 @@
 [
   {
-    "ID": "7603629743669248050",
-    "VoiceType": "en_female_stokie_uranus_bigtts",
-    "Name": "Stokie",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Stokie.png",
+    "VoiceType": "en_female_amanda_mars_bigtts",
+    "Name": "Amanda",
     "Gender": "女",
     "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Amanda.png",
+    "Description": "性格沉稳的老师，耐心细致，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_female_amanda_mars_bigtts.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种"
-        ]
-      }
+      "多语种",
+      "美式英语"
     ],
-    "CategoryKeys": [
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9",
-      "17cf4556-87de-4304-a07d-65185ad51a88"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_stokie_uranus_bigtts.mp3",
-    "ShortTrialURL": "",
     "Languages": [
       {
         "Language": "en",
-        "Text": "Slow down and savor the little moments in life—the warm morning sun, a quiet evening breeze, and all the simple joys that make life beautiful.",
+        "Text": "Page 12 foreshadowing the icepick murder – hear that bone-chilling wind through lace curtains?",
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "音色甜美温柔的邻家姐姐，性格亲切细腻，相处时让人倍感安心。",
-    "Status": "online",
-    "ResourceID": "seed-tts-2.0",
-    "CreateTime": "2026-02-25 14:30:44",
-    "UpdateTime": "2026-02-25 14:31:25",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 15,
-    "TextLength": 1136
+    "Emotions": []
   },
   {
-    "ID": "7603629743669264434",
-    "VoiceType": "en_female_dacey_uranus_bigtts",
-    "Name": "Dacey",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Dacey.png",
+    "VoiceType": "en_female_anna_mars_bigtts",
+    "Name": "Anna",
     "Gender": "女",
-    "Age": "青年",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Anna.png",
+    "Description": "知性治愈的姐姐，性格温柔有耐心，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_female_anna_mars_bigtts.mp3",
     "Categories": [
+      "多语种",
+      "英式英语"
+    ],
+    "Languages": [
       {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种"
-        ]
+        "Language": "en",
+        "Text": "Dreams are the stars that light up my path. I won't let obstacles dim their shine. I'll work hard, step by step, to turn those dreams into reality. Because in the pursuit, I find the true meaning and joy of living.",
+        "Flag": "🇺🇸"
       }
     ],
-    "CategoryKeys": [
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9",
-      "17cf4556-87de-4304-a07d-65185ad51a88"
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_candice_emo_v2_mars_bigtts",
+    "Name": "Candice",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Candice.png",
+    "Description": "声线优雅又成熟的御姐声音，理智坚定，擅长英语。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_candice_emo_v2_mars_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语",
+      "多情感"
     ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Oh darling, did you see the new bookshop on Portobello Road? Its windows are stacked with paperbacks like honeycombs, simply divine.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": [
+      {
+        "Icon": "🌹",
+        "Label": "深情",
+        "Value": "affectionate"
+      },
+      {
+        "Icon": "😡",
+        "Label": "生气",
+        "Value": "angry"
+      },
+      {
+        "Icon": "💬",
+        "Label": "对话/闲聊",
+        "Value": "chat"
+      },
+      {
+        "Icon": "🫨",
+        "Label": "激动",
+        "Value": "excited"
+      },
+      {
+        "Icon": "🤣",
+        "Label": "开心",
+        "Value": "happy"
+      },
+      {
+        "Icon": "😐",
+        "Label": "中性",
+        "Value": "neutral"
+      },
+      {
+        "Icon": "🥺",
+        "Label": "悲伤",
+        "Value": "sad"
+      },
+      {
+        "Icon": "☀️",
+        "Label": "温暖",
+        "Value": "warm"
+      },
+      {
+        "Icon": "🎙",
+        "Label": "低语(ASMR)",
+        "Value": "ASMR"
+      }
+    ]
+  },
+  {
+    "VoiceType": "zh_female_tiexinnvsheng_mars_bigtts",
+    "Name": "Candy",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Candy.png",
+    "Description": "善解人意的小姐姐，耐心治愈的你所有的不开心",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/Candy.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Darling, I noticed you're a bit stressed. How about we relax? We can have a cup of tea, listen to some soft music, and just forget about the worries for a while. You deserve a break.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_female_cc_cm_v1_tob",
+    "Name": "Charlie",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Charlie.png",
+    "Description": "充满活力的拉拉队队长，活泼开朗，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Charlie.mp3",
+    "Categories": [
+      "多语种",
+      "视频配音",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Hell's a mess, but redemption's a party—who's ready to dance with demons and rewrite their ending?",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_mengyatou_mars_bigtts",
+    "Name": "Cutey",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Cutey.png",
+    "Description": "活力满满的元气马尾少女，天真软萌爱撒娇",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/Cutey.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Oh, I saw a really cute puppy on the street. It was so fluffy and had the sweetest little face. I wanted to take it home right away. Don't you just love cute things?",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_dacey_uranus_bigtts",
+    "Name": "Dacey",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Dacey.png",
+    "Description": "温暖声的直爽小妹，性格阳光热情，相处爽快。",
+    "ResourceID": "seed-tts-2.0",
     "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_dacey_uranus_bigtts.mp3",
-    "ShortTrialURL": "",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
     "Languages": [
       {
         "Language": "en",
@@ -80,91 +199,131 @@
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "温暖声的直爽小妹，性格阳光热情，相处爽快。",
-    "Status": "online",
-    "ResourceID": "seed-tts-2.0",
-    "CreateTime": "2026-02-25 14:30:05",
-    "UpdateTime": "2026-02-25 14:31:25",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 97,
-    "TextLength": 6258
+    "Emotions": []
   },
   {
-    "ID": "7603630361217597486",
-    "VoiceType": "en_male_tim_uranus_bigtts",
-    "Name": "Tim",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/TIM2.png",
-    "Gender": "男",
+    "VoiceType": "en_female_dacey_conversation_wvae_bigtts",
+    "Name": "Daisy",
+    "Gender": "女",
     "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Daisy.png",
+    "Description": "知性姐姐，治愈温柔，稳重有耐心，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Daisy.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种"
-        ]
-      }
+      "多语种",
+      "美式英语"
     ],
-    "CategoryKeys": [
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9",
-      "17cf4556-87de-4304-a07d-65185ad51a88"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_tim_uranus_bigtts.mp3",
-    "ShortTrialURL": "",
     "Languages": [
       {
         "Language": "en",
-        "Text": "The warm sun and gentle wind, all the good things are coming.",
+        "Text": "I'll loop in the tech team for feasibility by EOD, and we can review potential risks at tomorrow's sync. ",
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "声线温润干净的儒雅青年，待人温柔又暖心，自带治愈人心的力量。",
-    "Status": "online",
-    "ResourceID": "seed-tts-2.0",
-    "CreateTime": "2026-02-13 11:52:36",
-    "UpdateTime": "2026-02-13 11:53:26",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 105,
-    "TextLength": 7239
+    "Emotions": []
   },
   {
-    "ID": "7569913701206179846",
-    "VoiceType": "en_female_lauren_moon_bigtts",
-    "Name": "Lauren",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Lauren2.png",
+    "VoiceType": "en_female_daisy_moon_bigtts",
+    "Name": "Delicate Girl",
     "Gender": "女",
     "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Delicate Girl.png",
+    "Description": "温柔女高，清冷乖巧，做事稳重，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_daisy_moon_bigtts.mp3",
     "Categories": [
+      "多语种",
+      "英式英语"
+    ],
+    "Languages": [
       {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
+        "Language": "en",
+        "Text": "Strength lies not in being perfect, but in embracing flaws and growing stronger every day.",
+        "Flag": "🇺🇸"
       }
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_emily_mars_bigtts",
+    "Name": "Emily",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Emily.png",
+    "Description": "温柔明亮的知心姐姐，开朗温暖，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Emily.mp3",
+    "Categories": [
+      "多语种",
+      "英式英语"
     ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Darling, let's pop down to the pub for a pint and have a proper natter about that absolutely barmy day, shall we?",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_product_darcie_moon_bigtts",
+    "Name": "Flirty Female",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Flirty Female.png",
+    "Description": "温暖的知性姐姐，气质优雅，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_product_darcie_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Bloody hell, forgot to order oat milk—guess I'll brave the rain with a flat white, though the commute's gonna be chaos.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_jitangmeimei_mars_bigtts",
+    "Name": "Hope",
+    "Gender": "女",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Hope.png",
+    "Description": "温暖的知心大姐，待人亲切温柔超治愈",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/Hope.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "You know, even when things seem tough, don't give up. Every setback is a chance to grow. There's always a silver lining. Believe in yourself and keep moving forward. You've got this!",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_lauren_moon_bigtts",
+    "Name": "Lauren",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Lauren2.png",
+    "Description": "温柔知性的贴心姐姐，成熟柔和，擅长英语",
+    "ResourceID": "seed-tts-1.0",
     "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_lauren1_moon_bigtts.mp3",
-    "ShortTrialURL": "",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
     "Languages": [
       {
         "Language": "en",
@@ -172,51 +331,44 @@
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "温柔知性的贴心姐姐，成熟柔和，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2026-02-02 15:24:15",
-    "UpdateTime": "2026-02-02 15:29:51",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 3937,
-    "TextLength": 155277
+    "Emotions": []
   },
   {
-    "ID": "7569913658957250601",
-    "VoiceType": "en_female_nadia_tips_emo_v2_mars_bigtts",
-    "Name": "Nadia",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Nadia.png",
+    "VoiceType": "en_female_sarah_new_conversation_wvae_bigtts",
+    "Name": "Luna",
     "Gender": "女",
     "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Luna.png",
+    "Description": "乐观向上的学姐，大方开朗又明媚，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Luna.mp3",
     "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
       {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多情感"
-        ]
+        "Language": "en",
+        "Text": "Hey, wanna grab a flat white at that cute café near the library? I’ve got this amazing essay idea about postcolonial literature to bounce off you!",
+        "Flag": "🇺🇸"
       }
     ],
-    "CategoryKeys": [
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e",
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "0d436ae3-d144-4d47-8057-527a9876ff73"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_nadia_tips_emo_v2_mars_bigtts",
+    "Name": "Nadia",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Nadia.png",
+    "Description": "音色甜美温柔的邻家姐姐，亲切细腻，擅长英语。",
+    "ResourceID": "seed-tts-1.0",
     "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_nadia_tips_emo_v2_mars_bigtts.mp3",
-    "ShortTrialURL": "",
+    "Categories": [
+      "多语种",
+      "英式英语",
+      "多情感"
+    ],
     "Languages": [
       {
         "Language": "en",
@@ -270,51 +422,869 @@
         "Label": "低语(ASMR)",
         "Value": "ASMR"
       }
-    ],
-    "Description": "音色甜美温柔的邻家姐姐，亲切细腻，擅长英语。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:51:11",
-    "UpdateTime": "2025-11-24 16:03:54",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 31114,
-    "TextLength": 7737330
+    ]
   },
   {
-    "ID": "7569913701206474758",
-    "VoiceType": "en_male_corey_emo_v2_mars_bigtts",
-    "Name": "Corey",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Corey.png",
-    "Gender": "男",
+    "VoiceType": "en_female_nara_moon_bigtts",
+    "Name": "Nara",
+    "Gender": "女",
     "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Nara.png",
+    "Description": "清冷的忧郁女孩，内敛中藏着文艺气息，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_nara_moon_bigtts.mp3",
     "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
       {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多情感"
-        ]
+        "Language": "en",
+        "Text": "This Billie Holiday album survived three house fires—just like how some heartbreaks become the soundtrack of your bones.",
+        "Flag": "🇺🇸"
       }
     ],
-    "CategoryKeys": [
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e",
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "0d436ae3-d144-4d47-8057-527a9876ff73"
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_onez_moon_bigtts",
+    "Name": "Onez",
+    "Gender": "女",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Onez.png",
+    "Description": "温柔治愈的姐姐，心思细腻，善解人意，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_onez_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "英式英语"
     ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Between the pages of old books and the scent of morning coffee, I find magic in quiet moments.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_emotional_moon_bigtts",
+    "Name": "Peaceful Female",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Peaceful Female.png",
+    "Description": "甜美元气的少女，可爱活泼，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_emotional_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Some days I wish to live in a world of pastels, where stars fall like confetti and wishes really come true.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_sarah_mars_bigtts",
+    "Name": "Sarah",
+    "Gender": "女",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Sarah.png",
+    "Description": "冷艳御姐，外表高冷内心柔软，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_female_sarah_mars_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "澳洲英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "The world is full of beauty and kindness. I like to explore every corner of it, feel the different cultures and meet interesting people. Life is a wonderful journey, and I'm enjoying every moment of it.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_skye_emo_v2_mars_bigtts",
+    "Name": "Serena",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Skye.png",
+    "Description": "热情活力的有志青年声音，乐观开朗，擅长英语。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_skye_emo_v2_mars_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语",
+      "多情感"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "I build my own path chase dreams bravely and shine brighter than anyone's expectations.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": [
+      {
+        "Icon": "🌹",
+        "Label": "深情",
+        "Value": "affectionate"
+      },
+      {
+        "Icon": "😡",
+        "Label": "生气",
+        "Value": "angry"
+      },
+      {
+        "Icon": "💬",
+        "Label": "对话/闲聊",
+        "Value": "chat"
+      },
+      {
+        "Icon": "🫨",
+        "Label": "激动",
+        "Value": "excited"
+      },
+      {
+        "Icon": "🤣",
+        "Label": "开心",
+        "Value": "happy"
+      },
+      {
+        "Icon": "😐",
+        "Label": "中性",
+        "Value": "neutral"
+      },
+      {
+        "Icon": "🥺",
+        "Label": "悲伤",
+        "Value": "sad"
+      },
+      {
+        "Icon": "☀️",
+        "Label": "温暖",
+        "Value": "warm"
+      },
+      {
+        "Icon": "🎙",
+        "Label": "低语(ASMR)",
+        "Value": "ASMR"
+      }
+    ]
+  },
+  {
+    "VoiceType": "zh_female_cancan_mars_bigtts",
+    "Name": "Shiny",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Shiny.png",
+    "Description": "声线元气温柔的甜美萝莉，活泼可爱，很会撒娇。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/shiny.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Hey, you seem a bit down. Let's look on the bright side! There's always something good around the corner. A smile can change the world, so let's shine together and make it a better place.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_shuangkuaisisi_moon_bigtts",
+    "Name": "Skye",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Skye.png",
+    "Description": "温暖的直爽小妹，铁杆闺蜜型，直率阳光，热情满满。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Skye.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Hey everyone! I'm a girl who really loves to do meditation. When I sit down cross-legged, close my eyes and focus on my breath, it's like entering a peaceful world of my own. I feel my body and mind gradually relaxing, all the stress and worries seem to fade away.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_sophie_conversation_wvae_bigtts",
+    "Name": "Sophie",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Sophie.png",
+    "Description": "温润沉稳的清冷学姐，温暖知性，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Sophie.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "You don't have to be a rose to be remarkable. Be a wildflower—grow where you want, bend in the wind, and bloom unapologetically under your own sky.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_female_stokie_uranus_bigtts",
+    "Name": "Stokie",
+    "Gender": "女",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Stokie.png",
+    "Description": "音色甜美温柔的邻家姐姐，性格亲切细腻，相处时让人倍感安心。",
+    "ResourceID": "seed-tts-2.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_stokie_uranus_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Slow down and savor the little moments in life—the warm morning sun, a quiet evening breeze, and all the simple joys that make life beautiful.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_peiqi_mars_bigtts",
+    "Name": "佩奇猪",
+    "Gender": "女",
+    "Age": "儿童",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/佩奇猪.png",
+    "Description": "活泼幽默超童趣，天真烂漫超可爱",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/zh_female_peiqi_mars_bigtts.mp3",
+    "Categories": [
+      "视频配音"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "我喜欢和朋友们一起玩耍，在泥坑里跳来跳去可开心了，还有我的弟弟乔治，我们总是能发现好多好玩的事情。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_peiqi_uranus_bigtts",
+    "Name": "佩奇猪 2.0",
+    "Gender": "女",
+    "Age": "儿童",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/佩奇猪.png",
+    "Description": "活泼童趣，天真烂漫，可爱治愈",
+    "ResourceID": "seed-tts-2.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/zh_female_peiqi_uranus_bigtts.mp3",
+    "Categories": [
+      "视频配音"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "哈喽大家好，我是佩奇！我最喜欢和家人朋友一起玩，一起跳泥坑，一起哈哈大笑。希望你每天也能拥有满满的快乐，发现生活中的无限乐趣。",
+        "Flag": "🇨🇳🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_jiaxiaozi_tob",
+    "Name": "假小子",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/假小子.png",
+    "Description": "直率果敢的校园假小子，豪爽大胆超有范儿",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_female_jiaxiaozi_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "怕什么，跟我一起上，这点小挑战算不了什么，别婆婆妈妈的。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_aomanjiaosheng_tob",
+    "Name": "傲慢娇声",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/傲慢娇声.png",
+    "Description": "腹黑傲娇的大小姐，娇气自满，自带优越感",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_female_aomanjiaosheng_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "你们这些人，都要好好伺候本小姐，若是有差池，定不轻饶。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_wuxi_tob",
+    "Name": "元气甜妹",
+    "Gender": "女",
+    "Age": "儿童",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/元气甜妹.png",
+    "Description": "可爱的元气甜妹，性格活泼，举动讨喜。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/元气甜妹.mp3",
+    "Categories": [
+      "通用场景"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "早上好呀！今天也要带着小蛋糕和满分元气，蹦蹦跳跳闯天下哦。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_keainvsheng_tob",
+    "Name": "可爱女生",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/可爱女生.png",
+    "Description": "甜美的漫画少女，天真活泼，满是热情",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_female_keainvsheng_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "哇，这个好可爱呀，我好喜欢，要是能拥有就好了。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_daimengchuanmei_moon_bigtts",
+    "Name": "呆萌川妹",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/呆萌川妹.png",
+    "Description": "阳光活泼的女生，偶尔一根筋，却很真实。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/呆萌川妹.mp3",
+    "Categories": [
+      "趣味口音",
+      "四川口音"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "哎呀，你晓得不嘛，今天天气好好哟，人家好想出去耍一哈儿嘛，好不好嘛~",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_meituojieer_moon_bigtts",
+    "Name": "妹坨洁儿",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/妹坨洁儿.png",
+    "Description": "元气温柔且带方言味的元气少女，性格甜美可爱。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/妹坨洁儿.mp3",
+    "Categories": [
+      "趣味口音",
+      "长沙口音"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "我们长沙的美食那可真是多得不得了嘞！那臭豆腐呀，闻起来臭，吃起来香得很嘞，粉就更不用说咯，早上来一碗，精神一整天嘞！这些都是我们长沙的宝嘞，你们一定要尝尝看咯！",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_jiaoruoluoli_tob",
+    "Name": "娇弱萝莉",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/娇弱萝莉.png",
+    "Description": "呆萌羞怯的小女孩，双马尾发型，娇小玲珑，懵懂胆小",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_female_jiaoruoluoli_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "哎呀，人家好怕怕，这个该怎么办呀？你能不能帮帮我，好不好嘛。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_shaoergushi_mars_bigtts",
+    "Name": "少儿故事",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/少儿故事.png",
+    "Description": "元气妹妹，天真活泼超可爱，满满青春活力",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/zh_female_shaoergushi_mars_bigtts.mp3",
+    "Categories": [
+      "视频配音"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "森林里住着一只聪明的小狐狸，它总是能想出各种奇妙的点子，帮助小伙伴们解决难题，大家都可喜欢它啦。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_yuanqinvyou_moon_bigtts",
+    "Name": "撒娇学妹",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/撒娇学妹2.png",
+    "Description": "嗲软甜美的可爱妹妹，娇气活泼超讨喜",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/撒娇学妹.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "等会儿你一定要好好地、用心地让人家品尝一下你亲自做的美食哟~人家可期待了呢，你做的肯定超级超级好吃，人家现在就已经迫不及待啦，亲爱的最好了啦~",
+        "Flag": "🇨🇳🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_yingtaowanzi_mars_bigtts",
+    "Name": "樱桃丸子",
+    "Gender": "女",
+    "Age": "儿童",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/樱桃丸子.png",
+    "Description": "调皮妹妹，活泼甜美超机灵，像小太阳般讨喜",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/zh_female_yingtaowanzi_mars_bigtts.mp3",
+    "Categories": [
+      "视频配音"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "我好想快点长大呀，这样就可以做自己想做的事情，不用再听妈妈唠叨，还能买好多好多喜欢的东西。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_huopodiaoman_tob",
+    "Name": "活泼刁蛮",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/活泼刁蛮.png",
+    "Description": "傲娇酷拽的小公主，明眸皓齿，天真灵动",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_female_huopodiaoman_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "我就要这个，你不给我，我就一直缠着你，哼，看你能拿我怎样。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_huoponvhai_tob",
+    "Name": "活泼女孩",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/活泼女孩.png",
+    "Description": "明亮天真的甜美女友，阳光活泼，满是活力",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/活泼女孩.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "嗨，亲爱的，今天我去一个超级有趣的地方，那里有好多好玩东西，我尝试了一些新的美食，还拍了好多好看的照片呢。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_tianmeiyueyue_moon_bigtts",
+    "Name": "甜美悦悦",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/甜美悦悦.png",
+    "Description": "甜美的客服，亲切耐心，交流起来让人舒心。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/甜美悦悦.mp3",
+    "Categories": [
+      "通用场景"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "你喜欢看电影吗？电影就像是一个个奇妙的世界，能让我们沉浸其中，体验各种不同的人生。有搞笑的喜剧让我们开怀大笑，有感人的剧情片让我们热泪盈眶，你最喜欢哪种类型的电影呢？",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_bingjiaomengmei_tob",
+    "Name": "病娇萌妹",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/病娇萌妹.png",
+    "Description": "破碎感美人，偏执但纯真呆萌，惹人怜惜",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_female_bingjiaomengmei_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "你要是敢离开我，我就哭给你看，然后把自己关起来，谁也不见。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_bingruoshaonv_tob",
+    "Name": "病弱少女",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/病弱少女.png",
+    "Description": "稚气可爱的妹妹，懦弱谦虚，语气轻柔，让人充满保护欲",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/病弱少女.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "你好呀，我感觉今天身体好了一点点，虽然还是有一点虚弱。希望我能赶快好起来，和你一起度过更多美好的时光，谢谢你的关心和陪伴。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_female_tiaopigongzhu_tob",
+    "Name": "调皮公主",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/调皮公主.png",
+    "Description": "娇俏公主，古灵精怪，偶尔娇气带点小自大",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_female_tiaopigongzhu_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "哈哈，看我把这皇宫搅得鸡飞狗跳，他们肯定拿我没办法。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_female_linjianvhai_moon_bigtts",
+    "Name": "邻家女孩",
+    "Gender": "女",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/邻家女孩.png",
+    "Description": "软糯温暖声的邻家女孩，性格低调、耐心亲切。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/邻家女孩.mp3",
+    "Categories": [
+      "通用场景"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "哎呀，你来找我啦！今天过得怎么样呀？我今天看到院子里的花开了呢，可漂亮啦！你想不想和我一起去看看呀？",
+        "Flag": "🇨🇳🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_adam_mars_bigtts",
+    "Name": "Adam",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Adam.png",
+    "Description": "成熟的职场型男，温暖内敛又理性可靠，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_male_adam_mars_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "I'm not afraid of challenges. I believe that with my determination and efforts, I can break through any difficulties and reach the peak of success. I'm ready to face whatever comes my way.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_cc_alastor_tob",
+    "Name": "Alastor",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Alastor.png",
+    "Description": "恐怖电影里的小丑，声音尖锐，有侵略性，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Alastor.mp3",
+    "Categories": [
+      "多语种",
+      "英式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Smile, smile darling—my radio plays the song of souls, and your scream would make a delightful chorus.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_wennuanahu_moon_bigtts",
+    "Name": "Alvin",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Alvin.png",
+    "Description": "磁性又充满少年感的知心学长，阳光自信又亲切直率。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Alvin.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "So, what do you want to talk about? Sports? Movies? Music? Or anything else that comes to mind. Let's have a great conversation!",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_oogie2_tob",
+    "Name": "Big Boogie",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Big Boogie.png",
+    "Description": "声音沙哑浑厚的爷爷，从容有气度，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_oogie2_tob_e699cdb8-47b4-439a-803c-82c7d18e9bf0.mp3",
+    "Categories": [
+      "多语种",
+      "角色扮演",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "As pumpkins grin and snowflakes shiver, fear wears a Santa suit—welcome to a night where joy hides fangs.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_shaonianzixin_moon_bigtts",
+    "Name": "Brayan",
+    "Gender": "男",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Brayan.png",
+    "Description": "少年感满满的小奶狗，温柔亲切，待人热情阳光。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Brayan.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "How are you today? I had a really cool day at school today. We had a great science class and I learned some fascinating stuff. And then I played basketball with my friends during the break, it was so much fun. What about you?",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_bruce_moon_bigtts",
+    "Name": "Bruce",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Bruce.png",
+    "Description": "浑厚磁性的成熟大叔，冷静理性，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_bruce_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "This goddamn engine's been playing up all week—after sundown reckon I will strip it down , though the missus will moan bout grease on the kitchen table.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_cc_sha_v1_tob",
+    "Name": "Cartoon Chef",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Cartoon Chef.png",
+    "Description": "声音磁性的成熟大叔，稳重坚定，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_cc_sha_v1_tob_eb4a14df-284f-4287-a77d-26432cd0ba63.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Become a master chef in Shawarma 93 - Cartoon Chef - DM! Cook shawarma like a pro and serve up fun!",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_cc_chucky_tob",
+    "Name": "Chucky",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Chucky.png",
+    "Description": "善于伪装的反派角色，行事诡秘又奸诈，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Chucky.mp3",
+    "Categories": [
+      "多语种",
+      "视频配音",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Hey, pal! Ready for a playdate? This doll’s got a blade for a bestie and a grin that outlives your screams.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_cc_penny_v1_tob",
+    "Name": "Clown Man",
+    "Gender": "男",
+    "Age": "老年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Clown Man.png",
+    "Description": "嘶哑磁性的恐怖小丑，性格诡秘奸诈，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_cc_penny_v1_tob_82d9f07d-9b2e-4796-8fd0-6159ef6c7324.mp3",
+    "Categories": [
+      "多语种",
+      "视频配音",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Clowns bring smiles… but mine taste like fear. Come float with me, where laughter drowns and shadows feast.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_corey_emo_v2_mars_bigtts",
+    "Name": "Corey",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Corey.png",
+    "Description": "声音治愈温润的男性声音，温暖成熟，擅长英语。",
+    "ResourceID": "seed-tts-1.0",
     "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_corey_emo_v2_mars_bigtts.mp3",
-    "ShortTrialURL": "",
+    "Categories": [
+      "多语种",
+      "英式英语",
+      "多情感"
+    ],
     "Languages": [
       {
         "Language": "en",
@@ -373,51 +1343,514 @@
         "Label": "低语(ASMR)",
         "Value": "ASMR"
       }
-    ],
-    "Description": "声音治愈温润的男性声音，温暖成熟，擅长英语。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:51:11",
-    "UpdateTime": "2025-11-24 16:03:54",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 489,
-    "TextLength": 92315
+    ]
   },
   {
-    "ID": "7569913701206507526",
-    "VoiceType": "en_male_sylus_emo_v2_mars_bigtts",
-    "Name": "Sylus",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Sylus.png",
+    "VoiceType": "zh_male_xudong_conversation_wvae_bigtts",
+    "Name": "Daniel",
     "Gender": "男",
-    "Age": "中年",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/まさお（正男）.png",
+    "Description": "平易近人的大叔，温柔乐观好相处，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Daniel.mp3",
     "Categories": [
+      "多语种",
+      "英式英语"
+    ],
+    "Languages": [
       {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多情感"
-        ]
+        "Language": "en",
+        "Text": "Life is not about waiting for the storm to pass, but learning to dance in the rain. So put on your favorite song, let the drops hit your face, and find joy in the chaos of the moment.",
+        "Flag": "🇺🇸"
       }
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9",
-      "0d436ae3-d144-4d47-8057-527a9876ff73"
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_dave_moon_bigtts",
+    "Name": "Dave",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Dave.png",
+    "Description": "气泡音大叔，温柔体贴，坚定细心，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_dave_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "英式英语"
     ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Rise before the sun, tackle challenges head-on, and let actions speak louder than any words.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_dryw_mars_bigtts",
+    "Name": "Dryw",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Dryw.png",
+    "Description": "运动型青叔，直率阳光，活力满满，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_male_dryw_mars_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "澳洲英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "I focus on details. In my eyes, every little thing matters. I strive for perfection in my work, for only by doing so can I create something truly remarkable and make a difference in this complex world.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_campaign_jamal_moon_bigtts",
+    "Name": "Energetic Male II",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Energetic Male II.png",
+    "Description": "干净沉稳的文艺青年，阳光乐观，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_campaign_jamal_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Guess the rugby team needs a new strategy—bloody rain messed up the pitch, but the cheers on Friday were exhausted when this chaos occurred.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_aussie_v1_tob",
+    "Name": "Ethan",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Ethan.png",
+    "Description": "温文尔雅的大叔，亲切又耐心擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Ethan.mp3",
+    "Categories": [
+      "多语种",
+      "澳洲英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Good day mate, reckon we’ll hit the surf before the storm? She’ll be a ripper—just don’t bog the ute in the sand!",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_frosty1_tob",
+    "Name": "Frosty Man",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Frosty Man.png",
+    "Description": "低沉浑厚的儒雅大叔，温柔亲切，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_frosty1_tob_fb4bd11a-4f15-4a1e-b8b1-a34d339236bb.mp3",
+    "Categories": [
+      "多语种",
+      "角色扮演",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Let’s build a snowman that laughs in the cold—his carrot nose points to adventures, coal eyes hold winter’s magic!",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_glen_emo_v2_mars_bigtts",
+    "Name": "Glen",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Glen.png",
+    "Description": "清澈少年音的男高中生声音，阳光活力，擅长英语。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_glen_emo_v2_mars_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语",
+      "多情感"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Balance ambition with gratitude: count wins, but never forget the quiet moments that make life worth living.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": [
+      {
+        "Icon": "🌹",
+        "Label": "深情",
+        "Value": "affectionate"
+      },
+      {
+        "Icon": "😡",
+        "Label": "生气",
+        "Value": "angry"
+      },
+      {
+        "Icon": "💬",
+        "Label": "对话/闲聊",
+        "Value": "chat"
+      },
+      {
+        "Icon": "🫨",
+        "Label": "激动",
+        "Value": "excited"
+      },
+      {
+        "Icon": "🤣",
+        "Label": "开心",
+        "Value": "happy"
+      },
+      {
+        "Icon": "😐",
+        "Label": "中性",
+        "Value": "neutral"
+      },
+      {
+        "Icon": "🥺",
+        "Label": "悲伤",
+        "Value": "sad"
+      },
+      {
+        "Icon": "☀️",
+        "Label": "温暖",
+        "Value": "warm"
+      },
+      {
+        "Icon": "🎙",
+        "Label": "低语(ASMR)",
+        "Value": "ASMR"
+      }
+    ]
+  },
+  {
+    "VoiceType": "en_male_chris_moon_bigtts",
+    "Name": "Gotham Hero",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Gotham Hero.png",
+    "Description": "声音低沉嘶哑的大叔，充满神秘感，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_chris_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Grind until the critics call it talent, hustle until success has no choice but to notice.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_hades_moon_bigtts",
+    "Name": "Hades",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Hades.png",
+    "Description": "儒雅大叔，低沉成熟，耐心温暖，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_hades_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "英式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Negotiations at Canary Wharf tested every fibre—still, after killing the shark people must taste a 25-year-old single malt.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_jingqiangkanye_moon_bigtts",
+    "Name": "Harmony",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Harmony.png",
+    "Description": "有气泡音的京圈少爷，潇洒直率，幽默阳光。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Harmony.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Hey there! I'm a sports-loving boy! You know, I'm always full of energy and passion for sports. Whether it's running on the track, shooting hoops on the basketball court, or kicking the ball on the soccer field, I'm always in the game.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_jackson_mars_bigtts",
+    "Name": "Jackson",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Jackson.png",
+    "Description": "成熟的大学学长，内敛稳重，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_male_jackson_mars_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Yo squad turn it UP! Glow sticks in the air. I wanna see mosh pits forming NOW!",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_cc_jigsaw_tob",
+    "Name": "Jigsaw",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Jigsaw.png",
+    "Description": "声音嘶哑的病弱爷爷，质朴有耐心，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Jigsaw.mp3",
+    "Categories": [
+      "多语种",
+      "角色扮演",
+      "视频配音",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Tick-tock, the clock's a heartbeat—will your choices carve survival, or feed the silence of rusted chains?",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_kevin2_tob",
+    "Name": "Kevin McCallister",
+    "Gender": "男",
+    "Age": "儿童",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Kevin McCallister.png",
+    "Description": "可爱乖巧的萌娃，说话干净软糯，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_kevin2_tob_2db1c07b-f33e-472e-8264-b8ab16d275b1.mp3",
+    "Categories": [
+      "多语种",
+      "视频配音",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Mom, can we go to the park after tea? I wanna show you my new trick on the swing. Promise… I won't fall off this time!",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_M100_conversation_wvae_bigtts",
+    "Name": "Lucas",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Lucas.png",
+    "Description": "低沉儒雅的温柔哥哥，性格温暖稳重，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Lucas.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Some souls are like constellations—even when they’re far apart, their light still finds a way to connect. Maybe that’s why I still feel your warmth, even on the coldest nights.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_michael_tob",
+    "Name": "Michael",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Michael.png",
+    "Description": "平易近人的学长，温暖亲切，待人真诚，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Michael.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Would you like to join my sailing trip this weekend? The Solent’s winds in September are perfect for discussing classic literature over a flask of tea.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_michael_moon_bigtts",
+    "Name": "Michael",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Michael.png",
+    "Description": "沉稳儒雅的温柔青年，待人细致体贴，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_michael_moon_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "The day we met, your laugh shook pollen from the lilacs—now even rain on the windowpane sounds like that first 'hello'.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_jieshuonansheng_mars_bigtts",
+    "Name": "Morgan",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Morgan.png",
+    "Description": "低沉儒雅的纪录片旁白大叔，稳重又有温度",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/Morgan.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Listen, I just watched an amazing documentary. The way they presented the story was so captivating. It made me realize how powerful a good narration can be. It can really bring a whole new world to life.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_en_male_cc_dracula_v1_tob",
+    "Name": "Noah",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Noah.png",
+    "Description": "浑厚苍老的严厉爷爷，沉稳直率，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Noah.mp3",
+    "Categories": [
+      "多语种",
+      "视频配音",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Your heartbeat thrums wildly beneath my fingertips—ever wonder if this is the final waltz for the shadows?",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_charlie_conversation_wvae_bigtts",
+    "Name": "Owen",
+    "Gender": "男",
+    "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Owen.png",
+    "Description": "声音浑厚的沉稳大叔，稳重有耐心，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Owen.mp3",
+    "Categories": [
+      "多语种",
+      "美式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "Fancy a pint at The Three Lions later? Got a mental theory about how Beckham’s free kicks changed modern football tactics—you in?",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_smith_mars_bigtts",
+    "Name": "Smith",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Smith.png",
+    "Description": "腹黑男友，带有侵略性，但能给人安全感，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_male_smith_mars_bigtts.mp3",
+    "Categories": [
+      "多语种",
+      "英式英语"
+    ],
+    "Languages": [
+      {
+        "Language": "en",
+        "Text": "I'm a man of principles. I will never compromise my beliefs for temporary gains. Justice and fairness are what I pursue. I will stand up and fight for what is right, no matter how strong the opposition is.",
+        "Flag": "🇺🇸"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "en_male_sylus_emo_v2_mars_bigtts",
+    "Name": "Sylus",
+    "Gender": "男",
+    "Age": "中年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Sylus.png",
+    "Description": "音色低沉磁性的男士声音，理性稳重，擅长英语。",
+    "ResourceID": "seed-tts-1.0",
     "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_sylus_emo_v2_mars_bigtts.mp3",
-    "ShortTrialURL": "",
+    "Categories": [
+      "多语种",
+      "美式英语",
+      "多情感"
+    ],
     "Languages": [
       {
         "Language": "en",
@@ -476,1589 +1909,22 @@
         "Label": "低语(ASMR)",
         "Value": "ASMR"
       }
-    ],
-    "Description": "音色低沉磁性的男士声音，理性稳重，擅长英语。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:51:10",
-    "UpdateTime": "2025-11-24 16:03:54",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 2421,
-    "TextLength": 494988
+    ]
   },
   {
-    "ID": "7569913701206491142",
-    "VoiceType": "en_male_glen_emo_v2_mars_bigtts",
-    "Name": "Glen",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Glen.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多情感"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9",
-      "0d436ae3-d144-4d47-8057-527a9876ff73"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_glen_emo_v2_mars_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Balance ambition with gratitude: count wins, but never forget the quiet moments that make life worth living.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [
-      {
-        "Icon": "🌹",
-        "Label": "深情",
-        "Value": "affectionate"
-      },
-      {
-        "Icon": "😡",
-        "Label": "生气",
-        "Value": "angry"
-      },
-      {
-        "Icon": "💬",
-        "Label": "对话/闲聊",
-        "Value": "chat"
-      },
-      {
-        "Icon": "🫨",
-        "Label": "激动",
-        "Value": "excited"
-      },
-      {
-        "Icon": "🤣",
-        "Label": "开心",
-        "Value": "happy"
-      },
-      {
-        "Icon": "😐",
-        "Label": "中性",
-        "Value": "neutral"
-      },
-      {
-        "Icon": "🥺",
-        "Label": "悲伤",
-        "Value": "sad"
-      },
-      {
-        "Icon": "☀️",
-        "Label": "温暖",
-        "Value": "warm"
-      },
-      {
-        "Icon": "🎙",
-        "Label": "低语(ASMR)",
-        "Value": "ASMR"
-      }
-    ],
-    "Description": "清澈少年音的男高中生声音，阳光活力，擅长英语。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:51:10",
-    "UpdateTime": "2025-11-24 16:03:54",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 1231,
-    "TextLength": 195270
-  },
-  {
-    "ID": "7569913674757226537",
-    "VoiceType": "en_female_skye_emo_v2_mars_bigtts",
-    "Name": "Serena",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Skye.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多情感"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9",
-      "0d436ae3-d144-4d47-8057-527a9876ff73"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_skye_emo_v2_mars_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "I build my own path chase dreams bravely and shine brighter than anyone's expectations.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [
-      {
-        "Icon": "🌹",
-        "Label": "深情",
-        "Value": "affectionate"
-      },
-      {
-        "Icon": "😡",
-        "Label": "生气",
-        "Value": "angry"
-      },
-      {
-        "Icon": "💬",
-        "Label": "对话/闲聊",
-        "Value": "chat"
-      },
-      {
-        "Icon": "🫨",
-        "Label": "激动",
-        "Value": "excited"
-      },
-      {
-        "Icon": "🤣",
-        "Label": "开心",
-        "Value": "happy"
-      },
-      {
-        "Icon": "😐",
-        "Label": "中性",
-        "Value": "neutral"
-      },
-      {
-        "Icon": "🥺",
-        "Label": "悲伤",
-        "Value": "sad"
-      },
-      {
-        "Icon": "☀️",
-        "Label": "温暖",
-        "Value": "warm"
-      },
-      {
-        "Icon": "🎙",
-        "Label": "低语(ASMR)",
-        "Value": "ASMR"
-      }
-    ],
-    "Description": "热情活力的有志青年声音，乐观开朗，擅长英语。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:51:10",
-    "UpdateTime": "2025-11-24 16:03:54",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 2413,
-    "TextLength": 563504
-  },
-  {
-    "ID": "7569913664204243007",
-    "VoiceType": "en_female_candice_emo_v2_mars_bigtts",
-    "Name": "Candice",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Candice.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      },
-      {
-        "Categories": [
-          "多情感"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9",
-      "0d436ae3-d144-4d47-8057-527a9876ff73"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_candice_emo_v2_mars_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Oh darling, did you see the new bookshop on Portobello Road? Its windows are stacked with paperbacks like honeycombs, simply divine.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [
-      {
-        "Icon": "🌹",
-        "Label": "深情",
-        "Value": "affectionate"
-      },
-      {
-        "Icon": "😡",
-        "Label": "生气",
-        "Value": "angry"
-      },
-      {
-        "Icon": "💬",
-        "Label": "对话/闲聊",
-        "Value": "chat"
-      },
-      {
-        "Icon": "🫨",
-        "Label": "激动",
-        "Value": "excited"
-      },
-      {
-        "Icon": "🤣",
-        "Label": "开心",
-        "Value": "happy"
-      },
-      {
-        "Icon": "😐",
-        "Label": "中性",
-        "Value": "neutral"
-      },
-      {
-        "Icon": "🥺",
-        "Label": "悲伤",
-        "Value": "sad"
-      },
-      {
-        "Icon": "☀️",
-        "Label": "温暖",
-        "Value": "warm"
-      },
-      {
-        "Icon": "🎙",
-        "Label": "低语(ASMR)",
-        "Value": "ASMR"
-      }
-    ],
-    "Description": "声线优雅又成熟的御姐声音，理智坚定，擅长英语。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:51:10",
-    "UpdateTime": "2025-11-24 16:03:54",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 28379,
-    "TextLength": 1921348
-  },
-  {
-    "ID": "7569913674773938195",
-    "VoiceType": "zh_female_mengyatou_mars_bigtts",
-    "Name": "Cutey",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Cutey.png",
-    "Gender": "女",
-    "Age": "少年/少女",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/Cutey.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Cutey.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Oh, I saw a really cute puppy on the street. It was so fluffy and had the sweetest little face. I wanted to take it home right away. Don't you just love cute things?",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "活力满满的元气马尾少女，天真软萌爱撒娇",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:49",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 491211,
-    "TextLength": 6149630
-  },
-  {
-    "ID": "7569913658965688362",
-    "VoiceType": "zh_female_tiexinnvsheng_mars_bigtts",
-    "Name": "Candy",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Candy.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/Candy.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Candy.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Darling, I noticed you're a bit stressed. How about we relax? We can have a cup of tea, listen to some soft music, and just forget about the worries for a while. You deserve a break.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "善解人意的小姐姐，耐心治愈的你所有的不开心",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:48",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 886228,
-    "TextLength": 16231712
-  },
-  {
-    "ID": "7569913674773921811",
-    "VoiceType": "zh_female_jitangmeimei_mars_bigtts",
-    "Name": "Hope",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Hope.png",
-    "Gender": "女",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/Hope.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Hope.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "You know, even when things seem tough, don't give up. Every setback is a chance to grow. There's always a silver lining. Believe in yourself and keep moving forward. You've got this!",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "温暖的知心大姐，待人亲切温柔超治愈",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:48",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 671980,
-    "TextLength": 32568123
-  },
-  {
-    "ID": "7569914898726223935",
-    "VoiceType": "zh_male_jieshuonansheng_mars_bigtts",
-    "Name": "Morgan",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Morgan.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/Morgan.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Morgan.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Listen, I just watched an amazing documentary. The way they presented the story was so captivating. It made me realize how powerful a good narration can be. It can really bring a whole new world to life.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "低沉儒雅的纪录片旁白大叔，稳重又有温度",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:48",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 146498,
-    "TextLength": 13117053
-  },
-  {
-    "ID": "7569913658965622826",
-    "VoiceType": "en_male_dryw_mars_bigtts",
-    "Name": "Dryw",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Dryw.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "澳洲英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "e7df7449-3a6d-4fee-8cae-32602c552e37"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_male_dryw_mars_bigtts.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Dryw.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "I focus on details. In my eyes, every little thing matters. I strive for perfection in my work, for only by doing so can I create something truly remarkable and make a difference in this complex world.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "运动型青叔，直率阳光，活力满满，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:41",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 607,
-    "TextLength": 20930
-  },
-  {
-    "ID": "7569913658965377066",
-    "VoiceType": "en_female_sarah_mars_bigtts",
-    "Name": "Sarah",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Sarah.png",
-    "Gender": "女",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "澳洲英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "e7df7449-3a6d-4fee-8cae-32602c552e37"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_female_sarah_mars_bigtts.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Sarah.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "The world is full of beauty and kindness. I like to explore every corner of it, feel the different cultures and meet interesting people. Life is a wonderful journey, and I'm enjoying every moment of it.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "冷艳御姐，外表高冷内心柔软，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:41",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 999,
-    "TextLength": 116978
-  },
-  {
-    "ID": "7569913658957283369",
-    "VoiceType": "ICL_en_male_aussie_v1_tob",
-    "Name": "Ethan",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Ethan.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "澳洲英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "e7df7449-3a6d-4fee-8cae-32602c552e37"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Ethan.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Good day mate, reckon we’ll hit the surf before the storm? She’ll be a ripper—just don’t bog the ute in the sand!",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "温文尔雅的大叔，亲切又耐心擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:41",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 5351,
-    "TextLength": 236821
-  },
-  {
-    "ID": "7569914898726109247",
-    "VoiceType": "en_female_anna_mars_bigtts",
-    "Name": "Anna",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Anna.png",
-    "Gender": "女",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_female_anna_mars_bigtts.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Anna.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Dreams are the stars that light up my path. I won't let obstacles dim their shine. I'll work hard, step by step, to turn those dreams into reality. Because in the pursuit, I find the true meaning and joy of living.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "知性治愈的姐姐，性格温柔有耐心，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:41",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 6696,
-    "TextLength": 378204
-  },
-  {
-    "ID": "7569913664208388102",
-    "VoiceType": "en_male_smith_mars_bigtts",
-    "Name": "Smith",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Smith.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_male_smith_mars_bigtts.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Smith.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "I'm a man of principles. I will never compromise my beliefs for temporary gains. Justice and fairness are what I pursue. I will stand up and fight for what is right, no matter how strong the opposition is.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "腹黑男友，带有侵略性，但能给人安全感，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:40",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 27219,
-    "TextLength": 1063032
-  },
-  {
-    "ID": "7569913664204275775",
-    "VoiceType": "ICL_en_male_cc_alastor_tob",
-    "Name": "Alastor",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Alastor.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Alastor.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Smile, smile darling—my radio plays the song of souls, and your scream would make a delightful chorus.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "恐怖电影里的小丑，声音尖锐，有侵略性，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:40",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 33658,
-    "TextLength": 767028
-  },
-  {
-    "ID": "7569913674757357609",
-    "VoiceType": "zh_male_xudong_conversation_wvae_bigtts",
-    "Name": "Daniel",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/まさお（正男）.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Daniel.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Life is not about waiting for the storm to pass, but learning to dance in the rain. So put on your favorite song, let the drops hit your face, and find joy in the chaos of the moment.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "平易近人的大叔，温柔乐观好相处，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:40",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 7384,
-    "TextLength": 182537
-  },
-  {
-    "ID": "7569913674757341225",
-    "VoiceType": "en_female_emily_mars_bigtts",
-    "Name": "Emily",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Emily.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Emily.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Darling, let's pop down to the pub for a pint and have a proper natter about that absolutely barmy day, shall we?",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "温柔明亮的知心姐姐，开朗温暖，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:40",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 232,
-    "TextLength": 14886
-  },
-  {
-    "ID": "7569913664204226623",
-    "VoiceType": "en_female_onez_moon_bigtts",
-    "Name": "Onez",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Onez.png",
-    "Gender": "女",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_onez_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Between the pages of old books and the scent of morning coffee, I find magic in quiet moments.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "温柔治愈的姐姐，心思细腻，善解人意，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:40",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 3811,
-    "TextLength": 171120
-  },
-  {
-    "ID": "7569913674757210153",
-    "VoiceType": "en_male_hades_moon_bigtts",
-    "Name": "Hades",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Hades.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_hades_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Negotiations at Canary Wharf tested every fibre—still, after killing the shark people must taste a 25-year-old single malt.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "儒雅大叔，低沉成熟，耐心温暖，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:40",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 433,
-    "TextLength": 61257
-  },
-  {
-    "ID": "7569913701206441990",
-    "VoiceType": "en_male_dave_moon_bigtts",
-    "Name": "Dave",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Dave.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_dave_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Rise before the sun, tackle challenges head-on, and let actions speak louder than any words.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "气泡音大叔，温柔体贴，坚定细心，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:39",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 382,
-    "TextLength": 56804
-  },
-  {
-    "ID": "7569913658957217833",
-    "VoiceType": "en_female_daisy_moon_bigtts",
-    "Name": "Delicate Girl",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Delicate Girl.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "英式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "f5aeafe0-a215-4403-a76a-2fa80fde400e"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_daisy_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Strength lies not in being perfect, but in embracing flaws and growing stronger every day.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "温柔女高，清冷乖巧，做事稳重，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:39",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 435,
-    "TextLength": 57909
-  },
-  {
-    "ID": "7569913658965983274",
-    "VoiceType": "en_male_jackson_mars_bigtts",
-    "Name": "Jackson",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Jackson.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_male_jackson_mars_bigtts.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Jackson.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Yo squad turn it UP! Glow sticks in the air. I wanna see mosh pits forming NOW!",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "成熟的大学学长，内敛稳重，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:39",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 20212,
-    "TextLength": 965519
-  },
-  {
-    "ID": "7569913658965999658",
-    "VoiceType": "en_female_amanda_mars_bigtts",
-    "Name": "Amanda",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Amanda.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_female_amanda_mars_bigtts.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Amanda.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Page 12 foreshadowing the icepick murder – hear that bone-chilling wind through lace curtains?",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "性格沉稳的老师，耐心细致，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:39",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 13501,
-    "TextLength": 638092
-  },
-  {
-    "ID": "7569913658965606442",
-    "VoiceType": "en_male_adam_mars_bigtts",
-    "Name": "Adam",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Adam.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/en_male_adam_mars_bigtts.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Adam.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "I'm not afraid of challenges. I believe that with my determination and efforts, I can break through any difficulties and reach the peak of success. I'm ready to face whatever comes my way.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "成熟的职场型男，温暖内敛又理性可靠，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:39",
-    "UpdateTime": "2025-11-24 16:03:55",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 3919,
-    "TextLength": 112123
-  },
-  {
-    "ID": "7569913658957332521",
-    "VoiceType": "ICL_en_male_cc_dracula_v1_tob",
-    "Name": "Noah",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Noah.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "视频配音"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b2c05039-a48f-4105-9557-b0e8f466ec99",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Noah.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Your heartbeat thrums wildly beneath my fingertips—ever wonder if this is the final waltz for the shadows?",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "浑厚苍老的严厉爷爷，沉稳直率，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:38",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 46,
-    "TextLength": 3869
-  },
-  {
-    "ID": "7569913658957316137",
-    "VoiceType": "ICL_en_male_xavier1_v1_tob",
-    "Name": "Xavier",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Xavier.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "视频配音"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b2c05039-a48f-4105-9557-b0e8f466ec99",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Xavier.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Stars fade, but my aim never does—tell me, love… shall I paint the night with your enemies’ sparks?",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "斯文眼镜男，忧郁内敛，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:38",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 487,
-    "TextLength": 28115
-  },
-  {
-    "ID": "7569913674757242921",
-    "VoiceType": "ICL_en_male_kevin2_tob",
-    "Name": "Kevin McCallister",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Kevin McCallister.png",
-    "Gender": "男",
-    "Age": "儿童",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "视频配音"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b2c05039-a48f-4105-9557-b0e8f466ec99",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_kevin2_tob_2db1c07b-f33e-472e-8264-b8ab16d275b1.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Mom, can we go to the park after tea? I wanna show you my new trick on the swing. Promise… I won't fall off this time!",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "可爱乖巧的萌娃，说话干净软糯，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:38",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 5333,
-    "TextLength": 182133
-  },
-  {
-    "ID": "7569913658957299753",
-    "VoiceType": "ICL_en_male_cc_penny_v1_tob",
-    "Name": "Clown Man",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Clown Man.png",
-    "Gender": "男",
-    "Age": "老年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "视频配音"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b2c05039-a48f-4105-9557-b0e8f466ec99",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_cc_penny_v1_tob_82d9f07d-9b2e-4796-8fd0-6159ef6c7324.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Clowns bring smiles… but mine taste like fear. Come float with me, where laughter drowns and shadows feast.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "嘶哑磁性的恐怖小丑，性格诡秘奸诈，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:38",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 3080,
-    "TextLength": 43556
-  },
-  {
-    "ID": "7569913674757324841",
-    "VoiceType": "ICL_en_male_cc_chucky_tob",
-    "Name": "Chucky",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Chucky.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "视频配音"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b2c05039-a48f-4105-9557-b0e8f466ec99",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Chucky.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Hey, pal! Ready for a playdate? This doll’s got a blade for a bestie and a grin that outlives your screams.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "善于伪装的反派角色，行事诡秘又奸诈，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:38",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 515,
-    "TextLength": 17496
-  },
-  {
-    "ID": "7569913701206573062",
-    "VoiceType": "ICL_en_male_cc_jigsaw_tob",
-    "Name": "Jigsaw",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Jigsaw.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "角色扮演"
-        ]
-      },
-      {
-        "Categories": [
-          "视频配音"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "1d8bf65c-331b-4f5a-a57d-da01dd29838c",
-      "b2c05039-a48f-4105-9557-b0e8f466ec99",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Jigsaw.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Tick-tock, the clock's a heartbeat—will your choices carve survival, or feed the silence of rusted chains?",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "声音嘶哑的病弱爷爷，质朴有耐心，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:37",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 400,
-    "TextLength": 15541
-  },
-  {
-    "ID": "7569913658957266985",
-    "VoiceType": "ICL_en_male_zayne_tob",
-    "Name": "Zayne",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Zayne.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "视频配音"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b2c05039-a48f-4105-9557-b0e8f466ec99",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Zayne.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "In the neon hum of New Atlantis, my shadow dances with secrets—stay close, starlight… the night hides more than stars.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "多愁善感的忧郁青年，温柔细腻，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:37",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 134,
-    "TextLength": 11000
-  },
-  {
-    "ID": "7569913674757308457",
     "VoiceType": "ICL_en_male_grinch2_tob",
     "Name": "The Grinch",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/The Grinch.png",
     "Gender": "男",
     "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "角色扮演"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "1d8bf65c-331b-4f5a-a57d-da01dd29838c",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/The Grinch.png",
+    "Description": "声音磁性的成熟大叔，沉稳直率，擅长英语",
+    "ResourceID": "seed-tts-1.0",
     "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_grinch2_tob_5d60fdc3-d842-4c99-8105-1e68743554e1.mp3",
-    "ShortTrialURL": "",
+    "Categories": [
+      "多语种",
+      "角色扮演",
+      "美式英语"
+    ],
     "Languages": [
       {
         "Language": "en",
@@ -2066,1068 +1932,193 @@
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "声音磁性的成熟大叔，沉稳直率，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:37",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 222,
-    "TextLength": 61408
+    "Emotions": []
   },
   {
-    "ID": "7569913701206556678",
-    "VoiceType": "ICL_en_male_frosty1_tob",
-    "Name": "Frosty Man",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Frosty Man.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "角色扮演"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "1d8bf65c-331b-4f5a-a57d-da01dd29838c",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_frosty1_tob_fb4bd11a-4f15-4a1e-b8b1-a34d339236bb.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Let’s build a snowman that laughs in the cold—his carrot nose points to adventures, coal eyes hold winter’s magic!",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "低沉浑厚的儒雅大叔，温柔亲切，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:37",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 251,
-    "TextLength": 18064
-  },
-  {
-    "ID": "7569913674757292073",
-    "VoiceType": "ICL_en_male_oogie2_tob",
-    "Name": "Big Boogie",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Big Boogie.png",
+    "VoiceType": "en_male_tim_uranus_bigtts",
+    "Name": "Tim",
     "Gender": "男",
     "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/TIM2.png",
+    "Description": "声线温润干净的儒雅青年，待人温柔又暖心，自带治愈人心的力量。",
+    "ResourceID": "seed-tts-2.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_tim_uranus_bigtts.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "角色扮演"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
+      "多语种",
+      "美式英语"
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "1d8bf65c-331b-4f5a-a57d-da01dd29838c",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_oogie2_tob_e699cdb8-47b4-439a-803c-82c7d18e9bf0.mp3",
-    "ShortTrialURL": "",
     "Languages": [
       {
         "Language": "en",
-        "Text": "As pumpkins grin and snowflakes shiver, fear wears a Santa suit—welcome to a night where joy hides fangs.",
+        "Text": "The warm sun and gentle wind, all the good things are coming.",
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "声音沙哑浑厚的爷爷，从容有气度，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:36",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 667,
-    "TextLength": 18137
+    "Emotions": []
   },
   {
-    "ID": "7569913658957348905",
-    "VoiceType": "ICL_en_female_cc_cm_v1_tob",
-    "Name": "Charlie",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Charlie.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "视频配音"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b2c05039-a48f-4105-9557-b0e8f466ec99",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Charlie.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Hell's a mess, but redemption's a party—who's ready to dance with demons and rewrite their ending?",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "充满活力的拉拉队队长，活泼开朗，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:36",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 1000,
-    "TextLength": 115902
-  },
-  {
-    "ID": "7569913674757275689",
-    "VoiceType": "ICL_en_male_michael_tob",
-    "Name": "Michael",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Michael.png",
+    "VoiceType": "ICL_en_male_xavier1_v1_tob",
+    "Name": "Xavier",
     "Gender": "男",
     "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Xavier.png",
+    "Description": "斯文眼镜男，忧郁内敛，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Xavier.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
+      "多语种",
+      "视频配音",
+      "美式英语"
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Michael.mp3",
-    "ShortTrialURL": "",
     "Languages": [
       {
         "Language": "en",
-        "Text": "Would you like to join my sailing trip this weekend? The Solent’s winds in September are perfect for discussing classic literature over a flask of tea.",
+        "Text": "Stars fade, but my aim never does—tell me, love… shall I paint the night with your enemies’ sparks?",
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "平易近人的学长，温暖亲切，待人真诚，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:36",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 580,
-    "TextLength": 13017
+    "Emotions": []
   },
   {
-    "ID": "7569913664204259391",
-    "VoiceType": "en_female_sarah_new_conversation_wvae_bigtts",
-    "Name": "Luna",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Luna.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Luna.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Hey, wanna grab a flat white at that cute café near the library? I’ve got this amazing essay idea about postcolonial literature to bounce off you!",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "乐观向上的学姐，大方开朗又明媚，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:36",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 73399,
-    "TextLength": 1331243
-  },
-  {
-    "ID": "7569913701206523910",
-    "VoiceType": "en_male_charlie_conversation_wvae_bigtts",
-    "Name": "Owen",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Owen.png",
+    "VoiceType": "ICL_en_male_zayne_tob",
+    "Name": "Zayne",
     "Gender": "男",
     "Age": "青年",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Zayne.png",
+    "Description": "多愁善感的忧郁青年，温柔细腻，擅长英语",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Zayne.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
+      "多语种",
+      "视频配音",
+      "美式英语"
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Owen.mp3",
-    "ShortTrialURL": "",
     "Languages": [
       {
         "Language": "en",
-        "Text": "Fancy a pint at The Three Lions later? Got a mental theory about how Beckham’s free kicks changed modern football tactics—you in?",
+        "Text": "In the neon hum of New Atlantis, my shadow dances with secrets—stay close, starlight… the night hides more than stars.",
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "声音浑厚的沉稳大叔，稳重有耐心，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:36",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 151,
-    "TextLength": 14594
+    "Emotions": []
   },
   {
-    "ID": "7569913701206343686",
-    "VoiceType": "en_female_dacey_conversation_wvae_bigtts",
-    "Name": "Daisy",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Daisy.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Daisy.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "I'll loop in the tech team for feasibility by EOD, and we can review potential risks at tomorrow's sync. ",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "知性姐姐，治愈温柔，稳重有耐心，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:35",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 896,
-    "TextLength": 40459
-  },
-  {
-    "ID": "7569913701206310918",
-    "VoiceType": "zh_female_sophie_conversation_wvae_bigtts",
-    "Name": "Sophie",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Sophie.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Sophie.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "You don't have to be a rose to be remarkable. Be a wildflower—grow where you want, bend in the wind, and bloom unapologetically under your own sky.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "温润沉稳的清冷学姐，温暖知性，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:35",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 242700,
-    "TextLength": 4715315
-  },
-  {
-    "ID": "7569913658957414441",
-    "VoiceType": "zh_male_M100_conversation_wvae_bigtts",
-    "Name": "Lucas",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Lucas.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Lucas.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Some souls are like constellations—even when they’re far apart, their light still finds a way to connect. Maybe that’s why I still feel your warmth, even on the coldest nights.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "低沉儒雅的温柔哥哥，性格温暖稳重，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:35",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 368444,
-    "TextLength": 6537864
-  },
-  {
-    "ID": "7569913701206589446",
-    "VoiceType": "ICL_en_male_cc_sha_v1_tob",
-    "Name": "Cartoon Chef",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Cartoon Chef.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_en_male_cc_sha_v1_tob_eb4a14df-284f-4287-a77d-26432cd0ba63.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Become a master chef in Shawarma 93 - Cartoon Chef - DM! Cook shawarma like a pro and serve up fun!",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "声音磁性的成熟大叔，稳重坚定，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:35",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 16958,
-    "TextLength": 501156
-  },
-  {
-    "ID": "7569913701206458374",
-    "VoiceType": "en_male_michael_moon_bigtts",
-    "Name": "Michael",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Michael.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_michael_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "The day we met, your laugh shook pollen from the lilacs—now even rain on the windowpane sounds like that first 'hello'.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "沉稳儒雅的温柔青年，待人细致体贴，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:35",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 1304,
-    "TextLength": 74119
-  },
-  {
-    "ID": "7569913674757193769",
-    "VoiceType": "en_male_bruce_moon_bigtts",
-    "Name": "Bruce",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Bruce.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_bruce_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "This goddamn engine's been playing up all week—after sundown reckon I will strip it down , though the missus will moan bout grease on the kitchen table.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "浑厚磁性的成熟大叔，冷静理性，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:35",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 1125,
-    "TextLength": 107346
-  },
-  {
-    "ID": "7569913658957234217",
-    "VoiceType": "en_female_nara_moon_bigtts",
-    "Name": "Nara",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Nara.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_nara_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "This Billie Holiday album survived three house fires—just like how some heartbreaks become the soundtrack of your bones.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "清冷的忧郁女孩，内敛中藏着文艺气息，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:34",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 487,
-    "TextLength": 61926
-  },
-  {
-    "ID": "7569913701206425606",
-    "VoiceType": "en_female_emotional_moon_bigtts",
-    "Name": "Peaceful Female",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Peaceful Female.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_emotional_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Some days I wish to live in a world of pastels, where stars fall like confetti and wishes really come true.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "甜美元气的少女，可爱活泼，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:34",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 662,
-    "TextLength": 89197
-  },
-  {
-    "ID": "7569913701206409222",
-    "VoiceType": "en_female_product_darcie_moon_bigtts",
-    "Name": "Flirty Female",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Flirty Female.png",
-    "Gender": "女",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_female_product_darcie_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Bloody hell, forgot to order oat milk—guess I'll brave the rain with a flat white, though the commute's gonna be chaos.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "温暖的知性姐姐，气质优雅，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:34",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 614,
-    "TextLength": 67717
-  },
-  {
-    "ID": "7569913701206392838",
-    "VoiceType": "en_male_chris_moon_bigtts",
-    "Name": "Gotham Hero",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Gotham Hero.png",
-    "Gender": "男",
-    "Age": "中年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_chris_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Grind until the critics call it talent, hustle until success has no choice but to notice.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "声音低沉嘶哑的大叔，充满神秘感，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:34",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 1190,
-    "TextLength": 83753
-  },
-  {
-    "ID": "7569913674757177385",
-    "VoiceType": "en_male_campaign_jamal_moon_bigtts",
-    "Name": "Energetic Male II",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Energetic Male II.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/en_male_campaign_jamal_moon_bigtts.mp3",
-    "ShortTrialURL": "",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Guess the rugby team needs a new strategy—bloody rain messed up the pitch, but the cheers on Friday were exhausted when this chaos occurred.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "干净沉稳的文艺青年，阳光乐观，擅长英语",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:33",
-    "UpdateTime": "2025-11-24 16:03:56",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 883,
-    "TextLength": 68918
-  },
-  {
-    "ID": "7569913658965360682",
-    "VoiceType": "zh_male_jingqiangkanye_moon_bigtts",
-    "Name": "Harmony",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Harmony.png",
-    "Gender": "男",
-    "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Harmony.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Harmony.mp3",
-    "Languages": [
-      {
-        "Language": "en",
-        "Text": "Hey there! I'm a sports-loving boy! You know, I'm always full of energy and passion for sports. Whether it's running on the track, shooting hoops on the basketball court, or kicking the ball on the soccer field, I'm always in the game.",
-        "Flag": "🇺🇸"
-      }
-    ],
-    "Emotions": [],
-    "Description": "有气泡音的京圈少爷，潇洒直率，幽默阳光。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:05",
-    "UpdateTime": "2025-11-24 16:03:57",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 842483,
-    "TextLength": 15731129
-  },
-  {
-    "ID": "7569913664208371718",
-    "VoiceType": "zh_male_shaonianzixin_moon_bigtts",
-    "Name": "Brayan",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Brayan.png",
+    "VoiceType": "zh_male_dongmanhaimian_mars_bigtts",
+    "Name": "亮嗓萌仔",
     "Gender": "男",
     "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/亮嗓萌仔.png",
+    "Description": "夹子音的亮嗓萌仔，像海绵宝宝般呆萌活泼，充满元气",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/zh_male_dongmanhaimian_mars_bigtts.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
+      "视频配音"
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Brayan.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Brayan.mp3",
     "Languages": [
       {
-        "Language": "en",
-        "Text": "How are you today? I had a really cool day at school today. We had a great science class and I learned some fascinating stuff. And then I played basketball with my friends during the break, it was so much fun. What about you?",
-        "Flag": "🇺🇸"
+        "Language": "zh-cn",
+        "Text": "比奇堡的海绵，以纯真之心，在奇幻海洋制造欢乐",
+        "Flag": "🇨🇳"
       }
     ],
-    "Emotions": [],
-    "Description": "少年感满满的小奶狗，温柔亲切，待人热情阳光。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:04",
-    "UpdateTime": "2025-11-24 16:03:57",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 234628,
-    "TextLength": 5278893
+    "Emotions": []
   },
   {
-    "ID": "7569913674773725203",
-    "VoiceType": "zh_male_wennuanahu_moon_bigtts",
-    "Name": "Alvin",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Alvin.png",
+    "VoiceType": "zh_male_tiancaitongsheng_mars_bigtts",
+    "Name": "天才童声",
     "Gender": "男",
-    "Age": "青年",
+    "Age": "儿童",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/天才童声.png",
+    "Description": "稚气少年音的小男孩，自信阳光超活泼",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/zh_male_tiancaitongsheng_mars_bigtts.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
+      "视频配音"
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Alvin.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Alvin.mp3",
     "Languages": [
       {
-        "Language": "en",
-        "Text": "So, what do you want to talk about? Sports? Movies? Music? Or anything else that comes to mind. Let's have a great conversation!",
-        "Flag": "🇺🇸"
+        "Language": "zh-cn",
+        "Text": "我唱歌超棒，老师都夸我有天赋，我要更努力，以后在大舞台上唱给全世界听，让所有人都为我鼓掌欢呼。",
+        "Flag": "🇨🇳"
       }
     ],
-    "Emotions": [],
-    "Description": "磁性又充满少年感的知心学长，阳光自信又亲切直率。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:03",
-    "UpdateTime": "2025-11-24 16:03:57",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 2884533,
-    "TextLength": 48916572
+    "Emotions": []
   },
   {
-    "ID": "7569913664208355334",
-    "VoiceType": "zh_female_shuangkuaisisi_moon_bigtts",
-    "Name": "Skye",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Skye.png",
-    "Gender": "女",
-    "Age": "青年",
+    "VoiceType": "zh_male_naiqimengwa_mars_bigtts",
+    "Name": "奶气萌娃",
+    "Gender": "男",
+    "Age": "儿童",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/奶气萌娃.png",
+    "Description": "稚气软糯的奶娃，阳光活泼又天真，格外惹人疼爱",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/zh_male_naiqimengwa_mars_bigtts.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
+      "角色扮演"
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Skye.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Skye.mp3",
     "Languages": [
       {
-        "Language": "en",
-        "Text": "Hey everyone! I'm a girl who really loves to do meditation. When I sit down cross-legged, close my eyes and focus on my breath, it's like entering a peaceful world of my own. I feel my body and mind gradually relaxing, all the stress and worries seem to fade away.",
-        "Flag": "🇺🇸"
+        "Language": "zh-cn",
+        "Text": "我不要睡觉，星星还没和我说完悄悄话呢，它们会告诉我好多小秘密，等我听完再睡好不好呀？",
+        "Flag": "🇨🇳"
       }
     ],
-    "Emotions": [],
-    "Description": "温暖的直爽小妹，铁杆闺蜜型，直率阳光，热情满满。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:03",
-    "UpdateTime": "2025-11-24 16:03:57",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 147632,
-    "TextLength": 6267091
+    "Emotions": []
   },
   {
-    "ID": "7569915035259043883",
-    "VoiceType": "zh_female_cancan_mars_bigtts",
-    "Name": "Shiny",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/Shiny.png",
-    "Gender": "女",
+    "VoiceType": "ICL_zh_male_xuebanantongzhuo_tob",
+    "Name": "学霸男同桌",
+    "Gender": "男",
     "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/学霸男同桌.png",
+    "Description": "清爽男高兼学霸同桌，木讷内敛，却很靠谱",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_male_xuebanantongzhuo_tob.mp3",
     "Categories": [
-      {
-        "Categories": [
-          "多语种"
-        ]
-      },
-      {
-        "Categories": [
-          "多语种",
-          "美式英语"
-        ]
-      }
+      "角色扮演"
     ],
-    "CategoryKeys": [
-      "17cf4556-87de-4304-a07d-65185ad51a88",
-      "b78540e6-ab49-4b4b-9ff7-6877db1c18e9"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
-    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/shiny.mp3",
-    "ShortTrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/short_trial_url/Shiny.mp3",
     "Languages": [
       {
-        "Language": "en",
-        "Text": "Hey, you seem a bit down. Let's look on the bright side! There's always something good around the corner. A smile can change the world, so let's shine together and make it a better place.",
-        "Flag": "🇺🇸"
+        "Language": "zh-cn",
+        "Text": "这道题很简单啊，先这样，再那样，就得出答案了，你学会了吗？",
+        "Flag": "🇨🇳"
       }
     ],
-    "Emotions": [],
-    "Description": "声线元气温柔的甜美萝莉，活泼可爱，很会撒娇。",
-    "Status": "online",
-    "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:50:02",
-    "UpdateTime": "2025-11-24 16:03:57",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 154590124,
-    "TextLength": 3055616412
+    "Emotions": []
   },
   {
-    "ID": "7569913701206540294",
+    "VoiceType": "ICL_zh_male_shaonianjiangjun_tob",
+    "Name": "少年将军",
+    "Gender": "男",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/少年将军.png",
+    "Description": "沉稳冷静的少年将军，英姿飒爽有气场",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_male_shaonianjiangjun_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "犯我疆土者，虽远必诛！众将士，随我冲锋陷阵，保家卫国！",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
     "VoiceType": "en_male_jason_conversation_wvae_bigtts",
     "Name": "开朗学长",
-    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/开朗学长.png",
     "Gender": "男",
     "Age": "青年",
-    "Categories": [
-      {
-        "Categories": [
-          "通用场景"
-        ]
-      }
-    ],
-    "CategoryKeys": [
-      "1340b51f-f828-4383-8fd0-f62a750d6cea"
-    ],
-    "NormalLabels": null,
-    "SpecialLabels": null,
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/开朗学长.png",
+    "Description": "声音磁性的学长，活力阳光，拥有独特成熟魅力。",
+    "ResourceID": "seed-tts-1.0",
     "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/Gavin.mp3",
-    "ShortTrialURL": "",
+    "Categories": [
+      "通用场景"
+    ],
     "Languages": [
       {
         "Language": "en",
@@ -3135,15 +2126,154 @@
         "Flag": "🇺🇸"
       }
     ],
-    "Emotions": [],
-    "Description": "声音磁性的学长，活力阳光，拥有独特成熟魅力。",
-    "Status": "online",
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_livelybro_mars_bigtts",
+    "Name": "开朗弟弟",
+    "Gender": "男",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/开朗弟弟.png",
+    "Description": "干净阳光开朗的男孩，性格活力乐观，待人亲切。",
     "ResourceID": "seed-tts-1.0",
-    "CreateTime": "2025-11-24 15:49:58",
-    "UpdateTime": "2025-11-24 16:03:57",
-    "Preview": true,
-    "Emoji": "",
-    "Requests": 12911,
-    "TextLength": 297267
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/zh_male_livelybro_mars_bigtts.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh",
+        "Text": "哥！周末我们去游乐园吧，我听说新上了超刺激的过山车，还有好多好吃的棉花糖，咱们一定要玩个痛快！",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_lanxiaoyang_mars_bigtts",
+    "Name": "懒音绵宝",
+    "Gender": "男",
+    "Age": "儿童",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/懒音绵宝.png",
+    "Description": "青青草草原懒羊羊，软糯呆呆萌，天真可爱",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/zh_male_lanxiaoyang_mars_bigtts.mp3",
+    "Categories": [
+      "视频配音"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "哎呀，先睡会儿，有事儿等我睡醒再说吧",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_male_yangyang_v1_tob",
+    "Name": "温暖少年",
+    "Gender": "男",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/温暖少年.png",
+    "Description": "温柔清澈的体贴少年，待人谦和有礼",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/温暖少年.mp3",
+    "Categories": [
+      "有声阅读",
+      "通用场景"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "你听呀，风穿过麦田的声音像不像小熊在打呼噜？我给你摘了朵最软的云当枕头。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_male_wenrounantongzhuo_tob",
+    "Name": "温柔男同桌",
+    "Gender": "男",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/温柔男同桌.png",
+    "Description": "温暖帅气的翩翩少年，性格温柔善良，超治愈",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/ICL_zh_male_wenrounantongzhuo_tob.mp3",
+    "Categories": [
+      "角色扮演"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "你不小心弄坏了东西？没关系啦，别太在意，我们一起想办法。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "ICL_zh_male_BV705_streaming_cs_tob",
+    "Name": "炀炀",
+    "Gender": "男",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/premium-default-avatar.png",
+    "Description": "阳光爽朗的元气小哥，语气明快有活力，自带温暖感染力。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/ICL_zh_male_BV705_streaming_cs_tob.mp3",
+    "Categories": [
+      "通用场景"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "刚刚还在想你怎么还不来找我聊天，你就来了，真是心有灵犀呀！",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_xionger_mars_bigtts",
+    "Name": "熊二",
+    "Gender": "男",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/熊二.png",
+    "Description": "经典憨憨熊二，天真幽默超可爱",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/console/bigtts/zh_male_xionger_mars_bigtts.mp3",
+    "Categories": [
+      "视频配音"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "光头强又在砍树，俺得去阻止他，森林是俺们的家，不能让他给破坏了，俺要守护好俺们的蜂蜜和小伙伴们。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
+  },
+  {
+    "VoiceType": "zh_male_linjiananhai_moon_bigtts",
+    "Name": "邻家男孩",
+    "Gender": "男",
+    "Age": "少年/少女",
+    "Avatar": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/avatar/邻家男孩.png",
+    "Description": "气泡音的学生会长和学霸，像邻家男孩般自信帅气。",
+    "ResourceID": "seed-tts-1.0",
+    "TrialURL": "https://lf3-static.bytednsdoc.com/obj/eden-cn/lm_hz_ihsph/ljhwZthlaukjlkulzlp/portal/bigtts/邻家男孩.mp3",
+    "Categories": [
+      "通用场景"
+    ],
+    "Languages": [
+      {
+        "Language": "zh-cn",
+        "Text": "今天在这里遇到你，真的感觉特别奇妙。就好像命运的齿轮悄然转动，让我们在这个特定的时间和地点相遇。这一定是一种特别的缘分吧。你看，周围的人来来往往，而我的目光却不由自主地被你吸引。",
+        "Flag": "🇨🇳"
+      }
+    ],
+    "Emotions": []
   }
 ]
