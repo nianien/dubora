@@ -2,7 +2,19 @@
 import json
 from pathlib import Path
 
-_EMOTIONS_PATH = Path(__file__).parent / "emotions.json"
+
+def _find_project_root() -> Path:
+    """向上查找 pyproject.toml 定位项目根目录。"""
+    current = Path(__file__).resolve().parent
+    for parent in [current, *current.parents]:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise FileNotFoundError("Cannot find project root (no pyproject.toml found)")
+
+
+PROJECT_ROOT = _find_project_root()
+
+_EMOTIONS_PATH = PROJECT_ROOT / "resources" / "emotions.json"
 
 _alias_map: dict[str, str] | None = None
 

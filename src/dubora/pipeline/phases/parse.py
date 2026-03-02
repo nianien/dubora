@@ -178,14 +178,28 @@ class ParsePhase(Phase):
                 json.dump(asr_model.to_dict(), f, indent=2, ensure_ascii=False)
             info(f"Saved dub.json (SSOT) to: {model_path}")
 
-            # ── Reseg（断句优化，合并自原 ResegPhase）──
-            reseg_metrics = {}
+            # ── LLM 初始化（reseg + emotion_correct 共用）──
             reseg_config = ctx.config.get("phases", {}).get("reseg", {})
             reseg_enabled = reseg_config.get("enabled", ctx.config.get("reseg_enabled", True))
+            emotion_correct_enabled = phase_config.get("emotion_correct_enabled", True)
 
-            if reseg_enabled and segments:
+            translate_fn = None
+            if (reseg_enabled or emotion_correct_enabled) and segments:
+                translate_fn = self._create_llm_fn(ctx, reseg_config)
+
+            # ── Reseg（断句优化，合并自原 ResegPhase）──
+            reseg_metrics = {}
+            if reseg_enabled and segments and translate_fn:
                 reseg_metrics = self._run_reseg(
                     ctx, asr_model, raw_response, model_path, reseg_config,
+                    translate_fn,
+                )
+
+            # ── Emotion Correct（LLM 情绪修正）──
+            emotion_metrics = {}
+            if emotion_correct_enabled and asr_model.segments and translate_fn:
+                emotion_metrics = self._run_emotion_correct(
+                    ctx, asr_model, model_path, translate_fn,
                 )
 
             metrics = {
@@ -195,6 +209,8 @@ class ParsePhase(Phase):
             }
             if reseg_metrics:
                 metrics["reseg"] = reseg_metrics
+            if emotion_metrics:
+                metrics["emotion_correct"] = emotion_metrics
 
             return PhaseResult(
                 status="succeeded",
@@ -213,25 +229,19 @@ class ParsePhase(Phase):
                 ),
             )
 
-    def _run_reseg(
-        self,
-        ctx: RunContext,
-        asr_model,
-        raw_response: dict,
-        model_path: Path,
-        reseg_config: dict,
-    ) -> dict:
-        """执行 reseg 断句优化（合并自原 ResegPhase）。
+    def _create_llm_fn(self, ctx: RunContext, llm_config: dict):
+        """创建 LLM 调用函数（reseg + emotion_correct 共用）。
+
+        Args:
+            ctx: 运行上下文
+            llm_config: LLM 配置（通常取 phases.reseg 配置）
 
         Returns:
-            metrics 字典（空字典表示跳过或无拆分）
+            translate_fn 或 None（API key 缺失或初始化失败时）
         """
-        segments = asr_model.segments
-
-        # 构造 translate_fn（复用 MT 的引擎选择逻辑）
-        engine = reseg_config.get("engine")
+        engine = llm_config.get("engine")
         if not engine:
-            model_name = reseg_config.get("model", ctx.config.get("mt_model", ""))
+            model_name = llm_config.get("model", ctx.config.get("mt_model", ""))
             if model_name.startswith("gemini"):
                 engine = "gemini"
             elif model_name.startswith("gpt") or model_name.startswith("o1"):
@@ -244,39 +254,55 @@ class ParsePhase(Phase):
 
         if is_gemini:
             from dubora.config.settings import get_gemini_key
-            model = reseg_config.get(
+            model = llm_config.get(
                 "model",
                 ctx.config.get("mt_model", ctx.config.get("gemini_model", "gemini-2.0-flash")),
             )
-            api_key = reseg_config.get("api_key") or get_gemini_key()
+            api_key = llm_config.get("api_key") or get_gemini_key()
             if not api_key:
-                warning("Reseg skipped: Gemini API key not found")
-                return {}
-            temperature = reseg_config.get("temperature", 0.3)
-            info(f"Reseg using Gemini engine: {model}")
+                warning("LLM skipped: Gemini API key not found")
+                return None
+            temperature = llm_config.get("temperature", 0.3)
+            info(f"LLM using Gemini engine: {model}")
         else:
             from dubora.config.settings import get_openai_key
-            model = reseg_config.get(
+            model = llm_config.get(
                 "model",
                 ctx.config.get("mt_model", ctx.config.get("openai_model", "gpt-4o-mini")),
             )
-            api_key = reseg_config.get("api_key") or get_openai_key()
+            api_key = llm_config.get("api_key") or get_openai_key()
             if not api_key:
-                warning("Reseg skipped: OpenAI API key not found")
-                return {}
-            temperature = reseg_config.get("temperature", 0.3)
-            info(f"Reseg using OpenAI engine: {model}")
+                warning("LLM skipped: OpenAI API key not found")
+                return None
+            temperature = llm_config.get("temperature", 0.3)
+            info(f"LLM using OpenAI engine: {model}")
 
         try:
             from dubora.pipeline.processors.mt.time_aware_impl import create_translate_fn
-            translate_fn = create_translate_fn(
+            return create_translate_fn(
                 api_key=api_key,
                 model=model,
                 temperature=temperature,
             )
         except Exception as e:
-            warning(f"Reseg skipped: failed to create translate function: {e}")
-            return {}
+            warning(f"LLM init failed: {e}")
+            return None
+
+    def _run_reseg(
+        self,
+        ctx: RunContext,
+        asr_model,
+        raw_response: dict,
+        model_path: Path,
+        reseg_config: dict,
+        translate_fn,
+    ) -> dict:
+        """执行 reseg 断句优化（合并自原 ResegPhase）。
+
+        Returns:
+            metrics 字典（空字典表示跳过或无拆分）
+        """
+        segments = asr_model.segments
 
         # 读取 reseg 参数
         min_chars = reseg_config.get(
@@ -320,3 +346,42 @@ class ParsePhase(Phase):
 
         info(f"Reseg: saved updated dub.json to: {model_path}")
         return metrics
+
+    def _run_emotion_correct(
+        self,
+        ctx: RunContext,
+        asr_model,
+        model_path: Path,
+        translate_fn,
+    ) -> dict:
+        """执行 LLM 情绪修正。
+
+        Returns:
+            metrics 字典（空字典表示跳过或无修正）
+        """
+        from dubora.pipeline.processors.emotion import run as emotion_run
+
+        result = emotion_run(
+            segments=asr_model.segments,
+            translate_fn=translate_fn,
+        )
+
+        if result.corrected_count == 0:
+            info("Emotion correct: no corrections needed")
+            return {"corrected_count": 0}
+
+        # 应用修正到 segments
+        for seg in asr_model.segments:
+            if seg.id in result.corrections:
+                old = seg.emotion
+                seg.emotion = result.corrections[seg.id]
+                info(f"  {seg.id}: {old} -> {seg.emotion}")
+
+        asr_model.bump_rev()
+        asr_model.update_fingerprint()
+
+        with open(model_path, "w", encoding="utf-8") as f:
+            json.dump(asr_model.to_dict(), f, indent=2, ensure_ascii=False)
+
+        info(f"Emotion correct: {result.corrected_count} segments corrected, saved dub.json")
+        return {"corrected_count": result.corrected_count}

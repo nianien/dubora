@@ -2,7 +2,7 @@
   {"key": "neutral", "name": "中性", "lang": ["zh", "en"]},
   {"key": "chat", "name": "闲聊", "lang": ["en"]},
   {"key": "happy", "name": "开心", "lang": ["zh", "en"]},
-  {"key": "angry", "name": "愤怒", "lang": ["zh", "en"]},
+  {"key": "angry", "name": "生气", "lang": ["zh", "en"]},
   {"key": "sad", "name": "悲伤", "lang": ["zh", "en"]},
   {"key": "surprised", "name": "惊讶", "lang": ["zh"], "alias": ["surprise"], "disabled": true},
   {"key": "excited", "name": "激动", "lang": ["zh", "en"]},
