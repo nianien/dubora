@@ -132,6 +132,20 @@ class TTSPhase(Phase):
             dict_dir = workspace_path.parent / "dict"
             roles_path = str(dict_dir / "roles.json")
 
+            # ── 前置检查：所有 speaker 必须有角色音色分配 ──
+            unassigned = self._check_voice_assignment(
+                asr_model, roles_path,
+            )
+            if unassigned:
+                names = ", ".join(sorted(unassigned))
+                return PhaseResult(
+                    status="failed",
+                    error=ErrorInfo(
+                        type="VoiceAssignmentError",
+                        message=f"以下角色未分配音色，请在 Voice Casting 中完成分配后重试: {names}",
+                    ),
+                )
+
             # 输出路径
             segments_dir = outputs.get("tts.segments_dir")
             segments_dir.mkdir(parents=True, exist_ok=True)
@@ -234,3 +248,25 @@ class TTSPhase(Phase):
                     traceback=traceback.format_exc(),
                 ),
             )
+
+    def _check_voice_assignment(
+        self, asr_model: AsrModel, roles_path: str,
+    ) -> set[str]:
+        """检查所有 speaker 是否已在 roles.json 中分配音色，返回未分配的 speaker 集合。"""
+        # 收集所有 speaker
+        speakers = {seg.speaker for seg in asr_model.segments if seg.speaker}
+
+        # 加载 roles.json
+        roles_file = Path(roles_path)
+        if not roles_file.exists():
+            return speakers  # 文件不存在，全部未分配
+
+        with open(roles_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        roles = data.get("roles", {})
+        if isinstance(roles, list):
+            roles = {e["role_id"]: e["voice_type"] for e in roles if e.get("role_id")}
+
+        # speaker 不在 roles 中，或 voice_type 为空 → 未分配
+        return {spk for spk in speakers if not roles.get(spk)}

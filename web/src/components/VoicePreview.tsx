@@ -71,9 +71,11 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
   const [addingRole, setAddingRole] = useState(false)
   const [newRoleName, setNewRoleName] = useState('')
 
-  // global player
-  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null)
-  const [playingLabel, setPlayingLabel] = useState('')
+  // inline player: track which item is playing
+  const [playingKey, setPlayingKey] = useState<string | null>(null) // "trial:{voice_id}" or "hist:{key}"
+  const [playingUrl, setPlayingUrl] = useState<string | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [playProgress, setPlayProgress] = useState(0) // 0-1
   const audioRef = useRef<HTMLAudioElement>(null)
 
   // inline synthesis (per-voice)
@@ -173,33 +175,91 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
     }, 50)
   }, [selectedRole, editingDefault])
 
-  // ── play helper ───────────────────────────────────────────────────────
+  // ── audio event listeners ────────────────────────────────────────────
 
-  const playAudio = useCallback((url: string, label: string) => {
-    setCurrentAudioUrl(url)
-    setPlayingLabel(label)
-    setTimeout(() => {
-      const el = audioRef.current
-      if (el) { el.load(); el.play() }
-    }, 0)
+  useEffect(() => {
+    const el = audioRef.current
+    if (!el) return
+    const onPlay = () => setIsPlaying(true)
+    const onPause = () => setIsPlaying(false)
+    const onEnded = () => { setIsPlaying(false); setPlayProgress(0) }
+    const onTime = () => {
+      if (el.duration > 0) setPlayProgress(el.currentTime / el.duration)
+    }
+    el.addEventListener('play', onPlay)
+    el.addEventListener('pause', onPause)
+    el.addEventListener('ended', onEnded)
+    el.addEventListener('timeupdate', onTime)
+    return () => {
+      el.removeEventListener('play', onPlay)
+      el.removeEventListener('pause', onPause)
+      el.removeEventListener('ended', onEnded)
+      el.removeEventListener('timeupdate', onTime)
+    }
   }, [])
 
+  // ── keyboard: Space to toggle play/pause ─────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === ' ') {
+        e.preventDefault()
+        const el = audioRef.current
+        if (!el || !playingKey) return
+        if (el.paused) el.play()
+        else el.pause()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [playingKey])
+
+  // ── play helper ───────────────────────────────────────────────────────
+
+  const togglePlay = useCallback((key: string, url: string) => {
+    const el = audioRef.current
+    if (!el) return
+    if (playingKey === key) {
+      // same item: toggle pause/resume
+      if (el.paused) el.play()
+      else el.pause()
+    } else {
+      // new item: switch and play
+      setPlayingKey(key)
+      setPlayingUrl(url)
+      setPlayProgress(0)
+      el.src = url
+      el.load()
+      el.play()
+    }
+  }, [playingKey])
+
   const handleTrial = useCallback((voice: Voice) => {
-    if (voice.trial_url) playAudio(voice.trial_url, `${voice.name} (trial)`)
-  }, [playAudio])
+    if (voice.trial_url) togglePlay(`trial:${voice.voice_id}`, voice.trial_url)
+  }, [togglePlay])
 
   // ── assign voice ──────────────────────────────────────────────────────
 
   const handleAssign = useCallback((voiceId: string) => {
     if (!roles) return
     if (editingDefault) {
+      if (roles.default_roles[editingDefault] === voiceId) return
       setRoles({ ...roles, default_roles: { ...roles.default_roles, [editingDefault]: voiceId } })
       setDirty(true)
     } else if (selectedRole) {
+      if (roles.roles[selectedRole] === voiceId) return
       setRoles({ ...roles, roles: { ...roles.roles, [selectedRole]: voiceId } })
       setDirty(true)
     }
   }, [roles, selectedRole, editingDefault])
+
+  const handleUnassign = useCallback((roleId: string) => {
+    if (!roles) return
+    setRoles({ ...roles, roles: { ...roles.roles, [roleId]: '' } })
+    setDirty(true)
+  }, [roles])
 
   // ── select role ───────────────────────────────────────────────────────
 
@@ -264,8 +324,7 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
       }
       const data = await res.json()
       const voice = voiceMap[expandedVoice]
-      const emotionLabel = voice?.emotions.find(e => e.value === selectedEmotion)
-      playAudio(data.audio_url, `${voice?.name ?? expandedVoice} / ${emotionLabel?.label ?? (selectedEmotion || 'neutral')}`)
+      togglePlay(`hist:${data.key}`, data.audio_url)
 
       // append to local history
       const newEntry: HistoryEntry = {
@@ -282,17 +341,17 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
     } finally {
       setSynthesizing(false)
     }
-  }, [expandedVoice, selectedEmotion, text, voiceMap, playAudio])
+  }, [expandedVoice, selectedEmotion, text, voiceMap, togglePlay])
 
   // ── download ──────────────────────────────────────────────────────────
 
   const handleDownload = useCallback(() => {
-    if (!currentAudioUrl) return
+    if (!playingUrl) return
     const a = document.createElement('a')
-    a.href = currentAudioUrl
-    a.download = `${playingLabel.replace(/[/ ]+/g, '_') || 'voice'}.wav`
+    a.href = playingUrl
+    a.download = `${playingKey?.replace(/[/:]+/g, '_') || 'voice'}.wav`
     a.click()
-  }, [currentAudioUrl, playingLabel])
+  }, [playingUrl, playingKey])
 
   // ── render ────────────────────────────────────────────────────────────
 
@@ -304,10 +363,14 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
     )
   }
 
-  // pinyin-sorted role entries
-  const sortedRoleEntries = useMemo(() => {
-    if (!roles) return []
-    return Object.entries(roles.roles).sort(([a], [b]) => a.localeCompare(b, 'zh-Hans-CN'))
+  // pinyin-sorted role entries, split by assignment status
+  const { unassignedRoles, assignedRoles } = useMemo(() => {
+    if (!roles) return { unassignedRoles: [], assignedRoles: [] }
+    const entries = Object.entries(roles.roles).sort(([a], [b]) => a.localeCompare(b, 'zh-Hans-CN'))
+    return {
+      unassignedRoles: entries.filter(([_, v]) => !v),
+      assignedRoles: entries.filter(([_, v]) => !!v),
+    }
   }, [roles])
 
   const handleAddNewRole = useCallback(() => {
@@ -322,15 +385,30 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
     setEditingDefault(null)
   }, [newRoleName, roles])
 
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+
   const handleDeleteRole = useCallback((roleId: string) => {
+    if (confirmDelete !== roleId) {
+      setConfirmDelete(roleId)
+      return
+    }
     if (!roles) return
     const { [roleId]: _, ...rest } = roles.roles
     setRoles({ ...roles, roles: rest })
     setDirty(true)
+    setConfirmDelete(null)
     if (selectedRole === roleId) {
       setSelectedRole(null)
     }
-  }, [roles, selectedRole])
+  }, [roles, selectedRole, confirmDelete])
+
+  // 点击其他地方取消确认
+  useEffect(() => {
+    if (!confirmDelete) return
+    const handler = () => setConfirmDelete(null)
+    window.addEventListener('click', handler)
+    return () => window.removeEventListener('click', handler)
+  }, [confirmDelete])
 
   const hasSelection = selectedRole !== null || editingDefault !== null
 
@@ -363,16 +441,8 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
         )}
       </header>
 
-      {/* Global audio player */}
-      {currentAudioUrl && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-gray-800/60 border-b border-gray-700 shrink-0">
-          <span className="text-xs text-gray-400 shrink-0 w-44 truncate">{playingLabel}</span>
-          <audio ref={audioRef} src={currentAudioUrl} controls className="flex-1 h-8" />
-          <button onClick={handleDownload} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 shrink-0">
-            Download
-          </button>
-        </div>
-      )}
+      {/* Hidden audio element */}
+      <audio ref={audioRef} className="hidden" />
 
       {/* Main split layout */}
       <div className="flex-1 flex overflow-hidden">
@@ -416,39 +486,92 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
                     <button onClick={() => { setAddingRole(false); setNewRoleName('') }} className="text-xs text-gray-500 hover:text-gray-300 px-1">X</button>
                   </div>
                 )}
-                <div className="space-y-0.5">
-                  {sortedRoleEntries.length === 0 && (
+                <div className="space-y-2">
+                  {unassignedRoles.length === 0 && assignedRoles.length === 0 && (
                     <div className="text-xs text-gray-600 italic py-1">No roles defined</div>
                   )}
-                  {sortedRoleEntries.map(([roleId, voiceId]) => {
-                    const isActive = selectedRole === roleId && editingDefault === null
-                    const voice = voiceId ? voiceMap[voiceId] : null
-                    return (
-                      <div
-                        key={roleId}
-                        className={`group flex items-center rounded text-xs transition-colors ${
-                          isActive
-                            ? 'bg-blue-600/30 border border-blue-500/50'
-                            : 'hover:bg-gray-800 border border-transparent'
-                        }`}
-                      >
-                        <button
-                          onClick={() => handleSelectRole(roleId)}
-                          className="flex-1 text-left px-2 py-1.5 min-w-0"
-                        >
-                          <div className="font-medium text-gray-200">{roleId}</div>
-                          <div className="text-[10px] text-gray-500 mt-0.5">
-                            {voice ? voice.name : voiceId ? voiceId : '(none)'}
+
+                  {/* Unassigned group */}
+                  <div>
+                    <div className="text-[10px] text-yellow-500/70 mb-0.5 px-1">Unassigned ({unassignedRoles.length})</div>
+                    <div className="space-y-0.5">
+                      {unassignedRoles.length === 0 && (
+                        <div className="text-[10px] text-gray-600 italic px-2 py-1">--</div>
+                      )}
+                      {unassignedRoles.map(([roleId]) => {
+                        const isActive = selectedRole === roleId && editingDefault === null
+                        const isConfirming = confirmDelete === roleId
+                        return (
+                          <div
+                            key={roleId}
+                            className={`group flex items-center rounded text-xs transition-colors ${
+                              isActive
+                                ? 'bg-blue-600/30 border border-blue-500/50'
+                                : 'hover:bg-gray-800 border border-transparent'
+                            }`}
+                          >
+                            <button
+                              onClick={() => handleSelectRole(roleId)}
+                              className="flex-1 text-left px-2 py-1.5 min-w-0"
+                            >
+                              <div className="font-medium text-gray-200">{roleId}</div>
+                              <div className="text-[10px] text-yellow-500/50 mt-0.5">(none)</div>
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleDeleteRole(roleId) }}
+                              className={`${isConfirming ? 'opacity-100 text-red-400' : 'opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400'} px-1.5 py-1 text-[10px] shrink-0`}
+                              title={isConfirming ? 'Click again to confirm' : 'Delete role'}
+                            >{isConfirming ? 'Confirm?' : 'Delete'}</button>
                           </div>
-                        </button>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDeleteRole(roleId) }}
-                          className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-1 text-xs shrink-0"
-                          title="Delete role"
-                        >X</button>
-                      </div>
-                    )
-                  })}
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Assigned group */}
+                  <div>
+                    <div className="text-[10px] text-green-500/70 mb-0.5 px-1">Assigned ({assignedRoles.length})</div>
+                    <div className="space-y-0.5">
+                      {assignedRoles.length === 0 && (
+                        <div className="text-[10px] text-gray-600 italic px-2 py-1">--</div>
+                      )}
+                      {assignedRoles.map(([roleId, voiceId]) => {
+                        const isActive = selectedRole === roleId && editingDefault === null
+                        const voice = voiceMap[voiceId]
+                        const isConfirming = confirmDelete === roleId
+                        return (
+                          <div
+                            key={roleId}
+                            className={`group flex items-center rounded text-xs transition-colors ${
+                              isActive
+                                ? 'bg-blue-600/30 border border-blue-500/50'
+                                : 'hover:bg-gray-800 border border-transparent'
+                            }`}
+                          >
+                            <button
+                              onClick={() => handleSelectRole(roleId)}
+                              className="flex-1 text-left px-2 py-1.5 min-w-0"
+                            >
+                              <div className="font-medium text-gray-200">{roleId}</div>
+                              <div className="text-[10px] text-gray-500 mt-0.5">
+                                {voice ? voice.name : voiceId}
+                              </div>
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleUnassign(roleId) }}
+                              className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-yellow-400 px-1.5 py-1 text-[10px] shrink-0"
+                              title="Clear voice assignment"
+                            >Clear</button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleDeleteRole(roleId) }}
+                              className={`${isConfirming ? 'opacity-100 text-red-400' : 'opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400'} px-1.5 py-1 text-[10px] shrink-0`}
+                              title={isConfirming ? 'Click again to confirm' : 'Delete role'}
+                            >{isConfirming ? 'Confirm?' : 'Delete'}</button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -539,13 +662,31 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
                         {isAssigned && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
                       </span>
 
-                      {/* Trial play */}
-                      <button
-                        onClick={e => { e.stopPropagation(); handleTrial(v) }}
-                        disabled={!v.trial_url}
-                        className="text-blue-400 hover:text-blue-300 disabled:text-gray-600 shrink-0 text-base"
-                        title={v.trial_url ? 'Play trial audio' : 'No trial available'}
-                      >&#9654;</button>
+                      {/* Trial play/pause */}
+                      {(() => {
+                        const trialKey = `trial:${v.voice_id}`
+                        const isCurrent = playingKey === trialKey
+                        const showPause = isCurrent && isPlaying
+                        return (
+                          <div className="relative shrink-0 flex items-center">
+                            <button
+                              onClick={e => { e.stopPropagation(); handleTrial(v) }}
+                              disabled={!v.trial_url}
+                              className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-colors ${
+                                showPause
+                                  ? 'bg-blue-600 text-white'
+                                  : 'text-blue-400 hover:text-blue-300 disabled:text-gray-600 hover:bg-gray-700'
+                              }`}
+                              title={v.trial_url ? (showPause ? 'Pause' : 'Play trial') : 'No trial available'}
+                            >{showPause ? '\u23F8' : '\u25B6'}</button>
+                            {isCurrent && playProgress > 0 && (
+                              <div className="absolute -bottom-1 left-0 w-7 h-0.5 bg-gray-600 rounded overflow-hidden">
+                                <div className="h-full bg-blue-400 transition-all" style={{ width: `${playProgress * 100}%` }} />
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
 
                       {/* Avatar */}
                       {v.avatar && (
@@ -622,6 +763,13 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
                           >
                             {synthesizing ? 'Synthesizing...' : 'Synthesize'}
                           </button>
+                          {playingUrl && playingKey?.startsWith(`trial:${v.voice_id}`) && (
+                            <button
+                              onClick={handleDownload}
+                              className="px-2 py-1 text-[11px] rounded bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-gray-200 shrink-0"
+                              title="Download"
+                            >Download</button>
+                          )}
                         </div>
 
                         {/* History for this voice */}
@@ -629,19 +777,39 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
                           <div>
                             <div className="text-[10px] text-gray-500 mb-1">History</div>
                             <div className="space-y-1 max-h-32 overflow-y-auto">
-                              {voiceHistory.map(h => (
-                                <div
-                                  key={h.key}
-                                  className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 cursor-pointer group"
-                                  onClick={() => playAudio(`/api/voices/audio/${h.key}`, `${h.voice_name} / ${h.emotion || 'neutral'}`)}
-                                >
-                                  <span className="text-blue-400 group-hover:text-blue-300 shrink-0">&#9654;</span>
-                                  {h.emotion && (
-                                    <span className="px-1 py-0.5 rounded bg-gray-700/50 text-[10px] shrink-0">{h.emotion}</span>
-                                  )}
-                                  <span className="truncate">{h.text}</span>
-                                </div>
-                              ))}
+                              {voiceHistory.map(h => {
+                                const histKey = `hist:${h.key}`
+                                const isCurrent = playingKey === histKey
+                                const showPause = isCurrent && isPlaying
+                                return (
+                                  <div
+                                    key={h.key}
+                                    className={`flex items-center gap-2 text-xs cursor-pointer group ${
+                                      isCurrent ? 'text-blue-300' : 'text-gray-400 hover:text-gray-200'
+                                    }`}
+                                    onClick={() => togglePlay(histKey, `/api/voices/audio/${h.key}`)}
+                                  >
+                                    <span className={`shrink-0 ${showPause ? 'text-blue-300' : 'text-blue-400 group-hover:text-blue-300'}`}>
+                                      {showPause ? '\u23F8' : '\u25B6'}
+                                    </span>
+                                    {h.emotion && (
+                                      <span className="px-1 py-0.5 rounded bg-gray-700/50 text-[10px] shrink-0">{h.emotion}</span>
+                                    )}
+                                    <span className="truncate flex-1">{h.text}</span>
+                                    {isCurrent && playProgress > 0 && (
+                                      <div className="w-12 h-1 bg-gray-600 rounded overflow-hidden shrink-0">
+                                        <div className="h-full bg-blue-400 transition-all" style={{ width: `${playProgress * 100}%` }} />
+                                      </div>
+                                    )}
+                                    {isCurrent && (
+                                      <button
+                                        onClick={e => { e.stopPropagation(); handleDownload() }}
+                                        className="opacity-0 group-hover:opacity-100 text-[10px] text-gray-500 hover:text-gray-300 shrink-0"
+                                      >DL</button>
+                                    )}
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         )}

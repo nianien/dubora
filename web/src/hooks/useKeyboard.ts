@@ -85,17 +85,17 @@ export function useKeyboard() {
         const editStart = currentTime <= midMs
         if (editStart) {
           updateSegment(seg.id, {
-            start_ms: Math.max(0, Math.min(currentTime, seg.end_ms - 50)),
+            start_ms: Math.max(0, Math.min(currentTime, seg.end_ms - 30)),
           })
         } else {
           updateSegment(seg.id, {
-            end_ms: Math.max(seg.start_ms + 50, currentTime),
+            end_ms: Math.max(seg.start_ms + 30, currentTime),
           })
         }
         return
       }
 
-      // Alt+Arrow: fine-tune segment edge ±50ms (cursor position decides start or end)
+      // Alt+Arrow: fine-tune segment edge ±30ms (cursor position decides start or end)
       if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault()
         const video = document.querySelector('video')
@@ -107,11 +107,11 @@ export function useKeyboard() {
         const direction = e.key === 'ArrowLeft' ? -1 : 1
         if (editStart) {
           updateSegment(seg.id, {
-            start_ms: Math.max(0, Math.min(seg.start_ms + direction * 50, seg.end_ms - 50)),
+            start_ms: Math.max(0, Math.min(seg.start_ms + direction * 30, seg.end_ms - 30)),
           })
         } else {
           updateSegment(seg.id, {
-            end_ms: Math.max(seg.start_ms + 50, seg.end_ms + direction * 50),
+            end_ms: Math.max(seg.start_ms + 30, seg.end_ms + direction * 30),
           })
         }
         return
@@ -196,12 +196,12 @@ export function useKeyboard() {
         return
       }
 
-      // Arrow Left/Right (no modifier): seek playback ±50ms (±1s with Shift), auto-pause
+      // Arrow Left/Right (no modifier): seek playback ±30ms (±1s with Shift), auto-pause
       if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault()
         const video = document.querySelector('video')
         if (video && !video.paused) video.pause()
-        const step = e.shiftKey ? 1000 : 50
+        const step = e.shiftKey ? 1000 : 30
         const direction = e.key === 'ArrowLeft' ? -1 : 1
         const duration = useEditorStore.getState().duration
         const newTime = Math.max(0, Math.min(duration, currentTime + direction * step))
