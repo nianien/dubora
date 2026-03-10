@@ -195,25 +195,17 @@ class ParsePhase(Phase):
                 ctx.store.delete_episode_cues(ctx.episode_id)
                 ctx.store.delete_episode_utterances(ctx.episode_id)
 
-                # Auto-create roles for each speaker, map speaker name → role_id
-                ep = ctx.store.get_episode(ctx.episode_id)
-                drama_id = ep["drama_id"] if ep else 0
-                speaker_to_role_id: dict[str, int] = {}
-                for seg in asr_model.segments:
-                    if seg.speaker and seg.speaker not in speaker_to_role_id:
-                        speaker_to_role_id[seg.speaker] = ctx.store.ensure_role(drama_id, seg.speaker)
-
+                # Store raw ASR speaker cluster ID. Roles are created manually by the user.
                 cue_rows = []
                 for seg in asr_model.segments:
                     cue_rows.append({
                         "start_ms": seg.start_ms,
                         "end_ms": seg.end_ms,
                         "text": seg.text,
-                        "speaker": str(speaker_to_role_id.get(seg.speaker, 0)),
+                        "speaker": seg.speaker or "0",
                         "emotion": seg.emotion or "neutral",
                         "kind": seg.type if hasattr(seg, "type") and seg.type else "speech",
                         "gender": seg.gender,
-                        "cv": 1,
                     })
                 ctx.store.insert_cues(ctx.episode_id, cue_rows)
                 info(f"Wrote {len(cue_rows)} SRC cues to DB (after reseg + emotion)")

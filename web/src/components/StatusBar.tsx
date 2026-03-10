@@ -14,7 +14,7 @@ export function StatusBar() {
   if (!loaded) {
     return (
       <div className="flex items-center justify-between px-3 py-1 bg-gray-800 border-t border-gray-700 text-xs text-gray-500">
-        <span>No model loaded</span>
+        <span>未加载数据</span>
       </div>
     )
   }
@@ -22,14 +22,14 @@ export function StatusBar() {
   return (
     <div className="flex items-center justify-between px-3 py-1 bg-gray-800 border-t border-gray-700 text-xs text-gray-400">
       <div className="flex items-center gap-4">
-        <span>{cues.length} cues</span>
-        <span>{deriveSpeakers(cues).length} speakers</span>
+        <span>{cues.length} 条字幕</span>
+        <span>{deriveSpeakers(cues).length} 个角色</span>
         <span>{msToDisplay(currentTime)}</span>
       </div>
       <div className="flex items-center gap-4">
-        {loading && <span className="text-blue-400">Saving...</span>}
-        {dirty && !loading && <span className="text-yellow-400">Unsaved changes</span>}
-        {!dirty && !loading && <span className="text-green-400">Saved</span>}
+        {loading && <span className="text-blue-400">保存中...</span>}
+        {dirty && !loading && <span className="text-yellow-400">有未保存的更改</span>}
+        {!dirty && !loading && <span className="text-green-400">已保存</span>}
       </div>
     </div>
   )

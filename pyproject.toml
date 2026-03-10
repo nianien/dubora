@@ -37,6 +37,7 @@ faster = [
 web = [
   "fastapi>=0.110.0",
   "uvicorn[standard]>=0.27.0",
+  "python-multipart>=0.0.6",
 ]
 dub = [
   "demucs>=4.0.0",

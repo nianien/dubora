@@ -90,16 +90,15 @@ class ASRPhase(Phase):
         # 获取配置
         phase_config = ctx.config.get("phases", {}).get("asr", {})
         preset = phase_config.get("preset", ctx.config.get("doubao_asr_preset", "asr_vad_spk"))
-        # 热词：从 names.json 自动加载人名
+        # 热词：从 DB glossary 表加载人名
         hotwords = None
-        names_path = Path(ctx.workspace).parent / "dict" / "names.json"
-        if names_path.exists():
-            try:
-                with open(names_path, "r", encoding="utf-8") as f:
-                    hotwords = list(json.load(f).keys())
-                info(f"Loaded {len(hotwords)} hotwords from names.json")
-            except Exception as e:
-                info(f"Failed to load names.json for hotwords: {e}")
+        if ctx.store and ctx.episode_id:
+            ep = ctx.store.get_episode(ctx.episode_id)
+            if ep:
+                names = ctx.store.get_dict_map(ep["drama_id"], "name")
+                if names:
+                    hotwords = list(names.keys())
+                    info(f"Loaded {len(hotwords)} hotwords from glossary")
 
         info(f"ASR strategy: preset={preset}")
         info(f"Audio file: {audio_path.name} (size: {audio_path.stat().st_size / 1024 / 1024:.2f} MB)")

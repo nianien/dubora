@@ -17,7 +17,7 @@ class Phase(ABC):
     @abstractmethod
     def requires(self) -> List[str]:
         """
-        返回该 Phase 需要的 artifact keys（从 manifest.artifacts 获取）。
+        返回该 Phase 需要的 artifact keys（由 resolve_artifact_path 计算路径）。
         
         Returns:
             artifact keys 列表，例如 ["extract.audio"]

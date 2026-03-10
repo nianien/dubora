@@ -163,7 +163,6 @@ export function useKeyboard() {
           speaker: refCue?.speaker ?? 0,
           emotion: 'neutral',
           kind: 'speech',
-          cv: 1,
         }
 
         insertCue(insertIdx, newCue)

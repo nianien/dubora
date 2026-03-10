@@ -1,6 +1,8 @@
 """
-Burn Phase: 生成 SRT 字幕 + 烧录字幕到视频
+Burn Phase: 生成 SRT 字幕 + 烧录字幕到视频 + 上传 GCS + 写 artifacts 表
 """
+import hashlib
+import logging
 import os
 import subprocess
 from pathlib import Path
@@ -10,6 +12,28 @@ from dubora.pipeline.core.phase import Phase
 from dubora.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora.utils.logger import info
 from dubora.utils.timecode import write_srt_from_segments
+
+logger = logging.getLogger(__name__)
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _upload_gcs(local_path: Path, gcs_path: str) -> bool:
+    """Best-effort upload to GCS. Returns True on success."""
+    try:
+        from dubora.utils.file_store import _gcs_bucket
+        blob = _gcs_bucket().blob(gcs_path)
+        blob.upload_from_filename(str(local_path))
+        return True
+    except Exception as e:
+        logger.warning("GCS upload failed for %s: %s", gcs_path, e)
+        return False
 
 
 class BurnPhase(Phase):
@@ -36,8 +60,10 @@ class BurnPhase(Phase):
         执行 Burn Phase。
 
         流程：
-        1. 从 DB cues 生成 en.srt
+        1. 从 DB cues 生成 en.srt + zh.srt
         2. 使用 ffmpeg 将字幕烧录到视频
+        3. 上传 GCS (best-effort)
+        4. 写 artifacts 表
         """
         store = ctx.store
         episode_id = ctx.episode_id
@@ -65,26 +91,36 @@ class BurnPhase(Phase):
                 ),
             )
 
-        # 从 DB cues 生成 en.srt
+        # 从 DB cues 生成 en.srt + zh.srt
         all_cues = store.get_cues(episode_id)
-        srt_segments = []
+
+        en_segments = []
+        zh_segments = []
         for cue in all_cues:
+            start = cue["start_ms"] / 1000.0
+            end = cue["end_ms"] / 1000.0
             text_en = (cue.get("text_en") or "").strip()
-            if not text_en:
-                continue
-            srt_segments.append({
-                "start": cue["start_ms"] / 1000.0,
-                "end": cue["end_ms"] / 1000.0,
-                "en_text": text_en,
-            })
-        srt_segments.sort(key=lambda x: x["start"])
+            text_cn = (cue.get("text") or "").strip()
+            if text_en:
+                en_segments.append({"start": start, "end": end, "en_text": text_en})
+            if text_cn:
+                zh_segments.append({"start": start, "end": end, "zh_text": text_cn})
 
-        srt_path = workspace_path / "output" / "en.srt"
-        srt_path.parent.mkdir(parents=True, exist_ok=True)
-        write_srt_from_segments(srt_segments, str(srt_path), text_key="en_text")
-        info(f"Generated en.srt: {len(srt_segments)} segments")
+        en_segments.sort(key=lambda x: x["start"])
+        zh_segments.sort(key=lambda x: x["start"])
 
-        if not srt_segments:
+        output_dir = workspace_path / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        en_srt_path = output_dir / "en.srt"
+        write_srt_from_segments(en_segments, str(en_srt_path), text_key="en_text")
+        info(f"Generated en.srt: {len(en_segments)} segments")
+
+        zh_srt_path = output_dir / "zh.srt"
+        write_srt_from_segments(zh_segments, str(zh_srt_path), text_key="zh_text")
+        info(f"Generated zh.srt: {len(zh_segments)} segments")
+
+        if not en_segments:
             return PhaseResult(
                 status="failed",
                 error=ErrorInfo(
@@ -92,7 +128,7 @@ class BurnPhase(Phase):
                     message="No translated cues found. Run translate phase first.",
                 ),
             )
-        
+
         # 获取 video_path（从 config）
         video_path = ctx.config.get("video_path")
         if not video_path:
@@ -103,18 +139,14 @@ class BurnPhase(Phase):
                     message="video_path not found in config",
                 ),
             )
-        
+
         # 输出视频路径（使用 runner 预分配的 outputs）
         output_video_path = outputs.get("burn.video")
-        
+
         try:
-            # 使用 ffmpeg 烧录字幕
-            # 需要将 SRT 转换为 ASS（或直接使用 SRT）
-            # 这里简化处理，直接使用 SRT
-            
             # 转义路径（Windows 兼容）
-            escaped_srt = os.path.abspath(srt_path).replace("\\", "\\\\").replace(":", "\\:")
-            
+            escaped_srt = os.path.abspath(en_srt_path).replace("\\", "\\\\").replace(":", "\\:")
+
             cmd = [
                 "ffmpeg",
                 "-i", str(video_path),
@@ -129,14 +161,14 @@ class BurnPhase(Phase):
                 "-y",
                 str(output_video_path),
             ]
-            
-            result = subprocess.run(
+
+            subprocess.run(
                 cmd,
                 check=True,
                 capture_output=True,
                 text=True,
             )
-            
+
             if not output_video_path.exists():
                 return PhaseResult(
                     status="failed",
@@ -145,10 +177,35 @@ class BurnPhase(Phase):
                         message=f"Burn failed: {output_video_path} was not created",
                     ),
                 )
-            
+
             info(f"Burn completed: {output_video_path.name} (size: {output_video_path.stat().st_size / 1024 / 1024:.2f} MB)")
-            
-            # 返回 PhaseResult：只声明哪些 outputs 成功
+
+            # ── 写 artifacts 表 + GCS 上传 ──
+            ep_row = store.get_episode(episode_id)
+            drama_name = ep_row["drama_name"] if ep_row else "unknown"
+            ep_number = ep_row["number"] if ep_row else 0
+            gcs_prefix = f"videos/{drama_name}/{ep_number}"
+
+            deliverables = [
+                ("zh_srt", zh_srt_path, f"{gcs_prefix}-zh.srt"),
+                ("en_srt", en_srt_path, f"{gcs_prefix}-en.srt"),
+                ("dubbed_video", output_video_path, f"{gcs_prefix}-dubbed.mp4"),
+            ]
+
+            for kind, local_abs, gcs_key in deliverables:
+                checksum = _sha256_file(local_abs) if local_abs.is_file() else None
+                uploaded = _upload_gcs(local_abs, gcs_key)
+                if uploaded:
+                    info(f"Uploaded {kind} to GCS: {gcs_key}")
+                else:
+                    info(f"GCS upload skipped/failed for {kind}: {gcs_key}")
+                store.upsert_artifact(
+                    episode_id,
+                    kind,
+                    gcs_path=gcs_key if uploaded else None,
+                    checksum=checksum,
+                )
+
             return PhaseResult(
                 status="succeeded",
                 outputs=["burn.video"],
@@ -156,7 +213,7 @@ class BurnPhase(Phase):
                     "output_video_size_mb": output_video_path.stat().st_size / 1024 / 1024,
                 },
             )
-            
+
         except subprocess.CalledProcessError as e:
             return PhaseResult(
                 status="failed",

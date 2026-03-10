@@ -1,8 +1,8 @@
 """
-Cues API: GET/PUT cue-level data with cv versioning.
+Cues API: GET/PUT cue-level data.
 Also serves utterances endpoint.
 
-DB cues are the single source of truth — no dub.json dependency.
+DB cues are the single source of truth.
 """
 from pathlib import Path
 
@@ -20,7 +20,7 @@ def _get_store(db_path: Path) -> PipelineStore:
 def _ensure_episode(store: PipelineStore, drama: str, ep: str) -> int:
     """Ensure drama + episode exist in DB, return episode_id."""
     drama_id = store.ensure_drama(name=drama)
-    episode_id = store.ensure_episode(drama_id=drama_id, name=ep)
+    episode_id = store.ensure_episode(drama_id=drama_id, number=int(ep))
     return episode_id
 
 
@@ -37,7 +37,7 @@ async def get_cues(request: Request, drama: str, ep: str) -> dict:
 
 @router.put("/episodes/{drama}/{ep}/cues")
 async def put_cues(request: Request, drama: str, ep: str) -> dict:
-    """Save SRC cues with automatic cv version bumping via diff_and_save.
+    """Save cues with automatic dirty detection via diff_and_save.
 
     diff_and_save automatically calls calculate_utterances() at the end.
     """

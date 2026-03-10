@@ -259,7 +259,6 @@ export function TranscriptList() {
     speaker,
     emotion: 'neutral',
     kind: 'speech',
-    cv: 1,
   }), [])
 
   const buildContextMenuItems = useCallback((cueId: number): ContextMenuItem[] => {
@@ -276,14 +275,14 @@ export function TranscriptList() {
 
     return [
       {
-        label: 'Split at Playhead',
+        label: '在播放头处分割',
         shortcut: '\u2318B',
         onClick: () => splitCue(cueId, ct),
         disabled: !canSplit,
         dividerAfter: true,
       },
       {
-        label: 'Insert Before',
+        label: '在前方插入',
         onClick: () => {
           const newStart = prev ? prev.end_ms : Math.max(0, cue.start_ms - 1000)
           const newCue = makeEmptyCue(newStart, cue.start_ms, cue.speaker)
@@ -293,7 +292,7 @@ export function TranscriptList() {
         },
       },
       {
-        label: 'Insert After',
+        label: '在后方插入',
         onClick: () => {
           const newEnd = next ? next.start_ms : cue.end_ms + 1000
           const newCue = makeEmptyCue(cue.end_ms, newEnd, cue.speaker)
@@ -303,19 +302,19 @@ export function TranscriptList() {
         },
       },
       {
-        label: 'Merge with Next',
+        label: '与下一条合并',
         shortcut: '\u2318M',
         onClick: () => mergeWithNext(cueId),
         disabled: isLast,
         dividerAfter: true,
       },
       {
-        label: cue.kind === 'singing' ? 'Set as Speech' : 'Set as Singing',
+        label: cue.kind === 'singing' ? '设为对白' : '设为歌唱',
         onClick: () => updateCue(cueId, { kind: cue.kind === 'singing' ? 'speech' : 'singing' }),
         dividerAfter: true,
       },
       {
-        label: 'Delete',
+        label: '删除',
         shortcut: '\u232B',
         onClick: () => {
           deleteCue(cueId)
@@ -332,7 +331,7 @@ export function TranscriptList() {
   if (!loaded) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
-        Select an episode to begin
+        请选择一集开始编辑
       </div>
     )
   }
@@ -411,9 +410,9 @@ export function TranscriptList() {
                 <button
                   onClick={e => { e.stopPropagation(); updateCue(cue.id, { kind: 'speech' }) }}
                   className="shrink-0 pt-1 text-xs px-1.5 py-0.5 rounded bg-pink-800 text-pink-200 hover:brightness-125"
-                  title="Singing (click to switch to speech)"
+                  title="歌唱（点击切换为对白）"
                 >
-                  singing
+                  歌唱
                 </button>
               )}
 
@@ -445,7 +444,7 @@ export function TranscriptList() {
                       : 'text-gray-600 italic'
                   }`}
                 >
-                  {cue.text_en || 'No translation'}
+                  {cue.text_en || '暂无翻译'}
                 </div>
               </div>
 
@@ -581,7 +580,7 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
       <button
         onClick={e => { e.stopPropagation(); onToggle(); setFilter(''); setHighlightIdx(-1); setTab('recent') }}
         className={`text-xs px-1.5 py-0.5 rounded ${badgeColor} text-white min-w-[24px] text-center hover:brightness-125 flex items-center gap-1`}
-        title="Assign role"
+        title="分配角色"
       >
         {speakerName}
         <span className="text-[10px] opacity-60">▾</span>
@@ -616,7 +615,7 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
               }}
               onClick={e => e.stopPropagation()}
               className="w-full bg-gray-700 text-gray-100 px-1.5 py-0.5 rounded text-xs outline-none ring-1 ring-gray-500 focus:ring-blue-400"
-              placeholder="Search or create..."
+              placeholder="搜索或创建..."
               autoFocus
             />
           </div>
@@ -655,7 +654,7 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
           ))}
           {!isFiltering && visibleRoles.length === 0 && (
             <div className="px-2 py-2 text-[10px] text-gray-600 italic text-center">
-              {tab === 'recent' ? 'No recent roles' : 'No roles'}
+              {tab === 'recent' ? '暂无常用角色' : '暂无角色'}
             </div>
           )}
           {hasCreate && (
@@ -667,7 +666,7 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
                   highlightIdx === createIdx ? 'bg-gray-600' : 'hover:bg-gray-700'
                 }`}
               >
-                + Create "{filter.trim()}"
+                + 创建「{filter.trim()}」
               </button>
             </div>
           )}
@@ -706,7 +705,7 @@ function EmotionBadge({ cue, emoColor, emotions, isOpen, onToggle, onSelect, onC
         onClick={e => { e.stopPropagation(); onToggle() }}
         style={{ background: emoColor.bg, color: emoColor.text }}
         className="text-xs px-1.5 py-0.5 rounded hover:brightness-125 flex items-center gap-0.5"
-        title="Change emotion"
+        title="更改情绪"
       >
         {emotions.find(e => e.key === cue.emotion)?.name ?? cue.emotion}
         <span className="text-[10px] opacity-60">▾</span>

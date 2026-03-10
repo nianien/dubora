@@ -19,7 +19,7 @@ export function ToolBar() {
           ({((selectedCue.end_ms - selectedCue.start_ms) / 1000).toFixed(1)}s)
         </span>
       ) : (
-        <span className="text-gray-500">No cue selected</span>
+        <span className="text-gray-500">未选择字幕</span>
       )}
     </div>
   )

@@ -80,8 +80,8 @@ def _parse_numbered_output(text: str, expected_count: int) -> list[str]:
     """
     result = [""] * expected_count
 
-    # Try [N] format
-    pattern = r'\[(\d+)\]\s*(.+?)(?=\n\s*\[\d+\]|\Z)'
+    # Try [N] format (handles both newline-separated and inline markers)
+    pattern = r'\[(\d+)\]\s*(.+?)(?=\s*\[\d+\]|\Z)'
     matches = re.findall(pattern, text.strip(), re.DOTALL)
     if matches:
         for num_str, content in matches:

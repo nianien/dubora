@@ -19,18 +19,52 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
-from dubora.config.settings import PipelineConfig
+from dubora.config.settings import PipelineConfig, get_workdir as _settings_get_workdir, get_upload_cache_dir, get_gcs_cache_dir
 from dubora.pipeline.core.events import EventEmitter, LogListener, PipelineEvent
 from dubora.pipeline.core.manifest import DbManifest
 from dubora.pipeline.core.runner import PhaseRunner
 from dubora.pipeline.core.store import PipelineStore
 from dubora.pipeline.core.types import RunContext
+from dubora.utils.logger import info as log_info, error as log_error
 
 
-def _get_workdir(video_path: Path) -> Path:
-    """Derive workdir: videos/drama/1.mp4 → videos/drama/dub/1/"""
-    video_path = Path(video_path).resolve()
-    return video_path.parent / "dub" / video_path.stem
+def _get_workdir(drama_name: str, episode_number: int) -> Path:
+    """Derive workdir from drama_name + episode_number."""
+    return _settings_get_workdir(drama_name, episode_number)
+
+
+def _resolve_video_path(episode: dict) -> Path | None:
+    """Resolve source video path by priority:
+    1. uploads/{blob_path} — freshly uploaded
+    2. gcs/{blob_path} — GCS download cache
+    3. Download from GCS → gcs/{blob_path}
+    """
+    blob_path = episode.get("path")
+    if not blob_path:
+        return None
+
+    # 1) Upload cache
+    upload = get_upload_cache_dir() / blob_path
+    if upload.is_file():
+        return upload
+
+    # 2) GCS download cache
+    gcs_local = get_gcs_cache_dir() / blob_path
+    if gcs_local.is_file():
+        return gcs_local
+
+    # 3) Download from GCS
+    try:
+        from dubora.utils.file_store import _gcs_bucket
+        blob = _gcs_bucket().blob(blob_path)
+        gcs_local.parent.mkdir(parents=True, exist_ok=True)
+        blob.download_to_filename(str(gcs_local))
+        if gcs_local.is_file():
+            return gcs_local
+    except Exception:
+        pass
+
+    return None
 
 
 def _active_range(
@@ -300,9 +334,10 @@ class PipelineWorker:
 
         # Set up per-episode execution context
         episode = self.store.get_episode(episode_id)
-        video_path = Path(episode["path"])
-        workdir = _get_workdir(video_path)
+        log_info(f"Task claimed: {task_type} (episode={episode['drama_name']}/{episode['number']}, task_id={task['id']})")
+        workdir = _get_workdir(episode["drama_name"], episode["number"])
         workdir.mkdir(parents=True, exist_ok=True)
+        video_path = _resolve_video_path(episode)
 
         manifest = DbManifest(self.store, episode_id, workdir)
         manifest.set_current_task(task["id"])
@@ -310,7 +345,7 @@ class PipelineWorker:
 
         config = PipelineConfig()
         config_dict = asdict(config)
-        config_dict["video_path"] = str(video_path.absolute())
+        config_dict["video_path"] = str(video_path.absolute()) if video_path else ""
         config_dict["phases"] = {}
         ctx = RunContext(
             job_id=str(episode_id),
@@ -340,10 +375,11 @@ class PipelineWorker:
         ))
 
         try:
-            success = runner.run_phase(
+            success, err_msg = runner.run_phase(
                 phase, ctx, force=bool(task_ctx.get("force", False)),
             )
         except Exception as e:
+            log_error(f"Task exception: {task_type} (task_id={task['id']}): {e}")
             self.store.fail_task(task["id"], error=str(e))
             emitter.emit(PipelineEvent(
                 kind="task_failed",
@@ -355,6 +391,7 @@ class PipelineWorker:
             return True
 
         if success:
+            log_info(f"Task succeeded: {task_type} (task_id={task['id']})")
             self.store.complete_task(task["id"])
             emitter.emit(PipelineEvent(
                 kind=f"{task_type}_done",
@@ -368,18 +405,20 @@ class PipelineWorker:
                 data={"type": task_type},
             ))
         else:
-            self.store.fail_task(task["id"], error=f"Phase '{task_type}' failed")
+            fail_msg = err_msg or f"Phase '{task_type}' failed"
+            log_error(f"Task failed: {task_type} (task_id={task['id']}): {fail_msg}")
+            self.store.fail_task(task["id"], error=fail_msg)
             emitter.emit(PipelineEvent(
                 kind=f"{task_type}_failed",
                 run_id=str(episode_id),
                 phase=task_type,
-                data={"type": task_type, "error": f"Phase '{task_type}' failed"},
+                data={"type": task_type, "error": fail_msg},
             ))
             emitter.emit(PipelineEvent(
                 kind="task_failed",
                 run_id=str(episode_id),
                 phase=task_type,
-                data={"type": task_type, "error": f"Phase '{task_type}' failed"},
+                data={"type": task_type, "error": fail_msg},
             ))
 
         return True

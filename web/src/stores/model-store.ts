@@ -22,7 +22,7 @@ interface ModelState {
   // episode selection
   episodes: Episode[]
   currentDrama: string
-  currentEpisode: string
+  currentEpisode: number
   videoFile: string    // relative path to video e.g. "东北雀神风云/2.mp4"
 
   // data state
@@ -31,7 +31,7 @@ interface ModelState {
   error: string | null
   dirty: boolean
 
-  // cues (DB-backed SRC cues with text_en from MT, cv versioning)
+  // cues (DB-backed SRC cues with text_en from MT)
   cues: Cue[]
 
   // utterances (from DB, for pipeline display only)
@@ -45,10 +45,10 @@ interface ModelState {
 
   // actions
   loadEpisodes: () => Promise<void>
-  selectEpisode: (drama: string, episode: string) => Promise<void>
-  loadCues: (drama: string, episode: string) => Promise<void>
+  selectEpisode: (drama: string, episode: number) => Promise<void>
+  loadCues: (drama: string, episode: number) => Promise<void>
   saveCues: () => Promise<void>
-  loadUtterances: (drama: string, episode: string) => Promise<void>
+  loadUtterances: (drama: string, episode: number) => Promise<void>
   loadRoles: (drama: string) => Promise<void>
   saveRoles: () => Promise<void>
   loadEmotions: () => Promise<void>
@@ -65,7 +65,7 @@ interface ModelState {
 export const useModelStore = create<ModelState>((set, get) => ({
   episodes: [],
   currentDrama: '',
-  currentEpisode: '',
+  currentEpisode: 0,
   videoFile: '',
   loaded: false,
   loading: false,

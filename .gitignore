@@ -71,5 +71,5 @@ web/tsconfig.tsbuildinfo
 .tmp/
 temp/
 .gcp
-/videos/
 /test_output/
+/data/

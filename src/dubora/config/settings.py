@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 from pathlib import Path
 from dataclasses import dataclass, field
 
@@ -64,6 +65,50 @@ def resolve_relative_path(path: str | Path) -> Path:
 
     # 如果找不到 .env 目录，相对于当前工作目录（向后兼容）
     return Path(path).resolve()
+
+
+_DEFAULT_DATA_DIR = "data/dubora"
+
+
+@lru_cache(maxsize=1)
+def get_data_dir() -> Path:
+    """DUBORA_DATA_DIR, default data/dubora. Auto-creates subdirectories."""
+    raw = os.getenv("DUBORA_DATA_DIR", _DEFAULT_DATA_DIR)
+    data_dir = resolve_relative_path(raw)
+    for sub in [
+        "db", "dub", "uploads/covers",
+        "uploads", "gcs", "cache/voice-preview", "cache/faststart",
+    ]:
+        (data_dir / sub).mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+
+def get_db_path() -> Path:
+    return get_data_dir() / "db" / "dubora.db"
+
+
+def get_workdir(drama_name: str, episode_number: int) -> Path:
+    return get_data_dir() / "dub" / drama_name / str(episode_number)
+
+
+def get_covers_dir() -> Path:
+    return get_data_dir() / "uploads" / "covers"
+
+
+def get_upload_cache_dir() -> Path:
+    return get_data_dir() / "uploads"
+
+
+def get_gcs_cache_dir() -> Path:
+    return get_data_dir() / "gcs"
+
+
+def get_voice_preview_cache_dir() -> Path:
+    return get_data_dir() / "cache" / "voice-preview"
+
+
+def get_faststart_cache_dir() -> Path:
+    return get_data_dir() / "cache" / "faststart"
 
 
 def get_openai_key() -> str | None:

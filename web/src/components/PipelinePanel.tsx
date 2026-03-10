@@ -113,7 +113,7 @@ function LogViewer({ logs, runError }: { logs: string[]; runError: string | null
   return (
     <div className="bg-gray-950 rounded text-[11px] font-mono p-2 overflow-y-auto max-h-40 min-h-[60px]">
       {logs.length === 0 && !runError && (
-        <span className="text-gray-600">No logs yet</span>
+        <span className="text-gray-600">暂无日志</span>
       )}
       {logs.map((line, i) => (
         <div key={i} className="text-gray-400 leading-tight whitespace-pre-wrap break-all">

@@ -1,77 +1,95 @@
 """
-Export API: 从 DB cues 按需生成 SRT 字幕。
-
-仅在 pipeline 全部成功后允许导出。
+Export API: 从 DB artifacts 表提供最终产物下载（本地优先，GCS 签名 URL 兜底）。
 """
+import logging
+from datetime import timedelta
 from pathlib import Path
 
-import srt
-from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
+from dubora.config.settings import get_workdir
+from dubora.pipeline.core.manifest import resolve_artifact_path
 from dubora.pipeline.core.store import PipelineStore
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+_FILENAME_TO_KIND = {
+    "zh.srt": "zh_srt",
+    "en.srt": "en_srt",
+    "dubbed.mp4": "dubbed_video",
+}
+
+# kind → manifest artifact key (for local file resolution)
+_KIND_TO_ARTIFACT_KEY = {
+    "zh_srt": "subs.zh_srt",
+    "en_srt": "subs.en_srt",
+    "dubbed_video": "burn.video",
+}
+
+_KIND_MEDIA_TYPE = {
+    "zh_srt": "text/plain; charset=utf-8",
+    "en_srt": "text/plain; charset=utf-8",
+    "dubbed_video": "video/mp4",
+}
 
 
 def _get_store(db_path: Path) -> PipelineStore:
     return PipelineStore(db_path)
 
 
-def _ensure_episode(store: PipelineStore, drama: str, ep: str) -> int:
-    drama_id = store.ensure_drama(name=drama)
-    return store.ensure_episode(drama_id=drama_id, name=ep)
+def _signed_url(gcs_path: str) -> str:
+    from dubora.utils.file_store import _gcs_bucket
+    blob = _gcs_bucket().blob(gcs_path)
+    return blob.generate_signed_url(expiration=timedelta(hours=1))
 
 
-def _check_pipeline_done(store: PipelineStore, episode_id: int) -> None:
-    """Raise if pipeline hasn't completed successfully."""
-    tasks = store.get_tasks(episode_id)
-    if not tasks:
-        raise HTTPException(status_code=409, detail="Pipeline has not been run yet")
-    latest = tasks[-1]
-    if latest["status"] != "succeeded":
-        raise HTTPException(
-            status_code=409,
-            detail=f"Pipeline not completed (latest task: {latest['type']} = {latest['status']})",
-        )
+@router.get("/export/{episode_id}/{filename}")
+async def export_file(request: Request, episode_id: int, filename: str):
+    """统一下载入口：zh.srt / en.srt / dubbed.mp4。
 
-
-def _build_srt(cues: list[dict], text_key: str = "text") -> str:
-    """Build SRT content from cue rows."""
-    subs = []
-    for i, c in enumerate(cues, start=1):
-        text = (c.get(text_key) or "").strip()
-        if not text:
-            continue
-        subs.append(srt.Subtitle(
-            index=i,
-            start=timedelta(milliseconds=c["start_ms"]),
-            end=timedelta(milliseconds=c["end_ms"]),
-            content=text,
-        ))
-    return srt.compose(subs)
-
-
-@router.get("/episodes/{drama}/{ep}/export/{lang}.srt")
-async def export_srt(request: Request, drama: str, ep: str, lang: str) -> PlainTextResponse:
-    """导出 SRT 字幕。lang = zh (text) | en (text_en)。"""
-    if lang not in ("zh", "en"):
-        raise HTTPException(status_code=400, detail="lang must be 'zh' or 'en'")
+    优先返回本地文件，本地缺失时 redirect 到 GCS 签名 URL。
+    """
+    kind = _FILENAME_TO_KIND.get(filename)
+    if not kind:
+        raise HTTPException(status_code=400, detail=f"Unknown filename: {filename}")
 
     store = _get_store(request.app.state.db_path)
-    episode_id = _ensure_episode(store, drama, ep)
-    _check_pipeline_done(store, episode_id)
+    ep_row = store.get_episode(episode_id)
+    if not ep_row:
+        raise HTTPException(status_code=404, detail="Episode not found")
 
-    cues = store.get_cues(episode_id)
-    if not cues:
-        raise HTTPException(status_code=404, detail="No cues found")
+    art = store.get_artifact(episode_id, kind)
+    if not art:
+        raise HTTPException(status_code=404, detail=f"Artifact '{kind}' not found. Run burn phase first.")
 
-    text_key = "text" if lang == "zh" else "text_en"
-    content = _build_srt(cues, text_key=text_key)
-    filename = f"{lang}.srt"
-    return PlainTextResponse(
-        content,
-        media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    # 1) 本地文件 (从 manifest 规则算路径)
+    artifact_key = _KIND_TO_ARTIFACT_KEY.get(kind)
+    if artifact_key:
+        workdir = get_workdir(ep_row["drama_name"], ep_row["number"])
+        local = resolve_artifact_path(artifact_key, workdir)
+        if local.is_file():
+            from urllib.parse import quote
+            dl_name = f"{ep_row['drama_name']}_EP{ep_row['number']}_{filename}"
+            encoded = quote(dl_name)
+            return FileResponse(
+                local,
+                media_type=_KIND_MEDIA_TYPE.get(kind, "application/octet-stream"),
+                headers={
+                    "Content-Disposition": f"attachment; filename*=UTF-8''{encoded}",
+                },
+            )
+
+    # 2) GCS signed URL redirect
+    if art["gcs_path"]:
+        try:
+            url = _signed_url(art["gcs_path"])
+            return RedirectResponse(url)
+        except Exception as e:
+            logger.error("GCS signed URL failed for %s: %s", art["gcs_path"], e)
+
+    raise HTTPException(
+        status_code=404,
+        detail="Artifact file not available (local missing, GCS unavailable).",
     )

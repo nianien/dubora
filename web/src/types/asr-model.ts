@@ -17,7 +17,6 @@ export interface Cue {
   emotion: string
   gender?: string | null
   kind: 'speech' | 'singing'
-  cv: number
 }
 
 /** Utterance: self-contained group computed from SRC cues + TTS cache */
@@ -49,18 +48,38 @@ export interface Role {
   role_type: string   // 'lead' | 'supporting' | 'extra' | 'narrator'
 }
 
+/** Paginated API response envelope */
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  page_size: number
+}
+
+/** Drama: aggregated drama info from API */
+export interface Drama {
+  id: number
+  name: string
+  synopsis: string | null
+  cover_image: string | null
+  total_episodes: number
+  episode_count: number
+  updated_at: string | null
+}
+
 export type EpisodeStatus = 'ready' | 'running' | 'succeeded' | 'failed' | 'review'
 
 export interface Episode {
   id: number
   drama: string
   drama_id: number
-  episode: string
+  episode: number
   path: string
   status: EpisodeStatus
+  updated_at: string | null
   video_file: string
   has_asr_result: boolean
   has_asr_model: boolean
-  dubbed_video: string
-  subtitle_file: string
+  dubbed_video: boolean
+  subtitle_file: boolean
 }

@@ -6,12 +6,12 @@ Tables:
   episodes          — business entity (INTEGER PK), status tracks pipeline progress
   tasks             — task queue (type = phase name or gate key)
   events            — audit log (task lifecycle events)
-  artifacts         — episode-level file registry for manifest
   cues              — atomic segments, content entity
   utterances        — grouping shell + TTS cache (content via utterance_cues → cues)
   utterance_cues    — junction: utterance ↔ cues
   roles             — per-drama speaker voice mapping
-  dictionary        — per-drama glossary (names, slang)
+  glossary          — per-drama glossary (names, slang)
+  artifacts         — final deliverables (zh_srt, en_srt, dubbed_video) with local + GCS paths
 """
 import json
 import sqlite3
@@ -54,15 +54,6 @@ class PipelineStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._init_schema()
-        self._maybe_migrate_to_v2()
-        self._ensure_cues_text_en()
-        self._ensure_utterance_text_columns()
-        self._ensure_utterance_cues_table()
-        self._ensure_utterance_caches()
-        self._migrate_dicts_from_files()
-        self._migrate_speaker_to_role_id()
-        self._ensure_roles_role_type()
-        self._drop_cues_type_column()
 
     def _init_schema(self) -> None:
         self._conn.executescript("""
@@ -70,6 +61,7 @@ class PipelineStore:
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 name        TEXT NOT NULL UNIQUE,
                 synopsis    TEXT NOT NULL DEFAULT '',
+                cover_image TEXT NOT NULL DEFAULT '',
                 created_at  TEXT NOT NULL,
                 updated_at  TEXT NOT NULL
             );
@@ -77,12 +69,12 @@ class PipelineStore:
             CREATE TABLE IF NOT EXISTS episodes (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 drama_id    INTEGER NOT NULL REFERENCES dramas(id),
-                name        TEXT NOT NULL,
+                number      INTEGER NOT NULL,
                 path        TEXT NOT NULL DEFAULT '',
                 status      TEXT NOT NULL DEFAULT 'ready',
                 created_at  TEXT NOT NULL,
                 updated_at  TEXT NOT NULL,
-                UNIQUE(drama_id, name)
+                UNIQUE(drama_id, number)
             );
 
             CREATE TABLE IF NOT EXISTS tasks (
@@ -106,16 +98,6 @@ class PipelineStore:
                 data        TEXT NOT NULL DEFAULT '{}'
             );
             CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
-
-            CREATE TABLE IF NOT EXISTS artifacts (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                episode_id  INTEGER NOT NULL REFERENCES episodes(id),
-                key         TEXT NOT NULL,
-                relpath     TEXT NOT NULL,
-                kind        TEXT NOT NULL,
-                fingerprint TEXT NOT NULL,
-                UNIQUE(episode_id, key)
-            );
 
             CREATE TABLE IF NOT EXISTS utterances (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -155,7 +137,6 @@ class PipelineStore:
                 emotion      TEXT NOT NULL DEFAULT 'neutral',
                 gender       TEXT,
                 kind         TEXT NOT NULL DEFAULT 'speech',
-                cv           INTEGER NOT NULL DEFAULT 1,
                 created_at   TEXT NOT NULL,
                 updated_at   TEXT NOT NULL
             );
@@ -170,7 +151,7 @@ class PipelineStore:
                 UNIQUE(drama_id, name)
             );
 
-            CREATE TABLE IF NOT EXISTS dictionary (
+            CREATE TABLE IF NOT EXISTS glossary (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 drama_id    INTEGER NOT NULL REFERENCES dramas(id),
                 type        TEXT NOT NULL,
@@ -178,289 +159,17 @@ class PipelineStore:
                 target      TEXT NOT NULL DEFAULT '',
                 UNIQUE(drama_id, type, src)
             );
+
+            CREATE TABLE IF NOT EXISTS artifacts (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                episode_id  INTEGER NOT NULL REFERENCES episodes(id),
+                kind        TEXT NOT NULL,
+                gcs_path    TEXT,
+                checksum    TEXT,
+                created_at  TEXT NOT NULL,
+                UNIQUE(episode_id, kind)
+            );
         """)
-
-    # ── V1 → V2 Migration ─────────────────────────────────────
-
-    def _maybe_migrate_to_v2(self) -> None:
-        """Detect v1 schema and migrate to v2 (cues + utterances)."""
-        # Check if old v1 utterances table exists (has source_text column)
-        try:
-            cols = self._conn.execute("PRAGMA table_info(utterances)").fetchall()
-        except Exception:
-            return
-        col_names = {row[1] for row in cols}
-        if "source_text" not in col_names:
-            return  # Already v2 or fresh
-
-        import shutil
-        backup_path = self.db_path.with_suffix(".db.v1-backup")
-        if not backup_path.exists():
-            shutil.copy2(self.db_path, backup_path)
-
-        self._migrate_to_v2()
-
-    def _migrate_to_v2(self) -> None:
-        """Migrate v1 three-table schema to v2 two-table schema."""
-        now = _now_iso()
-
-        has_segments = self._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='segments'"
-        ).fetchone() is not None
-
-        # Step 1: Rename old tables
-        self._conn.execute("ALTER TABLE utterances RENAME TO _old_utterances")
-        self._conn.execute("ALTER TABLE translation_units RENAME TO _old_translation_units")
-        if has_segments:
-            self._conn.execute("ALTER TABLE segments RENAME TO _old_segments")
-
-        # Step 2: Create new tables
-        self._init_schema()
-
-        # Step 3: Migrate old utterances → SRC cues
-        old_utts = self._conn.execute(
-            "SELECT * FROM _old_utterances ORDER BY id"
-        ).fetchall()
-
-        # Track old utterance → old unit_id mapping for grouping
-        old_unit_members: dict[int, list[dict]] = {}
-        for u in old_utts:
-            u = dict(u)
-            # Insert SRC cue
-            self._conn.execute(
-                """INSERT INTO cues
-                   (episode_id, type, text, start_ms, end_ms,
-                    speaker, emotion, gender, kind, cv, created_at, updated_at)
-                   VALUES (?, 'SRC', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    u["episode_id"],
-                    u.get("source_text", ""),
-                    u["start_ms"],
-                    u["end_ms"],
-                    u.get("speaker", ""),
-                    u.get("emotion", "neutral"),
-                    u.get("gender"),
-                    u.get("type", "speech"),
-                    u.get("cv", 1),
-                    u.get("created_at", now),
-                    now,
-                ),
-            )
-            unit_id = u.get("unit_id")
-            if unit_id:
-                old_unit_members.setdefault(unit_id, []).append(u)
-
-        # Step 4: Migrate old translation_units → utterances (with content fields)
-        old_units = self._conn.execute(
-            "SELECT * FROM _old_translation_units ORDER BY id"
-        ).fetchall()
-
-        for unit in old_units:
-            unit = dict(unit)
-            members = old_unit_members.get(unit["id"], [])
-            # Compute content fields from member utterances
-            text_cn = "".join(m.get("source_text", "") for m in members)
-            text_en = " ".join(
-                m.get("translated_text", "").strip() for m in members
-                if m.get("translated_text", "").strip()
-            )
-            start_ms = members[0]["start_ms"] if members else 0
-            end_ms = members[-1]["end_ms"] if members else 0
-            speaker = members[0].get("speaker", "") if members else ""
-            emotion = members[0].get("emotion", "neutral") if members else "neutral"
-            gender = members[0].get("gender") if members else None
-            kind = members[0].get("type", "speech") if members else "speech"
-
-            # Map v1 column names to v2 for hash computation
-            mapped = [{"text": m.get("source_text", ""), "speaker": m.get("speaker", ""),
-                        "emotion": m.get("emotion", "neutral"),
-                        "start_ms": m["start_ms"], "end_ms": m["end_ms"]}
-                       for m in members]
-            source_hash = _compute_source_hash(mapped) if mapped else None
-            voice_hash = _compute_voice_hash(text_en) if text_en else None
-
-            self._conn.execute(
-                """INSERT INTO utterances
-                   (episode_id, text_cn, text_en, start_ms, end_ms,
-                    speaker, emotion, gender, kind, source_hash, voice_hash,
-                    tts_policy, audio_path, tts_duration_ms, tts_rate, tts_error,
-                    created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    unit["episode_id"],
-                    text_cn, text_en, start_ms, end_ms,
-                    speaker, emotion, gender, kind, source_hash, voice_hash,
-                    unit.get("tts_policy"),
-                    unit.get("audio_path"),
-                    unit.get("tts_duration_ms"),
-                    unit.get("tts_rate"),
-                    unit.get("tts_error"),
-                    unit.get("created_at", now),
-                    now,
-                ),
-            )
-
-        # Step 5: Migrate old segments → DST cues
-        if has_segments:
-            old_segs = self._conn.execute(
-                "SELECT * FROM _old_segments ORDER BY id"
-            ).fetchall()
-            for seg in old_segs:
-                seg = dict(seg)
-                self._conn.execute(
-                    """INSERT INTO cues
-                       (episode_id, type, text, start_ms, end_ms,
-                        speaker, emotion, gender, kind, cv, created_at, updated_at)
-                       VALUES (?, 'DST', ?, ?, ?, '', 'neutral', NULL, 'speech', 1, ?, ?)""",
-                    (
-                        seg["episode_id"],
-                        seg.get("text", ""),
-                        seg["start_ms"],
-                        seg["end_ms"],
-                        now, now,
-                    ),
-                )
-
-        # Step 6: Drop old tables
-        self._conn.executescript("""
-            PRAGMA foreign_keys=OFF;
-            DROP TABLE IF EXISTS _old_segments;
-            DROP TABLE IF EXISTS _old_utterances;
-            DROP TABLE IF EXISTS _old_translation_units;
-            PRAGMA foreign_keys=ON;
-        """)
-        self._conn.commit()
-
-    def _ensure_cues_text_en(self) -> None:
-        """Add text_en column to cues table if missing (schema migration)."""
-        cols = self._conn.execute("PRAGMA table_info(cues)").fetchall()
-        col_names = {row[1] for row in cols}
-        if "text_en" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE cues ADD COLUMN text_en TEXT NOT NULL DEFAULT ''"
-            )
-            self._conn.commit()
-
-    def _ensure_utterance_text_columns(self) -> None:
-        """Add text_cn/text_en columns to utterances if missing (fresh DB from previous code)."""
-        cols = self._conn.execute("PRAGMA table_info(utterances)").fetchall()
-        col_names = {row[1] for row in cols}
-        if "text_cn" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE utterances ADD COLUMN text_cn TEXT NOT NULL DEFAULT ''"
-            )
-        if "text_en" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE utterances ADD COLUMN text_en TEXT NOT NULL DEFAULT ''"
-            )
-        self._conn.commit()
-
-    def _ensure_utterance_cues_table(self) -> None:
-        """Migration: ensure utterance_cues junction links exist and backfill cue text_en.
-
-        Detection: if utterance_cues table is empty but utterances exist, we need to
-        backfill. This handles both fresh creation and the case where _init_schema
-        already created an empty table.
-        """
-        # Table is created by _init_schema; check if it needs populating
-        has_links = self._conn.execute(
-            "SELECT 1 FROM utterance_cues LIMIT 1"
-        ).fetchone()
-        has_utts = self._conn.execute(
-            "SELECT 1 FROM utterances LIMIT 1"
-        ).fetchone()
-        if has_links or not has_utts:
-            return  # Already populated, or no utterances to backfill
-
-        # Check if old utterances have text_en column (pre-junction schema)
-        utt_cols = self._conn.execute("PRAGMA table_info(utterances)").fetchall()
-        utt_col_names = {row[1] for row in utt_cols}
-        has_old_text_en = "text_en" in utt_col_names and "start_ms" in utt_col_names
-
-        # Backfill: copy text_en from old utterances → SRC cues (by time range + speaker)
-        now = _now_iso()
-        episodes = self._conn.execute(
-            "SELECT DISTINCT episode_id FROM utterances"
-        ).fetchall()
-        for ep_row in episodes:
-            episode_id = ep_row[0]
-
-            if has_old_text_en:
-                old_utts = self._conn.execute(
-                    "SELECT * FROM utterances WHERE episode_id=? ORDER BY start_ms",
-                    (episode_id,),
-                ).fetchall()
-                src_cues = self._conn.execute(
-                    "SELECT * FROM cues WHERE episode_id=? AND type='SRC' ORDER BY start_ms",
-                    (episode_id,),
-                ).fetchall()
-
-                for utt in old_utts:
-                    utt = dict(utt)
-                    text_en = (utt.get("text_en") or "").strip()
-                    if not text_en:
-                        continue
-                    utt_start = utt.get("start_ms", 0)
-                    utt_end = utt.get("end_ms", 0)
-                    utt_speaker = utt.get("speaker", "")
-                    for cue in src_cues:
-                        cue = dict(cue)
-                        if (cue["start_ms"] >= utt_start
-                                and cue["end_ms"] <= utt_end
-                                and cue["speaker"] == utt_speaker
-                                and not (cue.get("text_en") or "").strip()):
-                            self._conn.execute(
-                                "UPDATE cues SET text_en=?, updated_at=? WHERE id=?",
-                                (text_en, now, cue["id"]),
-                            )
-
-            # Rebuild utterances with proper junction links
-            self._conn.commit()
-            self.calculate_utterances(episode_id)
-
-    def _ensure_utterance_caches(self) -> None:
-        """Sync utterance text_cn/text_en caches from linked cues if empty."""
-        needs_sync = self._conn.execute("""
-            SELECT DISTINCT u.episode_id FROM utterances u
-            JOIN utterance_cues uc ON uc.utterance_id = u.id
-            WHERE u.text_cn = '' OR u.text_cn IS NULL
-            LIMIT 1
-        """).fetchone()
-        if not needs_sync:
-            return
-        episodes = self._conn.execute(
-            "SELECT DISTINCT episode_id FROM utterances"
-        ).fetchall()
-        for ep_row in episodes:
-            self.sync_utterance_text_cache(ep_row[0])
-
-    def _ensure_roles_role_type(self) -> None:
-        """Add role_type column to roles table if missing (schema migration)."""
-        cols = self._conn.execute("PRAGMA table_info(roles)").fetchall()
-        col_names = {row[1] for row in cols}
-        if "role_type" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE roles ADD COLUMN role_type TEXT NOT NULL DEFAULT 'extra'"
-            )
-            self._conn.commit()
-
-    def _drop_cues_type_column(self) -> None:
-        """Migration: delete DST cues and drop the type column."""
-        cols = self._conn.execute("PRAGMA table_info(cues)").fetchall()
-        col_names = {row[1] for row in cols}
-        if "type" not in col_names:
-            return  # Already migrated
-        self._conn.execute("PRAGMA foreign_keys=OFF")
-        # Delete utterance_cues links to DST cues first (FK safety)
-        self._conn.execute(
-            "DELETE FROM utterance_cues WHERE cue_id IN "
-            "(SELECT id FROM cues WHERE type='DST')"
-        )
-        self._conn.execute("DELETE FROM cues WHERE type='DST'")
-        self._conn.execute("DROP INDEX IF EXISTS idx_cues_type")
-        self._conn.execute("ALTER TABLE cues DROP COLUMN type")
-        self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()
@@ -483,21 +192,28 @@ class PipelineStore:
         ).fetchone()
         return row["id"]
 
-    def ensure_episode(self, *, drama_id: int, name: str, path: str = "") -> int:
+    def ensure_episode(self, *, drama_id: int, number: int, path: str = "") -> int:
         """Insert or update an episode. Returns the episode id."""
         now = _now_iso()
         self._conn.execute(
-            """INSERT INTO episodes (drama_id, name, path, created_at, updated_at)
+            """INSERT INTO episodes (drama_id, number, path, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(drama_id, name) DO UPDATE SET
+               ON CONFLICT(drama_id, number) DO UPDATE SET
                    path = CASE WHEN excluded.path != '' THEN excluded.path ELSE episodes.path END,
                    updated_at=excluded.updated_at""",
-            (drama_id, name, path, now, now),
+            (drama_id, number, path, now, now),
+        )
+        # Keep total_episodes in sync
+        self._conn.execute(
+            """UPDATE dramas SET total_episodes = (
+                   SELECT COUNT(*) FROM episodes WHERE drama_id = ?
+               ) WHERE id = ?""",
+            (drama_id, drama_id),
         )
         self._conn.commit()
         row = self._conn.execute(
-            "SELECT id FROM episodes WHERE drama_id=? AND name=?",
-            (drama_id, name),
+            "SELECT id FROM episodes WHERE drama_id=? AND number=?",
+            (drama_id, number),
         ).fetchone()
         return row["id"]
 
@@ -507,12 +223,13 @@ class PipelineStore:
         ).fetchone()
         return dict(row) if row else None
 
-    def get_episode_by_names(self, drama_name: str, episode_name: str) -> Optional[dict]:
+    def get_episode_by_names(self, drama_name: str, episode_number: int) -> Optional[dict]:
         row = self._conn.execute(
-            """SELECT e.* FROM episodes e
+            """SELECT e.*, d.name AS drama_name
+               FROM episodes e
                JOIN dramas d ON e.drama_id = d.id
-               WHERE d.name=? AND e.name=?""",
-            (drama_name, episode_name),
+               WHERE d.name=? AND e.number=?""",
+            (drama_name, episode_number),
         ).fetchone()
         return dict(row) if row else None
 
@@ -525,13 +242,17 @@ class PipelineStore:
 
     def get_episode(self, episode_id: int) -> Optional[dict]:
         row = self._conn.execute(
-            "SELECT * FROM episodes WHERE id=?", (episode_id,),
+            """SELECT e.*, d.name AS drama_name
+               FROM episodes e
+               JOIN dramas d ON e.drama_id = d.id
+               WHERE e.id=?""",
+            (episode_id,),
         ).fetchone()
         return dict(row) if row else None
 
     def get_episodes(self, drama_id: int) -> list[dict]:
         rows = self._conn.execute(
-            "SELECT * FROM episodes WHERE drama_id=? ORDER BY name",
+            "SELECT * FROM episodes WHERE drama_id=? ORDER BY number",
             (drama_id,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -717,8 +438,8 @@ class PipelineStore:
         Episode status is derived from the resulting task state.
 
         Used when user edits cues after a gate was already passed:
-        - cv field change → reset to source_review
-        - text_en change  → reset to translation_review
+        - source field change → reset to source_review
+        - text_en change     → reset to translation_review
         """
         # Only reset if the gate was already passed
         existing_gate = self.get_gate_task(episode_id, gate_key)
@@ -777,35 +498,6 @@ class PipelineStore:
         ).fetchall()
         return [dict(r) for r in rows]
 
-    # ── Artifacts (episode-level) ─────────────────────────────
-
-    def upsert_artifact(
-        self, episode_id: int, key: str, relpath: str, kind: str, fingerprint: str,
-    ) -> None:
-        self._conn.execute(
-            """INSERT INTO artifacts (episode_id, key, relpath, kind, fingerprint)
-               VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(episode_id, key) DO UPDATE SET
-                   relpath=excluded.relpath, kind=excluded.kind,
-                   fingerprint=excluded.fingerprint""",
-            (episode_id, key, relpath, kind, fingerprint),
-        )
-        self._conn.commit()
-
-    def get_artifact(self, episode_id: int, key: str) -> Optional[dict]:
-        row = self._conn.execute(
-            "SELECT key, relpath, kind, fingerprint FROM artifacts WHERE episode_id=? AND key=?",
-            (episode_id, key),
-        ).fetchone()
-        return dict(row) if row else None
-
-    def get_all_artifacts(self, episode_id: int) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT key, relpath, kind, fingerprint FROM artifacts WHERE episode_id=?",
-            (episode_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-
     # ── Cues (atomic segments, no FK to utterances) ────────────
 
     def has_cues(self, episode_id: int) -> bool:
@@ -824,8 +516,8 @@ class PipelineStore:
             cur = self._conn.execute(
                 """INSERT INTO cues
                    (episode_id, text, text_en, start_ms, end_ms,
-                    speaker, emotion, gender, kind, cv, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    speaker, emotion, gender, kind, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     episode_id,
                     row.get("text", ""),
@@ -836,7 +528,6 @@ class PipelineStore:
                     row.get("emotion", "neutral"),
                     row.get("gender"),
                     row.get("kind", "speech"),
-                    row.get("cv", 1),
                     now, now,
                 ),
             )
@@ -899,21 +590,21 @@ class PipelineStore:
         return cur.rowcount
 
     def diff_and_save(self, episode_id: int, incoming: list[dict]) -> list[dict]:
-        """Diff incoming SRC cues against DB, apply cv bumps.
+        """Diff incoming cues against DB, detect source vs translation changes.
 
         Rules:
-        - text/speaker/start_ms/end_ms/emotion/kind/gender changed → cv++
-        - New rows → INSERT (cv=1)
-        - Missing rows → DELETE
+        - Source fields changed (text/speaker/timing/emotion/kind) → reset to source_review
+        - Only text_en changed → reset to translation_review
+        - New/deleted rows → reset to source_review
 
-        Returns updated SRC cue list.
+        Returns updated cue list.
         """
         existing = self.get_cues(episode_id)
         existing_by_id = {c["id"]: c for c in existing}
         incoming_ids = set()
 
-        _CV_FIELDS = ("text", "speaker", "start_ms", "end_ms", "emotion", "kind", "gender")
-        has_cv_change = False
+        _SOURCE_FIELDS = ("text", "speaker", "start_ms", "end_ms", "emotion", "kind")
+        has_source_change = False
         has_text_en_change = False
 
         for inc in incoming:
@@ -923,19 +614,13 @@ class PipelineStore:
                 old = existing_by_id[cid]
                 updates = {}
 
-                cv_changed = False
-                for f in _CV_FIELDS:
+                for f in _SOURCE_FIELDS:
                     old_val = old.get(f, "")
                     new_val = inc.get(f, "")
                     if str(old_val) != str(new_val):
                         updates[f] = new_val
-                        cv_changed = True
+                        has_source_change = True
 
-                if cv_changed:
-                    updates["cv"] = old["cv"] + 1
-                    has_cv_change = True
-
-                # text_en: save without cv bump (translation review edits)
                 old_en = old.get("text_en", "")
                 new_en = inc.get("text_en", "")
                 if new_en != old_en:
@@ -954,29 +639,26 @@ class PipelineStore:
                     "speaker": inc.get("speaker", ""),
                     "emotion": inc.get("emotion", "neutral"),
                     "kind": inc.get("kind", "speech"),
-                    "gender": inc.get("gender"),
-                    "cv": 1,
                 }
                 new_ids = self.insert_cues(episode_id, [row])
                 if new_ids:
                     incoming_ids.add(new_ids[0])
+                has_source_change = True
 
         # Delete missing rows
         to_delete = [cid for cid in existing_by_id if cid not in incoming_ids]
         if to_delete:
             self.delete_cues(to_delete)
+            has_source_change = True
 
         # Recalculate utterances after cue changes
         self.calculate_utterances(episode_id)
-        # Sync text_cn/text_en caches (handles translation_review edits)
         self.sync_utterance_text_cache(episode_id)
 
         # Reset to appropriate gate so downstream phases re-run
-        if has_cv_change:
-            # cv fields changed (text/speaker/timing/emotion) → back to source_review
+        if has_source_change:
             self.reset_to_gate(episode_id, "source_review")
         elif has_text_en_change:
-            # text_en changed → back to translation_review
             self.reset_to_gate(episode_id, "translation_review")
 
         return self.get_cues(episode_id)
@@ -1444,12 +1126,12 @@ class PipelineStore:
     def get_dict_entries(self, drama_id: int, type: Optional[str] = None) -> list[dict]:
         if type:
             rows = self._conn.execute(
-                "SELECT * FROM dictionary WHERE drama_id=? AND type=? ORDER BY src",
+                "SELECT * FROM glossary WHERE drama_id=? AND type=? ORDER BY src",
                 (drama_id, type),
             ).fetchall()
         else:
             rows = self._conn.execute(
-                "SELECT * FROM dictionary WHERE drama_id=? ORDER BY type, src",
+                "SELECT * FROM glossary WHERE drama_id=? ORDER BY type, src",
                 (drama_id,),
             ).fetchall()
         return [dict(r) for r in rows]
@@ -1457,14 +1139,14 @@ class PipelineStore:
     def get_dict_map(self, drama_id: int, type: str) -> dict[str, str]:
         """Get {src: target} map for a drama + type."""
         rows = self._conn.execute(
-            "SELECT src, target FROM dictionary WHERE drama_id=? AND type=?",
+            "SELECT src, target FROM glossary WHERE drama_id=? AND type=?",
             (drama_id, type),
         ).fetchall()
         return {r[0]: r[1] for r in rows}
 
     def upsert_dict_entry(self, drama_id: int, type: str, src: str, target: str) -> None:
         self._conn.execute(
-            """INSERT INTO dictionary (drama_id, type, src, target)
+            """INSERT INTO glossary (drama_id, type, src, target)
                VALUES (?, ?, ?, ?)
                ON CONFLICT(drama_id, type, src) DO UPDATE SET target=excluded.target""",
             (drama_id, type, src, target),
@@ -1474,144 +1156,57 @@ class PipelineStore:
     def set_dict_entries(self, drama_id: int, type: str, entries: dict[str, str]) -> None:
         """Full replace for a given type."""
         self._conn.execute(
-            "DELETE FROM dictionary WHERE drama_id=? AND type=?",
+            "DELETE FROM glossary WHERE drama_id=? AND type=?",
             (drama_id, type),
         )
         for src, target in entries.items():
             self._conn.execute(
-                "INSERT INTO dictionary (drama_id, type, src, target) VALUES (?, ?, ?, ?)",
+                "INSERT INTO glossary (drama_id, type, src, target) VALUES (?, ?, ?, ?)",
                 (drama_id, type, src, target),
             )
         self._conn.commit()
 
-    # ── Migration: files → DB ─────────────────────────────────
+    # ── Artifacts (final deliverables) ───────────────────────
 
-    def _migrate_dicts_from_files(self) -> None:
-        """One-time migration: import roles.json + names.json + slang.json into DB."""
-        has_roles = self._conn.execute("SELECT 1 FROM roles LIMIT 1").fetchone()
-        has_dict = self._conn.execute("SELECT 1 FROM dictionary LIMIT 1").fetchone()
-        if has_roles and has_dict:
-            return
+    def upsert_artifact(
+        self,
+        episode_id: int,
+        kind: str,
+        *,
+        gcs_path: Optional[str] = None,
+        checksum: Optional[str] = None,
+    ) -> None:
+        """Insert or update an artifact record."""
+        now = _now_iso()
+        self._conn.execute(
+            """INSERT INTO artifacts (episode_id, kind, gcs_path, checksum, created_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(episode_id, kind) DO UPDATE SET
+                   gcs_path   = COALESCE(excluded.gcs_path, artifacts.gcs_path),
+                   checksum   = COALESCE(excluded.checksum, artifacts.checksum),
+                   created_at = excluded.created_at""",
+            (episode_id, kind, gcs_path, checksum, now),
+        )
+        self._conn.commit()
 
-        episodes = self._conn.execute(
-            "SELECT DISTINCT e.drama_id, e.path "
-            "FROM episodes e WHERE e.path != ''"
+    def get_artifact(self, episode_id: int, kind: str) -> Optional[dict]:
+        row = self._conn.execute(
+            "SELECT * FROM artifacts WHERE episode_id=? AND kind=?",
+            (episode_id, kind),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def get_artifacts(self, episode_id: int) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT * FROM artifacts WHERE episode_id=? ORDER BY kind",
+            (episode_id,),
         ).fetchall()
+        return [dict(r) for r in rows]
 
-        imported_dramas: set[int] = set()
-        for ep in episodes:
-            drama_id = ep[0]
-            if drama_id in imported_dramas:
-                continue
-            ep_path = ep[1]
-            if not ep_path:
-                continue
-            dict_dir = Path(ep_path).parent / "dub" / "dict"
-            if not dict_dir.is_dir():
-                continue
-            imported_dramas.add(drama_id)
-
-            # Import roles.json
-            roles_file = dict_dir / "roles.json"
-            if roles_file.exists() and not has_roles:
-                try:
-                    data = json.loads(roles_file.read_text(encoding="utf-8"))
-                    roles = data.get("roles", {})
-                    if isinstance(roles, list):
-                        roles = {e["role_id"]: e["voice_type"] for e in roles if e.get("role_id")}
-                    for name, voice_type in roles.items():
-                        self._conn.execute(
-                            """INSERT OR IGNORE INTO roles (drama_id, name, voice_type)
-                               VALUES (?, ?, ?)""",
-                            (drama_id, name, voice_type),
-                        )
-                except Exception:
-                    pass
-
-            # Import names.json
-            names_file = dict_dir / "names.json"
-            if names_file.exists() and not has_dict:
-                try:
-                    data = json.loads(names_file.read_text(encoding="utf-8"))
-                    for src, target in data.items():
-                        self._conn.execute(
-                            """INSERT OR IGNORE INTO dictionary (drama_id, type, src, target)
-                               VALUES (?, 'name', ?, ?)""",
-                            (drama_id, src, target),
-                        )
-                except Exception:
-                    pass
-
-            # Import slang.json
-            slang_file = dict_dir / "slang.json"
-            if slang_file.exists() and not has_dict:
-                try:
-                    data = json.loads(slang_file.read_text(encoding="utf-8"))
-                    for src, target in data.items():
-                        self._conn.execute(
-                            """INSERT OR IGNORE INTO dictionary (drama_id, type, src, target)
-                               VALUES (?, 'slang', ?, ?)""",
-                            (drama_id, src, target),
-                        )
-                except Exception:
-                    pass
-
+    def delete_artifacts(self, episode_id: int) -> None:
+        self._conn.execute(
+            "DELETE FROM artifacts WHERE episode_id=?",
+            (episode_id,),
+        )
         self._conn.commit()
 
-    def _migrate_speaker_to_role_id(self) -> None:
-        """One-time migration: convert text speaker names to role.id integers in cues/utterances."""
-        # Quick check: if no cues exist, nothing to migrate
-        sample = self._conn.execute("SELECT speaker FROM cues LIMIT 1").fetchone()
-        if not sample:
-            return
-        speaker_val = sample[0]
-        # If speaker is already a valid integer matching a role.id, skip
-        try:
-            int(speaker_val)
-            # Check if this integer corresponds to a role.id
-            role_exists = self._conn.execute(
-                "SELECT 1 FROM roles WHERE id=? LIMIT 1", (int(speaker_val),),
-            ).fetchone()
-            if role_exists:
-                return  # Already migrated
-        except (ValueError, TypeError):
-            pass  # Non-integer speaker, needs migration
-
-        # Collect distinct (drama_id, speaker_text) from cues
-        rows = self._conn.execute("""
-            SELECT DISTINCT e.drama_id, c.speaker
-            FROM cues c
-            JOIN episodes e ON c.episode_id = e.id
-            WHERE c.speaker != ''
-        """).fetchall()
-
-        if not rows:
-            return
-
-        # Build mapping: (drama_id, speaker_text) → role_id
-        mapping: dict[tuple[int, str], int] = {}
-        for row in rows:
-            drama_id, speaker_text = row[0], row[1]
-            key = (drama_id, speaker_text)
-            if key not in mapping:
-                mapping[key] = self.ensure_role(drama_id, speaker_text)
-
-        # Update cues
-        for (drama_id, speaker_text), role_id in mapping.items():
-            self._conn.execute("""
-                UPDATE cues SET speaker = ?
-                WHERE speaker = ? AND episode_id IN (
-                    SELECT id FROM episodes WHERE drama_id = ?
-                )
-            """, (str(role_id), speaker_text, drama_id))
-
-        # Update utterances
-        for (drama_id, speaker_text), role_id in mapping.items():
-            self._conn.execute("""
-                UPDATE utterances SET speaker = ?
-                WHERE speaker = ? AND episode_id IN (
-                    SELECT id FROM episodes WHERE drama_id = ?
-                )
-            """, (str(role_id), speaker_text, drama_id))
-
-        self._conn.commit()

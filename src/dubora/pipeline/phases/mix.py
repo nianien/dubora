@@ -121,20 +121,16 @@ class MixPhase(Phase):
         if singing_segments:
             info(f"Found {len(singing_segments)} singing segments to preserve")
 
-        # 获取 accompaniment / vocals（可选，从 DB artifacts 表查询）
+        # 获取 accompaniment / vocals（可选，路径动态计算）
+        from dubora.pipeline.core.manifest import resolve_artifact_path
         accompaniment_path = None
         vocals_path = None
-        acc_art = store.get_artifact(episode_id, "extract.accompaniment")
-        if acc_art:
-            p = workspace_path / acc_art["relpath"]
-            if p.exists():
-                accompaniment_path = p
-
-        voc_art = store.get_artifact(episode_id, "extract.vocals")
-        if voc_art:
-            p = workspace_path / voc_art["relpath"]
-            if p.exists():
-                vocals_path = p
+        p = resolve_artifact_path("extract.accompaniment", workspace_path)
+        if p.exists():
+            accompaniment_path = p
+        p = resolve_artifact_path("extract.vocals", workspace_path)
+        if p.exists():
+            vocals_path = p
 
         # 获取 video_path（从 config）
         video_path = ctx.config.get("video_path")

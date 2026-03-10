@@ -27,6 +27,7 @@ export interface StageInfo {
 
 export interface PipelineStatusResponse {
   has_manifest: boolean
+  episode_status?: string
   phases: PhaseStatus[]
   gates: GateStatus[]
   stages: StageInfo[]

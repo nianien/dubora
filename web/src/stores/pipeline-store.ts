@@ -16,8 +16,11 @@ export interface WorkflowAction {
   fromPhase?: string   // for retry
 }
 
-function deriveAction(phases: PhaseStatus[], gates: GateStatus[]): WorkflowAction | null {
+function deriveAction(phases: PhaseStatus[], gates: GateStatus[], episodeStatus?: string): WorkflowAction | null {
   if (phases.some(p => p.status === 'running')) return null
+
+  // Episode already completed (covers cases where early phases have no task records)
+  if (episodeStatus === 'succeeded') return null
 
   // All done
   if (phases.every(p => p.status === 'succeeded' || p.status === 'skipped')
@@ -50,15 +53,15 @@ interface PipelineState {
   currentAction: WorkflowAction | null
 
   // Actions
-  loadStatus: (drama: string, ep: string) => Promise<void>
-  _fetchStatus: (drama: string, ep: string) => Promise<void>
+  loadStatus: (drama: string, ep: number) => Promise<void>
+  _fetchStatus: (drama: string, ep: number) => Promise<void>
   _startPolling: () => void
   _stopPolling: () => void
-  runPipeline: (drama: string, ep: string, fromPhase?: string) => Promise<void>
-  passGate: (drama: string, ep: string, gateKey: string) => Promise<void>
-  executeAction: (drama: string, ep: string) => Promise<void>
-  resetGate: (drama: string, ep: string, gateKey: string) => Promise<void>
-  _connectStream: (drama: string, ep: string) => Promise<void>
+  runPipeline: (drama: string, ep: number, fromPhase?: string) => Promise<void>
+  passGate: (drama: string, ep: number, gateKey: string) => Promise<void>
+  executeAction: (drama: string, ep: number) => Promise<void>
+  resetGate: (drama: string, ep: number, gateKey: string) => Promise<void>
+  _connectStream: (drama: string, ep: number) => Promise<void>
   cancelRun: () => void
   clearLogs: () => void
 }
@@ -87,12 +90,51 @@ const defaultStages: StageInfo[] = [
 let _abortController: AbortController | null = null
 // Track current drama/ep for re-fetching status
 let _currentDrama = ''
-let _currentEp = ''
+let _currentEp = 0
 // Polling timer for auto-refresh
 let _pollTimer: ReturnType<typeof setInterval> | null = null
 
+// Phases that require voice assignments
+const TTS_AND_AFTER = new Set(['tts', 'mix', 'burn'])
+
+/**
+ * Pre-flight check: if pipeline will reach TTS, verify all speech speakers
+ * have voice_type assigned. Returns error message or null.
+ */
+function _checkVoiceAssignments(fromPhase?: string): string | null {
+  const { cues, roles } = useModelStore.getState()
+  if (!cues.length) return null
+
+  // If fromPhase is before TTS (extract/asr/parse/translate), skip check
+  if (fromPhase && !TTS_AND_AFTER.has(fromPhase)) return null
+
+  // Build role voice map: role_id → voice_type
+  const voiceMap = new Map<number, string>()
+  for (const r of roles) {
+    voiceMap.set(r.id, r.voice_type || '')
+  }
+
+  // Find speech speakers with no voice
+  const missing: string[] = []
+  const checked = new Set<number>()
+  for (const cue of cues) {
+    if (cue.kind !== 'speech' || checked.has(cue.speaker)) continue
+    checked.add(cue.speaker)
+    const vt = voiceMap.get(cue.speaker)
+    if (!vt) {
+      const role = roles.find(r => r.id === cue.speaker)
+      missing.push(role?.name ?? `Speaker #${cue.speaker}`)
+    }
+  }
+
+  if (missing.length > 0) {
+    return `以下角色未分配音色，请先在音色面板中配置：${missing.join('、')}`
+  }
+  return null
+}
+
 /** Reload all model data after pipeline events */
-function _reloadModelData(drama: string, ep: string) {
+function _reloadModelData(drama: string, ep: number) {
   const ms = useModelStore.getState()
   if (ms.currentDrama === drama && ms.currentEpisode === ep) {
     ms.loadCues(drama, ep)
@@ -134,7 +176,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         phases: data.phases,
         gates,
         stages,
-        currentAction: deriveAction(data.phases, gates),
+        currentAction: deriveAction(data.phases, gates, data.episode_status),
       })
     } catch {
       // keep current state on fetch error
@@ -158,6 +200,13 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   runPipeline: async (drama, ep, fromPhase?) => {
+    // Pre-flight: check voice assignments before reaching TTS
+    const voiceError = _checkVoiceAssignments(fromPhase)
+    if (voiceError) {
+      set({ runError: voiceError })
+      return
+    }
+
     // Only abort SSE, do NOT send cancel (would race with the run request)
     if (_abortController) {
       _abortController.abort()
@@ -318,7 +367,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
               if (currentEvent.startsWith('pipeline_')) {
                 const result = currentEvent.replace('pipeline_', '')
                 if (result === 'failed') {
-                  set({ runError: 'Pipeline failed' })
+                  set({ runError: data.error || 'Pipeline failed' })
                 }
                 set({ isRunning: false })
                 await get().loadStatus(drama, ep)

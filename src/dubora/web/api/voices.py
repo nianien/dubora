@@ -18,9 +18,10 @@ from dubora.pipeline.processors.tts.volcengine import _call_volcengine_tts
 router = APIRouter()
 
 from dubora.config import PROJECT_ROOT
+from dubora.config.settings import get_voice_preview_cache_dir
 
 _VOICES_PATH = PROJECT_ROOT / "resources" / "voices.json"
-_CACHE_DIR = PROJECT_ROOT / ".cache" / "voice-preview"
+_CACHE_DIR = get_voice_preview_cache_dir()
 _MANIFEST_PATH = _CACHE_DIR / "manifest.json"
 
 

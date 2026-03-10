@@ -61,14 +61,15 @@ interface HistoryEntry {
 }
 
 interface Props {
-  onBack: () => void
-  dramas: string[]
+  onBack?: () => void
+  dramas?: string[]
   initialDrama: string
+  embedded?: boolean
 }
 
 // ── component ───────────────────────────────────────────────────────────────
 
-export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
+export function VoicePreview({ onBack, dramas, initialDrama, embedded }: Props) {
   const [drama, setDrama] = useState(initialDrama)
   // voices
   const [voices, setVoices] = useState<Voice[]>([])
@@ -450,22 +451,26 @@ export function VoicePreview({ onBack, dramas, initialDrama }: Props) {
   return (
     <div className="h-full flex flex-col bg-gray-900 text-gray-100">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0">
-        <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-200">&larr; Back</button>
-        <h1 className="text-sm font-bold text-gray-300">Voice Casting</h1>
-        <select
-          value={drama}
-          onChange={e => setDrama(e.target.value)}
-          className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none"
-        >
-          <option value="">Select drama...</option>
-          {dramas.map(d => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
-        <div className="flex-1" />
-        {synthError && <span className="text-xs text-red-400 mr-2">{synthError}</span>}
-      </header>
+      {!embedded && (
+        <header className="flex items-center gap-3 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0">
+          {onBack && <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-200">&larr; Back</button>}
+          <h1 className="text-sm font-bold text-gray-300">Voice Casting</h1>
+          {dramas && (
+            <select
+              value={drama}
+              onChange={e => setDrama(e.target.value)}
+              className="bg-gray-700 text-gray-200 text-sm rounded px-2 py-1 outline-none"
+            >
+              <option value="">Select drama...</option>
+              {dramas.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          )}
+          <div className="flex-1" />
+          {synthError && <span className="text-xs text-red-400 mr-2">{synthError}</span>}
+        </header>
+      )}
 
       {/* Hidden audio element */}
       <audio ref={audioRef} className="hidden" />

@@ -11,6 +11,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
+from dubora.config.settings import get_data_dir, get_faststart_cache_dir
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ def _needs_faststart(file_path: Path) -> bool:
     return False
 
 
-def _ensure_faststart(file_path: Path, videos_dir: Path) -> Path:
+def _ensure_faststart(file_path: Path) -> Path:
     """
     如果 MP4 非 faststart，用 ffmpeg remux 到 .faststart.mp4 缓存文件。
     只 copy stream 不重编码，耗时极短。返回可直接服务的文件路径。
@@ -60,11 +62,7 @@ def _ensure_faststart(file_path: Path, videos_dir: Path) -> Path:
     if not _needs_faststart(file_path):
         return file_path
 
-    # 缓存到 videos/{drama}/dub/.cache/ 目录
-    rel = file_path.relative_to(videos_dir)
-    drama = rel.parts[0]
-    cache_dir = videos_dir / drama / "dub" / ".cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir = get_faststart_cache_dir()
     cache_path = cache_dir / f"{file_path.stem}.faststart.mp4"
     if cache_path.is_file() and cache_path.stat().st_mtime >= file_path.stat().st_mtime:
         return cache_path
@@ -107,22 +105,29 @@ async def serve_media(request: Request, path: str):
     """
     静态文件服务，支持 Range header（视频 seek）。
 
-    路径相对于 videos_dir，例如：
-    /api/media/东北雀神风云/dub/2/audio/2.wav
-    /api/media/东北雀神风云/2.mp4
+    Multi-root lookup under data_dir:
+      1. workdir/{path}
+      2. uploads/{path}
+      3. gcs/{path}
     """
-    videos_dir: Path = request.app.state.videos_dir
-    file_path = (videos_dir / path).resolve()
+    data_dir: Path = request.app.state.data_dir
 
-    # 安全检查：不允许路径遍历
-    if not str(file_path).startswith(str(videos_dir)):
-        raise HTTPException(status_code=403, detail="Access denied")
+    # Try multiple roots
+    file_path = None
+    for sub in ("dub", "uploads", "gcs"):
+        candidate = (data_dir / sub / path).resolve()
+        # Security: resolved must be under data_dir
+        if not str(candidate).startswith(str(data_dir.resolve())):
+            continue
+        if candidate.is_file():
+            file_path = candidate
+            break
 
-    if not file_path.is_file():
+    if file_path is None:
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
 
     # 对 MP4 自动 faststart
-    file_path = _ensure_faststart(file_path, videos_dir)
+    file_path = _ensure_faststart(file_path)
 
     # 检测 MIME 类型
     mime_type, _ = mimetypes.guess_type(str(file_path))
