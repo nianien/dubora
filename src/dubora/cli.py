@@ -171,7 +171,7 @@ Examples:
         ok_count = len(episodes) - len(failed)
         info(f"Batch complete: {ok_count}/{len(episodes)} succeeded")
         if failed:
-            error(f"Failed: {', '.join(failed)}")
+            error(f"Failed: {', '.join(str(f) for f in failed)}")
             sys.exit(1)
 
 

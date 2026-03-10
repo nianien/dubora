@@ -140,7 +140,7 @@ export function EpisodeTab({ drama, episodes, onRefresh }: Props) {
     let ok = 0, fail = 0
     for (const ep of runnableSelected) {
       try {
-        await postJson(`/episodes/${drama.name}/${ep.episode}/pipeline/run`, {
+        await postJson(`/episodes/${encodeURIComponent(drama.name)}/${encodeURIComponent(ep.episode)}/pipeline/run`, {
           ...(toPhase ? { to_phase: toPhase } : {}),
         })
         ok++

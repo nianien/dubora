@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 import struct
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -213,7 +213,7 @@ async def synthesize_voice(req: SynthesizeRequest) -> Dict[str, Any]:
                 "voice_name": voice_name,
                 "emotion": emotion,
                 "text": req.text.strip(),
-                "created_at": datetime.now().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
         _save_manifest(entries)

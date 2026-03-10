@@ -13,7 +13,7 @@ Mix Phase: 混音 (Timeline-First Architecture)
 """
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 from dubora.pipeline.core.phase import Phase
 from dubora.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs

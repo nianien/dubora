@@ -8,8 +8,7 @@ import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import type { Cue } from '../types/asr-model'
 
-/** Negative temp IDs for new cues */
-let _nextTempId = -1
+import { nextTempId } from '../utils/temp-id'
 
 const RULER_HEIGHT = 20
 const TRACK_TOP = 24
@@ -385,7 +384,7 @@ export function TimelineView() {
           const newEnd = next ? Math.min(newStart + 1000, next.start_ms) : newStart + 1000
           const refCue = prev || next
           const newCue: Cue = {
-            id: _nextTempId--,
+            id: nextTempId(),
             episode_id: 0,
             text: '',
             start_ms: newStart,

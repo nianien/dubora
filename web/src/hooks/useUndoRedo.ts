@@ -5,8 +5,7 @@ import { useEditorStore } from '../stores/editor-store'
 import type { Cue } from '../types/asr-model'
 import type { Command } from '../stores/editor-store'
 
-/** Negative temp IDs for new cues — DB assigns real IDs on save */
-let _nextTempId = -1
+import { nextTempId } from '../utils/temp-id'
 
 /**
  * Hook providing undoable operations on cues.
@@ -95,7 +94,7 @@ export function useUndoableOps() {
     }
     const cue2: Cue = {
       ...cue,
-      id: _nextTempId--,
+      id: nextTempId(),
       start_ms: splitMs,
       text: text2,
     }

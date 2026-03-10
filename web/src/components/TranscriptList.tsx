@@ -13,8 +13,7 @@ import type { ContextMenuItem } from './ContextMenu'
 import type { Cue, Role } from '../types/asr-model'
 import { matchPinyin } from '../utils/pinyin-match'
 
-/** Negative temp IDs for new cues */
-let _nextTempId = -1
+import { nextTempId } from '../utils/temp-id'
 
 const SPEAKER_COLORS = [
   'bg-blue-900/40',
@@ -251,7 +250,7 @@ export function TranscriptList() {
 
   /** Helper: create a new empty cue */
   const makeEmptyCue = useCallback((startMs: number, endMs: number, speaker: number): Cue => ({
-    id: _nextTempId--,
+    id: nextTempId(),
     episode_id: 0,
     text: '',
     start_ms: startMs,

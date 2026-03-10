@@ -11,12 +11,8 @@ ASR Phase: 语音识别（只做识别，不负责字幕后处理）
 - asr.asr_result：SSOT（原始响应，包含完整语义信息，emotion/gender/score/degree）
 
 不负责：
-- 字幕后处理（由 Subtitle Phase 负责）
-- 切句策略（由 Subtitle Phase 负责）
-
-架构原则：
-- raw-response 是 SSOT，直接从 raw-response 生成 Subtitle Model
-- pipeline 默认走 IR（稳定、可替换、可复用）
+- 字幕后处理（由 Parse Phase 负责）
+- 切句策略（由 Parse Phase 负责）
 """
 import json
 from pathlib import Path
@@ -40,12 +36,7 @@ class ASRPhase(Phase):
         return ["extract.audio"]
 
     def provides(self) -> list[str]:
-        """生成 asr.asr_result（SSOT）。
-
-        注意：asr.fix.json 也会写入，但不声明为 provides，
-        这样人工编辑 fix.json 不会触发 ASR 重跑。
-        ASR 重跑时（新音频/force）会覆盖 fix.json。
-        """
+        """生成 asr.asr_result（SSOT）。"""
         return ["asr.asr_result"]
 
     def run(
@@ -61,9 +52,7 @@ class ASRPhase(Phase):
         1. 读取音频文件
         2. 上传到 TOS（如果需要）
         3. 调用 ASR API
-        4. 解析为 IR（Utterance[]）
-        5. 保存 IR 和 raw response
-        6. 自动生成 asr.fix.json
+        4. 保存原始 ASR 响应
         """
         # 获取输入音频（根据 asr_use_vocals 配置，可能是 extract.vocals 或 extract.audio）
         audio_artifact = inputs.get("extract.vocals") or inputs["extract.audio"]

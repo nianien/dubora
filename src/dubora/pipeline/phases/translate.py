@@ -24,10 +24,8 @@ from dubora.pipeline.core.store import _compute_source_hash
 from dubora.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora.pipeline.processors.mt.utterance_translate import (
     pick_k,
-    estimate_en_duration_ms,
     translate_utterance_with_retry,
     clean_translation_output,
-    is_only_punctuation,
 )
 from dubora.pipeline.processors.mt.time_aware_impl import create_translate_fn
 from dubora.pipeline.processors.mt.name_guard import NameGuard, load_config
@@ -46,14 +44,6 @@ def _build_name_variants(en_name: str, src_name: str) -> List[str]:
         variants.append(f"{a}{b.lower()}")
         variants.append(f"{a.lower()}'{b.lower()}")
         variants.append(f"{a}{b}")
-    semantic = {
-        "\u5e73\u5b89": ["Peace", "Safe", "Safety"],
-        "\u660e": ["Bright", "Light"],
-        "\u5b89": ["An'an", "Anan"],
-    }
-    for cn_part, words in semantic.items():
-        if cn_part in src_name:
-            variants.extend(words)
     return variants
 
 
@@ -290,7 +280,7 @@ class TranslatePhase(Phase):
         if is_gemini:
             from dubora.config.settings import get_gemini_key
             model = phase_config.get("model", ctx.config.get("mt_model",
-                    ctx.config.get("gemini_model", "gemini-1.5-flash")))
+                    ctx.config.get("gemini_model", "gemini-2.0-flash")))
             api_key = phase_config.get("api_key") or get_gemini_key()
             if not api_key:
                 raise RuntimeError("Gemini API key not found")

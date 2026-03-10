@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from dubora.pipeline.core.types import Artifact, ErrorInfo, RunContext, ResolvedOutputs
 from dubora.pipeline.core.phase import Phase
 from dubora.pipeline.core.manifest import resolve_artifact_path, now_iso
-from dubora.utils.logger import info, warning, error
+from dubora.utils.logger import info, error
 
 
 class PhaseRunner:

@@ -15,12 +15,12 @@ Parse Phase: 字幕后处理（从 ASR raw-response 生成 DB cues）
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict
 
 from dubora.pipeline.core.phase import Phase
 from dubora.pipeline.core.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora.pipeline.processors.srt import run as srt_run
-from dubora.schema.asr_model import AsrModel, AsrSegment, AsrMediaInfo, AsrHistory, AsrFingerprint
+from dubora.schema.asr_model import AsrModel, AsrSegment, AsrMediaInfo, AsrHistory
 from dubora.config import resolve_emotion
 from dubora.utils.logger import info, warning
 

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from dubora.pipeline.core.types import ErrorInfo, GateStatus, Status
+from dubora.pipeline.core.types import ErrorInfo, Status
 
 
 # ── Artifact path resolution ──────────────────────────────────
@@ -121,7 +121,6 @@ class DbManifest:
         status: Status,
         started_at: Optional[str] = None,
         finished_at: Optional[str] = None,
-        attempt: int = 1,
         requires: Optional[List[str]] = None,
         provides: Optional[List[str]] = None,
         config_fingerprint: Optional[str] = None,
@@ -149,13 +148,3 @@ class DbManifest:
                     "traceback": error.traceback,
                 }
             self.store.update_task_context(self._current_task_id, updates)
-
-    def get_gate_status(self, gate_key: str) -> Optional[GateStatus]:
-        task = self.store.get_gate_task(self.episode_id, gate_key)
-        if task is None:
-            return None
-        if task["status"] == "succeeded":
-            return "passed"
-        if task["status"] == "pending":
-            return "awaiting"
-        return "pending"

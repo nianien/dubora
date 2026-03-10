@@ -106,7 +106,7 @@ def build_phases(config=None) -> list:
         # ← Gate: source_review (校准)
         _LazyPhase(
             "dubora.pipeline.phases.translate", "TranslatePhase",
-            name="translate", version="3.0.0",
+            name="translate", version="4.0.0",
             requires=["extract.audio"],
             provides=[],
             label="翻译",
@@ -128,7 +128,7 @@ def build_phases(config=None) -> list:
         ),
         _LazyPhase(
             "dubora.pipeline.phases.burn", "BurnPhase",
-            name="burn", version="1.0.0",
+            name="burn", version="2.0.0",
             requires=["mix.audio"],
             provides=["burn.video"],
             label="烧字幕",

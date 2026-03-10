@@ -377,7 +377,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
 
               // Task status events
               if (data.type) {
-                get().loadStatus(drama, ep)
+                await get()._fetchStatus(drama, ep)
               }
             } catch {
               // Ignore malformed JSON

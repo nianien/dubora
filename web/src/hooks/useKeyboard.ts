@@ -6,8 +6,7 @@ import { deriveSpeakers } from '../utils/derive-speakers'
 import { useUndoableOps } from './useUndoRedo'
 import type { Cue } from '../types/asr-model'
 
-/** Negative temp IDs for new cues — DB assigns real IDs on save */
-let _nextTempId = -1
+import { nextTempId } from '../utils/temp-id'
 
 export function useKeyboard() {
   const cues = useModelStore(s => s.cues)
@@ -155,7 +154,7 @@ export function useKeyboard() {
         const refCue = prev || next
 
         const newCue: Cue = {
-          id: _nextTempId--,
+          id: nextTempId(),
           episode_id: 0,
           text: '',
           start_ms: newStart,

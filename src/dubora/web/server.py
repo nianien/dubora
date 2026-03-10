@@ -3,11 +3,10 @@ FastAPI server for ASR Calibration IDE
 
 启动方式：vsd ide [--port 8765]
 """
-import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
