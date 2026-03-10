@@ -58,12 +58,13 @@ class PipelineStore:
     def _init_schema(self) -> None:
         self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS dramas (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                name        TEXT NOT NULL UNIQUE,
-                synopsis    TEXT NOT NULL DEFAULT '',
-                cover_image TEXT NOT NULL DEFAULT '',
-                created_at  TEXT NOT NULL,
-                updated_at  TEXT NOT NULL
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                name             TEXT NOT NULL UNIQUE,
+                synopsis         TEXT NOT NULL DEFAULT '',
+                cover_image      TEXT NOT NULL DEFAULT '',
+                total_episodes   INTEGER NOT NULL DEFAULT 0,
+                created_at       TEXT NOT NULL,
+                updated_at       TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS episodes (
@@ -104,6 +105,8 @@ class PipelineStore:
                 episode_id      INTEGER NOT NULL REFERENCES episodes(id),
                 text_cn         TEXT NOT NULL DEFAULT '',
                 text_en         TEXT NOT NULL DEFAULT '',
+                start_ms        INTEGER NOT NULL DEFAULT 0,
+                end_ms          INTEGER NOT NULL DEFAULT 0,
                 speaker         TEXT NOT NULL DEFAULT '',
                 emotion         TEXT NOT NULL DEFAULT 'neutral',
                 gender          TEXT,
