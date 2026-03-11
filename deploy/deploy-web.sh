@@ -88,6 +88,28 @@ deploy_to_vm() {
     log "Done!  http://${EXTERNAL_IP}"
 }
 
+# ── 用法 ────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Usage: bash deploy/deploy-web.sh [OPTIONS]
+
+Deploy dubora-web to GCP VM (${VM_NAME})
+
+Options:
+  --build   Build new Docker image via Cloud Build
+  --init    Sync local SQLite DB to VM (stops container first)
+  --help    Show this help
+
+Without options: pull existing image + upload .env + restart container.
+
+Examples:
+  bash deploy/deploy-web.sh                # Deploy only
+  bash deploy/deploy-web.sh --build        # Build + deploy
+  bash deploy/deploy-web.sh --build --init # Build + sync DB + deploy
+EOF
+    exit 0
+}
+
 # ── 主流程 ────────────────────────────────────────────────
 BUILD=false
 INIT=false
@@ -95,6 +117,7 @@ for arg in "$@"; do
     case "$arg" in
         --build) BUILD=true ;;
         --init)  INIT=true ;;
+        --help|-h) usage ;;
         *)       fail "Unknown argument: $arg" ;;
     esac
 done

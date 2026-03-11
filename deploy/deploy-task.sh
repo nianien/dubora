@@ -13,6 +13,7 @@ REPO="dubora"
 IMAGE="dubora-task"
 IMAGE_URL="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/${IMAGE}:latest"
 
+WEB_VM_NAME="sg-dubora-web"
 VM_NAME="sg-dubora-task"
 VM_USER="nianien_gmail_com"
 CONTAINER_NAME="dubora-task"
@@ -46,6 +47,15 @@ build_image() {
 }
 
 # ── 部署容器 ─────────────────────────────────────────────
+resolve_web_ip() {
+    log "Resolving web VM internal IP..."
+    WEB_IP=$(gcloud compute instances describe "$WEB_VM_NAME" \
+        --zone="$ZONE" --format="get(networkInterfaces[0].networkIP)")
+    [ -n "$WEB_IP" ] || fail "Cannot resolve web VM IP"
+    API_URL="http://${WEB_IP}:8765"
+    log "Web API: ${API_URL}"
+}
+
 deploy_to_vm() {
     log "Uploading .env..."
     vm_scp "$PROJECT_DIR/.env" "~/.env.dubora"
@@ -59,10 +69,32 @@ deploy_to_vm() {
             --restart unless-stopped \
             -v ${DATA_DIR}:/data \
             --env-file ~/.env.dubora \
+            -e API_URL=${API_URL} \
             ${IMAGE_URL}
         docker ps --filter name=${CONTAINER_NAME}
     "
-    log "Task deployed."
+    log "Task deployed (API_URL=${API_URL})."
+}
+
+# ── 用法 ────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Usage: bash deploy/deploy-task.sh [OPTIONS]
+
+Deploy dubora-task (pipeline worker) to GCP VM (${VM_NAME})
+Connects to web API at ${WEB_VM_NAME} via internal IP.
+
+Options:
+  --build   Build new Docker image via Cloud Build
+  --help    Show this help
+
+Without options: pull existing image + upload .env + restart container.
+
+Examples:
+  bash deploy/deploy-task.sh               # Deploy only
+  bash deploy/deploy-task.sh --build       # Build + deploy
+EOF
+    exit 0
 }
 
 # ── 主流程 ────────────────────────────────────────────────
@@ -70,10 +102,12 @@ BUILD=false
 for arg in "$@"; do
     case "$arg" in
         --build) BUILD=true ;;
+        --help|-h) usage ;;
         *)       fail "Unknown argument: $arg" ;;
     esac
 done
 
 check_prerequisites
 if $BUILD; then build_image; fi
+resolve_web_ip
 deploy_to_vm
