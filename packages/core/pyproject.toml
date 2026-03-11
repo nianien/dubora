@@ -17,4 +17,4 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-dubora_core = ["resources/*.json", "resources/*.sql"]
+dubora_core = ["resources/*.json"]
