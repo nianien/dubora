@@ -67,17 +67,16 @@ def resolve_relative_path(path: str | Path) -> Path:
     return Path(path).resolve()
 
 
-_DEFAULT_DATA_DIR = "data/dubora"
+_DEFAULT_DATA_DIR = "data"
 
 
 @lru_cache(maxsize=1)
 def get_data_dir() -> Path:
-    """DUBORA_DATA_DIR, default data/dubora. Auto-creates subdirectories."""
-    raw = os.getenv("DUBORA_DATA_DIR", _DEFAULT_DATA_DIR)
+    """APP_DATA_DIR, default data. Auto-creates subdirectories."""
+    raw = os.getenv("APP_DATA_DIR", _DEFAULT_DATA_DIR)
     data_dir = resolve_relative_path(raw)
     for sub in [
-        "db", "dub", "uploads/covers",
-        "uploads", "gcs", "cache/voice-preview", "cache/faststart",
+        "db", "dub", "uploads", "gcs", "cache/voice-preview", "cache/faststart",
     ]:
         (data_dir / sub).mkdir(parents=True, exist_ok=True)
     return data_dir
@@ -89,10 +88,6 @@ def get_db_path() -> Path:
 
 def get_workdir(drama_name: str, episode_number: int) -> Path:
     return get_data_dir() / "dub" / drama_name / str(episode_number)
-
-
-def get_covers_dir() -> Path:
-    return get_data_dir() / "uploads" / "covers"
 
 
 def get_upload_cache_dir() -> Path:

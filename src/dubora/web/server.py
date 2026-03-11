@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from dubora.config.settings import get_data_dir, get_db_path, get_covers_dir, get_gcs_cache_dir
+from dubora.config.settings import get_data_dir, get_db_path, get_upload_cache_dir, get_gcs_cache_dir
 from dubora.web.api.emotions import router as emotions_router
 from dubora.web.api.episodes import router as episodes_router
 from dubora.web.api.export import router as export_router
@@ -50,14 +50,17 @@ def create_app(
 
     app.state.db_path = get_db_path()
     app.state.data_dir = data_dir
-    app.state.covers_dir = get_covers_dir()
 
     # File access layer: local-first, GCS fallback
     file_store = FileStore()
     file_store.add_local(data_dir / "dub", "/api/media/dub")
-    file_store.add_local(get_covers_dir(), "/api/covers")
+    file_store.add_local(get_upload_cache_dir(), "/api/media")
     file_store.set_gcs_cache_dir(get_gcs_cache_dir())
     app.state.file_store = file_store
+
+    @app.get("/api/health")
+    async def health():
+        return {"status": "ok"}
 
     # 注册 API 路由
     app.include_router(emotions_router, prefix="/api")
@@ -69,9 +72,6 @@ def create_app(
     app.include_router(cues_router, prefix="/api")
     app.include_router(voices_router, prefix="/api")
     app.include_router(glossary_router, prefix="/api")
-
-    # Serve cover images
-    app.mount("/api/covers", StaticFiles(directory=str(get_covers_dir())), name="covers")
 
     # 挂载前端静态文件（生产模式）— SPA catch-all
     if static_dir and Path(static_dir).is_dir():

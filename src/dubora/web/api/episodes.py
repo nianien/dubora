@@ -167,44 +167,47 @@ _ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 @router.post("/dramas/{drama_id}/cover")
 async def upload_cover(request: Request, drama_id: int, file: UploadFile) -> dict:
-    """Upload a cover image for a drama. Saves locally and uploads to GCS."""
+    """Upload a cover image for a drama. Saves as videos/{drama_name}/0{ext}."""
     store = _get_store(request.app.state.db_path)
-    row = store._conn.execute("SELECT id FROM dramas WHERE id=?", (drama_id,)).fetchone()
+    row = store._conn.execute("SELECT id, name FROM dramas WHERE id=?", (drama_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Drama not found")
+    drama_name = row["name"]
 
     # Validate file type
     ext = Path(file.filename or "").suffix.lower()
     if ext not in _ALLOWED_IMAGE_EXTS:
         raise HTTPException(status_code=400, detail=f"Only {', '.join(_ALLOWED_IMAGE_EXTS)} allowed")
 
-    filename = f"{drama_id}_{int(time.time())}{ext}"
     content = await file.read()
 
+    # Storage path: videos/{drama_name}/0{ext} (cover = episode 0)
+    blob_path = f"videos/{drama_name}/0{ext}"
+
     # Save locally
-    covers_dir: Path = request.app.state.covers_dir
-    (covers_dir / filename).write_bytes(content)
+    local_path = get_upload_cache_dir() / blob_path
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    local_path.write_bytes(content)
 
     # Upload to GCS
-    gcs_path = f"covers/{filename}"
     try:
         from dubora.utils.file_store import _gcs_bucket
-        blob = _gcs_bucket().blob(gcs_path)
+        blob = _gcs_bucket().blob(blob_path)
         blob.upload_from_string(content, content_type=file.content_type)
     except Exception as e:
-        logger.error("GCS upload failed for %s: %s", gcs_path, e)
-        raise HTTPException(status_code=500, detail="Failed to upload to cloud storage")
+        logger.error("GCS upload failed for %s: %s", blob_path, e)
+        raise HTTPException(status_code=500, detail="封面上传云存储失败")
 
     # Update DB
     store._conn.execute(
         "UPDATE dramas SET cover_image=? WHERE id=?",
-        (gcs_path, drama_id),
+        (blob_path, drama_id),
     )
     store._conn.commit()
 
     fs = _file_store(request)
-    fs.invalidate(gcs_path)
-    return {"cover_image": fs.get_url(gcs_path)}
+    fs.invalidate(blob_path)
+    return {"cover_image": fs.get_url(blob_path)}
 
 
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mkv", ".mov", ".avi", ".flv", ".wmv", ".webm"}

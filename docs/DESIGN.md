@@ -31,7 +31,7 @@ Gate:                        ↑              ↑
                       source_review   translation_review
 ```
 
-7 个 Phase + 2 个 Gate，5 个 Stage。数据存储在 SQLite DB (`data/dubora.db`)，task 队列驱动异步执行。
+7 个 Phase + 2 个 Gate，5 个 Stage。数据存储在 SQLite DB (`data/db/dubora.db`)，task 队列驱动异步执行。
 
 | Phase | 职责 | 技术 |
 |-------|------|------|

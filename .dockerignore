@@ -1,0 +1,12 @@
+.venv/
+.git/
+.idea/
+.env
+.gcp/
+data/
+web/node_modules/
+web/dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+.claude/
