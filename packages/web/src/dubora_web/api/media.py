@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
-from dubora_core.config.settings import get_data_dir, get_faststart_cache_dir
+from dubora_core.config.settings import get_data_dir, get_faststart_cache_dir, get_gcs_cache_dir
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -122,6 +122,20 @@ async def serve_media(request: Request, path: str):
         if candidate.is_file():
             file_path = candidate
             break
+
+    # 4. GCS download fallback
+    if file_path is None:
+        try:
+            from dubora_core.utils.file_store import _gcs_bucket
+            gcs_local = get_gcs_cache_dir() / path
+            blob = _gcs_bucket().blob(path)
+            if blob.exists():
+                gcs_local.parent.mkdir(parents=True, exist_ok=True)
+                blob.download_to_filename(str(gcs_local))
+                logger.info("Downloaded from GCS: %s", path)
+                file_path = gcs_local
+        except Exception as e:
+            logger.warning("GCS download failed for %s: %s", path, e)
 
     if file_path is None:
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
