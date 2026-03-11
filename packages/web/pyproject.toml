@@ -1,0 +1,21 @@
+[project]
+name = "dubora-web"
+version = "2.0.0"
+description = "Dubora web: FastAPI REST API server"
+requires-python = ">=3.9"
+dependencies = [
+  "dubora-core",
+  "fastapi>=0.110.0",
+  "uvicorn[standard]>=0.27.0",
+  "python-multipart>=0.0.6",
+]
+
+[project.scripts]
+vsd-web = "dubora_web.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "8765:8765"
+    volumes:
+      - data:/data
+    env_file:
+      - ../.env
+    environment:
+      - APP_DATA_DIR=/data
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.task
+    volumes:
+      - data:/data
+    env_file:
+      - ../.env
+    environment:
+      - APP_DATA_DIR=/data
+      - API_URL=http://web:8765
+    command: ["vsd-pipeline", "worker", "--api-url", "http://web:8765"]
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  data:

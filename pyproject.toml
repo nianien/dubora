@@ -1,23 +1,11 @@
 [project]
 name = "dubora"
 version = "2.0.0"
-description = "Complete video dubbing pipeline: Chinese short drama -> English subtitles + English dubbing with multi-voice support"
+description = "Dubora monorepo: video dubbing pipeline for Chinese short drama localization"
 requires-python = ">=3.9"
-dependencies = [
-  "openai-whisper>=20231117",
-  "google-genai>=0.2.0",
-  "ffmpeg-python>=0.2.0",
-  "opencc-python-reimplemented>=0.1.7",
-  "srt>=3.5.3",
-  "pydub>=0.25.1",
-  "tqdm>=4.66.0",
-  "python-dotenv>=1.0.0",
-  "requests>=2.19.1",  # Required for Doubao ASR API
-  "tos>=2.6.0",  # Required for TOS upload (Doubao ASR)
-]
-
-[project.scripts]
-vsd = "dubora.cli:main"
+# Root package has no runtime dependencies — install sub-packages instead.
+# This pyproject.toml exists for dev tooling (pytest, ruff, etc.) only.
+dependencies = []
 
 [project.optional-dependencies]
 dev = [
@@ -25,34 +13,7 @@ dev = [
   "black>=23.0.0",
   "ruff>=0.1.0",
 ]
-openai = [
-  "openai>=1.0.0",
-]
-terms = [
-  "pyyaml>=6.0",
-]
-faster = [
-  "faster-whisper>=1.0.0",
-]
-web = [
-  "fastapi>=0.110.0",
-  "uvicorn[standard]>=0.27.0",
-  "python-multipart>=0.0.6",
-]
-dub = [
-  "demucs>=4.0.0",
-  "google-cloud-speech>=2.21.0",
-  "google-cloud-storage>=2.10.0",  # Required for GCS upload
-  "openai>=1.0.0",
-  "azure-cognitiveservices-speech>=1.32.0",
-  "librosa>=0.10.0",
-  "numpy>=1.24.0,<2.0.0",
-  "torchaudio==2.0.2",  # Locked to avoid torchcodec dependency issues
-  "soundfile>=0.12.0",  # Required for torchaudio 2.0.2 to save audio files
-]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
-
-

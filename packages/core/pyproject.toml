@@ -1,0 +1,16 @@
+[project]
+name = "dubora-core"
+version = "2.0.0"
+description = "Dubora core: shared data layer, config, utils, schema, store"
+requires-python = ">=3.9"
+dependencies = [
+  "python-dotenv>=1.0.0",
+  "requests>=2.19.1",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,41 @@
+[project]
+name = "dubora-pipeline"
+version = "2.0.0"
+description = "Dubora pipeline: heavy execution phases (extract, asr, tts, etc.)"
+requires-python = ">=3.9"
+dependencies = [
+  "dubora-core",
+  "openai-whisper>=20231117",
+  "google-genai>=0.2.0",
+  "ffmpeg-python>=0.2.0",
+  "opencc-python-reimplemented>=0.1.7",
+  "srt>=3.5.3",
+  "pydub>=0.25.1",
+  "tqdm>=4.66.0",
+  "tos>=2.6.0",
+]
+
+[project.scripts]
+vsd-pipeline = "dubora_pipeline.cli:main"
+
+[project.optional-dependencies]
+openai = ["openai>=1.0.0"]
+terms = ["pyyaml>=6.0"]
+dub = [
+  "demucs>=4.0.0",
+  "google-cloud-speech>=2.21.0",
+  "google-cloud-storage>=2.10.0",
+  "openai>=1.0.0",
+  "azure-cognitiveservices-speech>=1.32.0",
+  "librosa>=0.10.0",
+  "numpy>=1.24.0,<2.0.0",
+  "torchaudio==2.0.2",
+  "soundfile>=0.12.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

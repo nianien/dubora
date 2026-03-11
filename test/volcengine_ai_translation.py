@@ -32,12 +32,8 @@ except ImportError:
 import os
 from pathlib import Path
 
-# 添加项目根目录到路径
-PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
-from dubora.config.settings import load_env_file
-from dubora.utils.logger import info, warning, error
+from dubora_core.config.settings import load_env_file
+from dubora_core.utils.logger import info, warning, error
 
 # 自动加载 .env 文件（如果存在）
 load_env_file()

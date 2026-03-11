@@ -12,13 +12,14 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY pyproject.toml ./
-COPY src/ ./src/
-RUN pip install --no-cache-dir -e ".[web,openai,terms]"
 
-# Copy frontend build output + package.json (sentinel for cli.py static discovery)
+# Install packages (core + web)
+COPY packages/core/ ./packages/core/
+COPY packages/web/ ./packages/web/
+RUN pip install --no-cache-dir ./packages/core ./packages/web
+
+# Copy frontend build output
 COPY --from=frontend /app/web/dist ./web/dist
-COPY web/package.json ./web/package.json
 
 VOLUME /data
 ENV APP_DATA_DIR=/data
@@ -28,4 +29,4 @@ EXPOSE 8765
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8765/api/health || exit 1
 
-CMD ["vsd", "ide", "--no-worker", "--port", "8765"]
+CMD ["vsd-web", "serve", "--port", "8765", "--static-dir", "/app/web/dist"]

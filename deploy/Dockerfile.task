@@ -4,13 +4,17 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY pyproject.toml ./
-COPY src/ ./src/
+
+# Install packages (core + pipeline)
+COPY packages/core/ ./packages/core/
+COPY packages/pipeline/ ./packages/pipeline/
 # Install CPU-only PyTorch first to avoid pulling the ~2GB CUDA version
 RUN pip install --no-cache-dir torch==2.0.1+cpu torchaudio==2.0.2+cpu -f https://download.pytorch.org/whl/torch_stable.html \
-    && pip install --no-cache-dir -e ".[dub,openai,terms]"
+    && pip install --no-cache-dir ./packages/core "./packages/pipeline[dub,openai,terms]"
 
 VOLUME /data
 ENV APP_DATA_DIR=/data
 
-CMD ["vsd", "worker"]
+# Default: remote mode via API_URL env var (set in docker-compose.yml)
+# Local mode: override CMD to remove --api-url
+CMD ["vsd-pipeline", "worker"]
