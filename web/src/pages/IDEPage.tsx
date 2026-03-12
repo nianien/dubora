@@ -7,7 +7,7 @@ import { PlayerEngine } from '../components/PlayerEngine'
 import { PlaybackControls } from '../components/PlaybackControls'
 import { TimelineView } from '../components/TimelineView'
 import { TranscriptList } from '../components/TranscriptList'
-import { ToolBar } from '../components/ToolBar'
+
 import { PipelinePanel } from '../components/PipelinePanel'
 import { StatusBar } from '../components/StatusBar'
 import { useKeyboard } from '../hooks/useKeyboard'
@@ -132,9 +132,6 @@ export function IDEPage() {
         <div className="w-1/2 flex flex-col">
           <div className="flex-1 min-h-0">
             <PlayerEngine />
-          </div>
-          <div className="shrink-0 border-t border-gray-700">
-            <ToolBar />
           </div>
           <div className="shrink-0 border-t border-gray-700">
             <PipelinePanel />
