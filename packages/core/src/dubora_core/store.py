@@ -59,14 +59,37 @@ class DbStore:
 
     def _init_schema(self) -> None:
         self._conn.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT NOT NULL DEFAULT '',
+                email       TEXT NOT NULL UNIQUE,
+                picture     TEXT NOT NULL DEFAULT '',
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS user_auths (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL REFERENCES users(id),
+                provider    TEXT NOT NULL,
+                provider_id TEXT NOT NULL,
+                email       TEXT NOT NULL DEFAULT '',
+                raw         TEXT NOT NULL DEFAULT '{}',
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL,
+                UNIQUE(provider, provider_id)
+            );
+
             CREATE TABLE IF NOT EXISTS dramas (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
-                name             TEXT NOT NULL UNIQUE,
+                name             TEXT NOT NULL,
+                user_id          INTEGER REFERENCES users(id),
                 synopsis         TEXT NOT NULL DEFAULT '',
                 cover_image      TEXT NOT NULL DEFAULT '',
                 total_episodes   INTEGER NOT NULL DEFAULT 0,
                 created_at       TEXT NOT NULL,
-                updated_at       TEXT NOT NULL
+                updated_at       TEXT NOT NULL,
+                UNIQUE(user_id, name)
             );
 
             CREATE TABLE IF NOT EXISTS episodes (
@@ -179,21 +202,64 @@ class DbStore:
     def close(self) -> None:
         self._conn.close()
 
-    # ── Dramas & Episodes ─────────────────────────────────────
+    # ── Users ──────────────────────────────────────────────────
 
-    def ensure_drama(self, *, name: str, synopsis: str = "") -> int:
-        """Insert or update a drama. Returns the drama id."""
+    def upsert_user(self, *, email: str, name: str = "", picture: str = "") -> int:
+        """Insert or update a user by email. Returns user_id."""
         now = _now_iso()
         self._conn.execute(
-            """INSERT INTO dramas (name, synopsis, created_at, updated_at)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT(name) DO UPDATE SET
+            """INSERT INTO users (email, name, picture, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(email) DO UPDATE SET
+                   name=excluded.name, picture=excluded.picture,
                    updated_at=excluded.updated_at""",
-            (name, synopsis, now, now),
+            (email, name, picture, now, now),
+        )
+        self._conn.commit()
+        row = self._conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+        return row["id"]
+
+    def upsert_user_auth(
+        self, *, user_id: int, provider: str, provider_id: str,
+        email: str = "", raw: str = "{}",
+    ) -> int:
+        """Insert or update a user auth record. Returns user_auth id."""
+        now = _now_iso()
+        self._conn.execute(
+            """INSERT INTO user_auths (user_id, provider, provider_id, email, raw, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(provider, provider_id) DO UPDATE SET
+                   user_id=excluded.user_id, email=excluded.email,
+                   raw=excluded.raw, updated_at=excluded.updated_at""",
+            (user_id, provider, provider_id, email, raw, now, now),
         )
         self._conn.commit()
         row = self._conn.execute(
-            "SELECT id FROM dramas WHERE name=?", (name,),
+            "SELECT id FROM user_auths WHERE provider=? AND provider_id=?",
+            (provider, provider_id),
+        ).fetchone()
+        return row["id"]
+
+    def get_user(self, user_id: int) -> Optional[dict]:
+        """Get user by id."""
+        row = self._conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+    # ── Dramas & Episodes ─────────────────────────────────────
+
+    def ensure_drama(self, *, name: str, synopsis: str = "", user_id: int | None = None) -> int:
+        """Insert or update a drama. Returns the drama id."""
+        now = _now_iso()
+        self._conn.execute(
+            """INSERT INTO dramas (name, user_id, synopsis, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(user_id, name) DO UPDATE SET
+                   updated_at=excluded.updated_at""",
+            (name, user_id, synopsis, now, now),
+        )
+        self._conn.commit()
+        row = self._conn.execute(
+            "SELECT id FROM dramas WHERE name=? AND user_id IS ?", (name, user_id),
         ).fetchone()
         return row["id"]
 

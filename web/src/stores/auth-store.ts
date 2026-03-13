@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 interface AuthUser {
+  id: number
   email: string
   name: string
   picture?: string

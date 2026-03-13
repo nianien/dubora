@@ -81,8 +81,9 @@ export function GlossaryPanel({ dramaId, dramaName }: Props) {
   }
 
   const handleAdd = async () => {
-    if (!newData.src.trim() || !newData.target.trim()) return
-    await postJson('/glossary', { ...newData, drama_id: dramaId ?? newData.drama_id })
+    const targetDramaId = dramaId ?? newData.drama_id
+    if (!targetDramaId || !newData.src.trim() || !newData.target.trim()) return
+    await postJson('/glossary', { ...newData, drama_id: targetDramaId })
     setAdding(false)
     setNewData(prev => ({ ...prev, src: '', target: '' }))
     await load()
@@ -119,7 +120,8 @@ export function GlossaryPanel({ dramaId, dramaName }: Props) {
           )}
           <button
             onClick={() => setAdding(true)}
-            className="h-8 px-4 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors"
+            disabled={!embedded && dramas.length === 0}
+            className="h-8 px-4 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             + 添加
           </button>

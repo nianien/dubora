@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from dubora_core.config.settings import get_workdir, get_gcs_cache_dir
 from dubora_core.manifest import resolve_artifact_path
 from dubora_core.store import DbStore
+from dubora_web.api._helpers import get_user_id, require_episode_owner
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ async def export_file(request: Request, episode_id: int, filename: str):
         raise HTTPException(status_code=400, detail=f"Unknown filename: {filename}")
 
     store = _get_store(request.app.state.db_path)
+    require_episode_owner(store, episode_id, get_user_id(request))
     ep_row = store.get_episode(episode_id)
     if not ep_row:
         raise HTTPException(status_code=404, detail="Episode not found")

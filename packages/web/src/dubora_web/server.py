@@ -40,6 +40,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         session = _get_session(request)
         if not session:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
+        request.state.user_id = session.get("user_id")
         return await call_next(request)
 
 

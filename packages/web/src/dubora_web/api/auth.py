@@ -14,6 +14,7 @@ Dev mode (no GOOGLE_CLIENT_ID):
 """
 
 import fnmatch
+import json
 import os
 import urllib.parse
 
@@ -21,6 +22,9 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+
+from dubora_core.config.settings import get_db_path
+from dubora_core.store import DbStore
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -80,9 +84,18 @@ def _set_session(response: RedirectResponse, session_data: dict):
 @router.get("/me")
 async def me(request: Request):
     session = _get_session(request)
-    if session:
-        return {"authenticated": True, "user": session}
-    return {"authenticated": False, "user": None}
+    if not session:
+        return {"authenticated": False, "user": None}
+    user_id = session.get("user_id")
+    if user_id:
+        store = DbStore(get_db_path())
+        user = store.get_user(user_id)
+        if user:
+            return {"authenticated": True, "user": {
+                "id": user["id"], "email": user["email"],
+                "name": user["name"], "picture": user["picture"],
+            }}
+    return {"authenticated": True, "user": session}
 
 
 @router.post("/logout")
@@ -97,7 +110,13 @@ async def logout():
 @router.get("/google/login")
 async def google_login(request: Request):
     if not auth_enabled():
-        session_data = {"email": "dev@localhost", "name": "Dev Mode", "provider": "dev"}
+        store = DbStore(get_db_path())
+        user_id = store.upsert_user(email="dev@localhost", name="Dev Mode")
+        store.upsert_user_auth(
+            user_id=user_id, provider="dev", provider_id="dev@localhost",
+            email="dev@localhost",
+        )
+        session_data = {"user_id": user_id, "email": "dev@localhost", "name": "Dev Mode", "provider": "dev"}
         response = RedirectResponse("/")
         _set_session(response, session_data)
         return response
@@ -151,7 +170,14 @@ async def google_callback(request: Request, code: str = ""):
             status_code=403,
         )
 
-    session_data = {"email": email, "name": name, "picture": picture, "provider": "google"}
+    store = DbStore(get_db_path())
+    user_id = store.upsert_user(email=email, name=name, picture=picture)
+    store.upsert_user_auth(
+        user_id=user_id, provider="google", provider_id=email,
+        email=email, raw=json.dumps(userinfo, ensure_ascii=False),
+    )
+
+    session_data = {"user_id": user_id, "email": email, "name": name, "picture": picture, "provider": "google"}
     response = RedirectResponse("/")
     _set_session(response, session_data)
     return response

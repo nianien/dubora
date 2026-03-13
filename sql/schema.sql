@@ -1,15 +1,40 @@
--- Pipeline DB schema v4
--- 10 tables: dramas, episodes, tasks, events, artifacts, utterances, utterance_cues, cues, roles, dictionary
+-- Pipeline DB schema v5
+-- 12 tables: users, user_auths, dramas, episodes, tasks, events, artifacts, utterances, utterance_cues, cues, roles, dictionary
 
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 
-CREATE TABLE IF NOT EXISTS dramas (
+CREATE TABLE IF NOT EXISTS users (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL UNIQUE,
-    synopsis    TEXT NOT NULL DEFAULT '',
+    name        TEXT NOT NULL DEFAULT '',
+    email       TEXT NOT NULL UNIQUE,
+    picture     TEXT NOT NULL DEFAULT '',
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_auths (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    provider    TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    email       TEXT NOT NULL DEFAULT '',
+    raw         TEXT NOT NULL DEFAULT '{}',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    UNIQUE(provider, provider_id)
+);
+
+CREATE TABLE IF NOT EXISTS dramas (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    name             TEXT NOT NULL,
+    user_id          INTEGER REFERENCES users(id),
+    synopsis         TEXT NOT NULL DEFAULT '',
+    cover_image      TEXT NOT NULL DEFAULT '',
+    total_episodes   INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL,
+    UNIQUE(user_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS episodes (
@@ -71,7 +96,6 @@ CREATE TABLE IF NOT EXISTS utterances (
     voice_hash      TEXT,
     audio_path      TEXT,
     tts_duration_ms INTEGER,
-    tts_rate        REAL,
     tts_error       TEXT,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL

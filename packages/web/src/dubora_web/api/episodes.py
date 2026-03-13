@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from dubora_core.config.settings import get_upload_cache_dir, get_workdir
 from dubora_core.store import DbStore
 from dubora_core.utils.file_store import FileStore  # noqa: F401 — used via _file_store()
+from dubora_web.api._helpers import get_user_id, require_drama_owner
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ async def list_dramas(
 ) -> dict:
     """Return dramas with pagination, search, and filtering."""
     store = _get_store(request.app.state.db_path)
+    user_id = get_user_id(request)
 
     # Base query with episode aggregation
     base = """
@@ -50,6 +52,10 @@ async def list_dramas(
     """
     where_clauses: list[str] = []
     params: list = []
+
+    if user_id is not None:
+        where_clauses.append("d.user_id = ?")
+        params.append(user_id)
 
     if search:
         where_clauses.append("d.name LIKE ?")
@@ -116,7 +122,8 @@ class CreateDramaBody(BaseModel):
 async def create_drama(request: Request, body: CreateDramaBody) -> dict:
     """Create a new drama with optional episodes and synopsis."""
     store = _get_store(request.app.state.db_path)
-    drama_id = store.ensure_drama(name=body.name, synopsis=body.synopsis)
+    user_id = get_user_id(request)
+    drama_id = store.ensure_drama(name=body.name, synopsis=body.synopsis, user_id=user_id)
 
     # Set total_episodes
     if body.total_episodes > 0:
@@ -141,6 +148,7 @@ class UpdateDramaBody(BaseModel):
 async def update_drama(request: Request, drama_id: int, body: UpdateDramaBody) -> dict:
     """Update drama fields."""
     store = _get_store(request.app.state.db_path)
+    require_drama_owner(store, drama_id, get_user_id(request))
     updates: list[str] = []
     params: list = []
     if body.synopsis is not None:
@@ -169,6 +177,7 @@ _ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 async def upload_cover(request: Request, drama_id: int, file: UploadFile) -> dict:
     """Upload a cover image for a drama. Saves as videos/{drama_name}/0{ext}."""
     store = _get_store(request.app.state.db_path)
+    require_drama_owner(store, drama_id, get_user_id(request))
     row = store._conn.execute("SELECT id, name FROM dramas WHERE id=?", (drama_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Drama not found")
@@ -223,6 +232,7 @@ async def upload_video(request: Request, drama_id: int, file: UploadFile) -> dic
     import re
 
     store = _get_store(request.app.state.db_path)
+    require_drama_owner(store, drama_id, get_user_id(request))
     row = store._conn.execute("SELECT id, name FROM dramas WHERE id=?", (drama_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Drama not found")
@@ -291,15 +301,28 @@ async def list_episodes(request: Request) -> List[dict]:
     ]
     """
     store = _get_store(request.app.state.db_path)
+    user_id = get_user_id(request)
 
-    rows = store._conn.execute(
-        """SELECT e.id, e.number, e.path, e.status, e.drama_id,
-                  e.updated_at,
-                  d.name AS drama_name
-           FROM episodes e
-           JOIN dramas d ON e.drama_id = d.id
-           ORDER BY d.id, e.number""",
-    ).fetchall()
+    if user_id is not None:
+        rows = store._conn.execute(
+            """SELECT e.id, e.number, e.path, e.status, e.drama_id,
+                      e.updated_at,
+                      d.name AS drama_name
+               FROM episodes e
+               JOIN dramas d ON e.drama_id = d.id
+               WHERE d.user_id = ?
+               ORDER BY d.id, e.number""",
+            (user_id,),
+        ).fetchall()
+    else:
+        rows = store._conn.execute(
+            """SELECT e.id, e.number, e.path, e.status, e.drama_id,
+                      e.updated_at,
+                      d.name AS drama_name
+               FROM episodes e
+               JOIN dramas d ON e.drama_id = d.id
+               ORDER BY d.id, e.number""",
+        ).fetchall()
 
     # Batch-query which episodes have SRC cues in DB
     cue_rows = store._conn.execute(
