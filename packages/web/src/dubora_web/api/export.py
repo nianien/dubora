@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 
 from dubora_core.config.settings import get_workdir, get_gcs_cache_dir
 from dubora_core.manifest import resolve_artifact_path

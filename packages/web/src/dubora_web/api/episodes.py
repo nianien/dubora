@@ -2,7 +2,6 @@
 Episodes API: query dramas + episodes from DB
 """
 import logging
-import time
 from pathlib import Path
 from typing import List
 
@@ -11,14 +10,13 @@ from pydantic import BaseModel
 
 from dubora_core.config.settings import get_upload_cache_dir, get_workdir
 from dubora_core.store import DbStore
-from dubora_core.utils.file_store import FileStore  # noqa: F401 — used via _file_store()
 from dubora_web.api._helpers import get_user_id, require_drama_owner
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _file_store(request: Request) -> FileStore:
+def _file_store(request: Request):
     return request.app.state.file_store
 
 
@@ -158,6 +156,9 @@ async def update_drama(request: Request, drama_id: int, body: UpdateDramaBody) -
         updates.append("cover_image=?")
         params.append(body.cover_image)
     if updates:
+        from datetime import datetime, timezone
+        updates.append("updated_at=?")
+        params.append(datetime.now(timezone.utc).isoformat())
         params.append(drama_id)
         store._conn.execute(
             f"UPDATE dramas SET {', '.join(updates)} WHERE id=?",
@@ -324,16 +325,37 @@ async def list_episodes(request: Request) -> List[dict]:
                ORDER BY d.id, e.number""",
         ).fetchall()
 
+    if not rows:
+        return []
+
     # Batch-query which episodes have SRC cues in DB
-    cue_rows = store._conn.execute(
-        "SELECT DISTINCT episode_id FROM cues",
-    ).fetchall()
+    if user_id is not None:
+        cue_rows = store._conn.execute(
+            """SELECT DISTINCT c.episode_id FROM cues c
+               JOIN episodes e ON c.episode_id = e.id
+               JOIN dramas d ON e.drama_id = d.id
+               WHERE d.user_id = ?""",
+            (user_id,),
+        ).fetchall()
+    else:
+        cue_rows = store._conn.execute(
+            "SELECT DISTINCT episode_id FROM cues",
+        ).fetchall()
     episodes_with_cues: set[int] = {r["episode_id"] for r in cue_rows}
 
     # Batch-query artifacts: {episode_id: set(kind)}
-    art_rows = store._conn.execute(
-        "SELECT episode_id, kind FROM artifacts",
-    ).fetchall()
+    if user_id is not None:
+        art_rows = store._conn.execute(
+            """SELECT a.episode_id, a.kind FROM artifacts a
+               JOIN episodes e ON a.episode_id = e.id
+               JOIN dramas d ON e.drama_id = d.id
+               WHERE d.user_id = ?""",
+            (user_id,),
+        ).fetchall()
+    else:
+        art_rows = store._conn.execute(
+            "SELECT episode_id, kind FROM artifacts",
+        ).fetchall()
     art_set: dict[int, set[str]] = {}
     for ar in art_rows:
         art_set.setdefault(ar["episode_id"], set()).add(ar["kind"])

@@ -2,7 +2,9 @@
 DbStore: SQLite-backed storage for all entity CRUD.
 
 Tables:
-  dramas            — business entity (INTEGER PK)
+  users             — registered users
+  user_auths        — third-party auth records (Google, dev, etc.)
+  dramas            — business entity (INTEGER PK), scoped by user_id
   episodes          — business entity (INTEGER PK), status tracks pipeline progress
   tasks             — task queue (type = phase name or gate key)
   events            — audit log (task lifecycle events)
@@ -83,7 +85,7 @@ class DbStore:
             CREATE TABLE IF NOT EXISTS dramas (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
                 name             TEXT NOT NULL,
-                user_id          INTEGER REFERENCES users(id),
+                user_id          INTEGER NOT NULL REFERENCES users(id),
                 synopsis         TEXT NOT NULL DEFAULT '',
                 cover_image      TEXT NOT NULL DEFAULT '',
                 total_episodes   INTEGER NOT NULL DEFAULT 0,
@@ -247,7 +249,7 @@ class DbStore:
 
     # ── Dramas & Episodes ─────────────────────────────────────
 
-    def ensure_drama(self, *, name: str, synopsis: str = "", user_id: int | None = None) -> int:
+    def ensure_drama(self, *, name: str, synopsis: str = "", user_id: int) -> int:
         """Insert or update a drama. Returns the drama id."""
         now = _now_iso()
         self._conn.execute(
@@ -259,7 +261,7 @@ class DbStore:
         )
         self._conn.commit()
         row = self._conn.execute(
-            "SELECT id FROM dramas WHERE name=? AND user_id IS ?", (name, user_id),
+            "SELECT id FROM dramas WHERE name=? AND user_id=?", (name, user_id),
         ).fetchone()
         return row["id"]
 
@@ -288,20 +290,34 @@ class DbStore:
         ).fetchone()
         return row["id"]
 
-    def get_drama_by_name(self, name: str) -> Optional[dict]:
-        row = self._conn.execute(
-            "SELECT * FROM dramas WHERE name=?", (name,),
-        ).fetchone()
+    def get_drama_by_name(self, name: str, user_id: int | None = None) -> Optional[dict]:
+        if user_id is not None:
+            row = self._conn.execute(
+                "SELECT * FROM dramas WHERE name=? AND user_id=?", (name, user_id),
+            ).fetchone()
+        else:
+            row = self._conn.execute(
+                "SELECT * FROM dramas WHERE name=?", (name,),
+            ).fetchone()
         return dict(row) if row else None
 
-    def get_episode_by_names(self, drama_name: str, episode_number: int) -> Optional[dict]:
-        row = self._conn.execute(
-            """SELECT e.*, d.name AS drama_name
-               FROM episodes e
-               JOIN dramas d ON e.drama_id = d.id
-               WHERE d.name=? AND e.number=?""",
-            (drama_name, episode_number),
-        ).fetchone()
+    def get_episode_by_names(self, drama_name: str, episode_number: int, user_id: int | None = None) -> Optional[dict]:
+        if user_id is not None:
+            row = self._conn.execute(
+                """SELECT e.*, d.name AS drama_name
+                   FROM episodes e
+                   JOIN dramas d ON e.drama_id = d.id
+                   WHERE d.name=? AND e.number=? AND d.user_id=?""",
+                (drama_name, episode_number, user_id),
+            ).fetchone()
+        else:
+            row = self._conn.execute(
+                """SELECT e.*, d.name AS drama_name
+                   FROM episodes e
+                   JOIN dramas d ON e.drama_id = d.id
+                   WHERE d.name=? AND e.number=?""",
+                (drama_name, episode_number),
+            ).fetchone()
         return dict(row) if row else None
 
     def update_episode_status(self, episode_id: int, status: str) -> None:
@@ -630,8 +646,11 @@ class DbStore:
         ).fetchall()
         return [self._cast_speaker(dict(r)) for r in rows]
 
+    _CUE_WRITABLE = {"text", "text_en", "start_ms", "end_ms", "speaker", "emotion", "gender", "kind"}
+
     def update_cue(self, cue_id: int, **fields) -> None:
         """Update specific fields of a cue."""
+        fields = {k: v for k, v in fields.items() if k in self._CUE_WRITABLE}
         if not fields:
             return
         fields["updated_at"] = _now_iso()
@@ -838,14 +857,21 @@ class DbStore:
             if not text_en:
                 continue
             current_hash = _compute_voice_hash(
-                text_en, utt.get("speaker", ""), utt.get("emotion", ""),
+                text_en, utt.get("speaker", ""), utt.get("emotion", "neutral"),
             )
             if utt.get("voice_hash") != current_hash:
                 dirty.append(utt)
         return dirty
 
+    _UTT_WRITABLE = {
+        "text_cn", "text_en", "start_ms", "end_ms", "speaker", "emotion",
+        "gender", "kind", "tts_policy", "source_hash", "voice_hash",
+        "audio_path", "tts_duration_ms", "tts_rate", "tts_error",
+    }
+
     def update_utterance(self, utterance_id: int, **fields) -> None:
         """Update specific fields of an utterance."""
+        fields = {k: v for k, v in fields.items() if k in self._UTT_WRITABLE}
         if not fields:
             return
         if "tts_policy" in fields and fields["tts_policy"] is not None:

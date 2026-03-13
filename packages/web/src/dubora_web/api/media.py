@@ -63,17 +63,18 @@ def _ensure_faststart(file_path: Path) -> Path:
         return file_path
 
     cache_dir = get_faststart_cache_dir()
-    cache_path = cache_dir / f"{file_path.stem}.faststart.mp4"
+    # Use full relative path as cache key to avoid collision across dramas
+    safe_name = str(file_path).replace("/", "_").replace("\\", "_")
+    cache_path = cache_dir / f"{safe_name}.faststart.mp4"
     if cache_path.is_file() and cache_path.stat().st_mtime >= file_path.stat().st_mtime:
         return cache_path
 
     logger.info("Remuxing %s → faststart", file_path.name)
+    tmp_path = None
     try:
-        # 写到临时文件再 rename，保证原子性
-        tmp_fd, tmp_path = tempfile.mkstemp(
-            suffix=".mp4", dir=str(file_path.parent)
-        )
         import os
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".mp4", dir=str(cache_dir))
         os.close(tmp_fd)
 
         result = subprocess.run(
@@ -97,6 +98,8 @@ def _ensure_faststart(file_path: Path) -> Path:
         return cache_path
     except Exception as e:
         logger.warning("Faststart remux error: %s", e)
+        if tmp_path:
+            Path(tmp_path).unlink(missing_ok=True)
         return file_path
 
 

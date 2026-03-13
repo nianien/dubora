@@ -16,7 +16,7 @@ from dubora_core.phase_registry import PHASE_META, PHASE_NAMES, GATES, GATE_AFTE
 from dubora_core.store import DbStore
 from dubora_core.events import EventEmitter, PipelineEvent
 from dubora_core.submit import PipelineReactor, submit_pipeline
-from dubora_web.api._helpers import get_user_id, require_episode_owner
+from dubora_web.api._helpers import get_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,9 @@ def _derive_stages(phases: list[dict]) -> list[dict]:
     result = []
     for stage_def in STAGES:
         child_phases = [phase_map.get(pn) for pn in stage_def["phases"] if phase_map.get(pn)]
-        if any(p["status"] == "failed" for p in child_phases):
+        if not child_phases:
+            status = "pending"
+        elif any(p["status"] == "failed" for p in child_phases):
             status = "failed"
         elif any(p["status"] == "running" for p in child_phases):
             status = "running"
@@ -128,10 +130,7 @@ async def pipeline_status(request: Request, drama: str, ep: str) -> dict:
     store = _get_store(request.app.state.db_path)
     user_id = get_user_id(request)
 
-    episode = store.get_episode_by_names(drama, int(ep))
-    if episode:
-        require_episode_owner(store, episode["id"], user_id)
-
+    episode = store.get_episode_by_names(drama, int(ep), user_id=user_id)
     if episode is None:
         phases = [{
             "name": m["name"], "label": m["label"], "status": "pending",
@@ -165,10 +164,9 @@ async def run_pipeline(request: Request, drama: str, ep: str) -> dict:
     """Submit pipeline tasks to DB. Worker process executes them."""
     store = _get_store(request.app.state.db_path)
 
-    episode = store.get_episode_by_names(drama, int(ep))
+    episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
         raise HTTPException(status_code=404, detail=f"Episode not found: {drama}/{ep}")
-    require_episode_owner(store, episode["id"], get_user_id(request))
 
     if store.has_running_tasks(episode["id"]):
         raise HTTPException(status_code=409, detail="Pipeline has running tasks")
@@ -197,11 +195,10 @@ async def pipeline_stream(request: Request, drama: str, ep: str):
             return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
         store = _get_store(request.app.state.db_path)
-        episode = store.get_episode_by_names(drama, int(ep))
+        episode = store.get_episode_by_names(drama, int(ep), user_id=user_id)
         if episode is None:
             yield sse("error", {"message": f"Episode not found: {drama}/{ep}"})
             return
-        require_episode_owner(store, episode["id"], user_id)
 
         episode_id = episode["id"]
         seen: set[tuple[int, str]] = set()
@@ -271,10 +268,9 @@ async def pipeline_stream(request: Request, drama: str, ep: str):
 async def cancel_pipeline(request: Request, drama: str, ep: str) -> dict:
     store = _get_store(request.app.state.db_path)
 
-    episode = store.get_episode_by_names(drama, int(ep))
+    episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
         raise HTTPException(status_code=404, detail=f"Episode not found: {drama}/{ep}")
-    require_episode_owner(store, episode["id"], get_user_id(request))
 
     store.delete_pending_tasks(episode["id"])
     status = store.derive_episode_status(episode["id"])
@@ -291,10 +287,9 @@ async def cancel_pipeline(request: Request, drama: str, ep: str) -> dict:
 async def pass_gate(request: Request, drama: str, ep: str, gate_key: str) -> dict:
     store = _get_store(request.app.state.db_path)
 
-    episode = store.get_episode_by_names(drama, int(ep))
+    episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
         raise HTTPException(status_code=404, detail=f"Episode not found: {drama}/{ep}")
-    require_episode_owner(store, episode["id"], get_user_id(request))
     episode_id = episode["id"]
 
     # Idempotency: if already has pending/running phase task, skip
@@ -333,10 +328,9 @@ async def reset_gate(request: Request, drama: str, ep: str, gate_key: str) -> di
     """Reset pipeline back to a gate. Deletes downstream tasks, creates pending gate task."""
     store = _get_store(request.app.state.db_path)
 
-    episode = store.get_episode_by_names(drama, int(ep))
+    episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
         raise HTTPException(status_code=404, detail=f"Episode not found: {drama}/{ep}")
-    require_episode_owner(store, episode["id"], get_user_id(request))
 
     store.reset_to_gate(episode["id"], gate_key)
     return {"status": "reset", "gate": gate_key}
@@ -349,9 +343,8 @@ async def reset_gate(request: Request, drama: str, ep: str, gate_key: str) -> di
 @router.get("/episodes/{drama}/{ep}/pipeline/events")
 async def get_pipeline_events(request: Request, drama: str, ep: str) -> dict:
     store = _get_store(request.app.state.db_path)
-    episode = store.get_episode_by_names(drama, int(ep))
+    episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
         return {"events": []}
-    require_episode_owner(store, episode["id"], get_user_id(request))
     events = store.get_events_for_episode(episode["id"])
     return {"events": events}

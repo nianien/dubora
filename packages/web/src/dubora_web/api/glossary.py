@@ -4,7 +4,7 @@ Glossary API: query and manage translation glossary terms
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from dubora_core.store import DbStore
@@ -62,23 +62,35 @@ class GlossaryEntryBody(BaseModel):
 async def create_entry(request: Request, body: GlossaryEntryBody) -> dict:
     """Create a new glossary entry."""
     if not body.drama_id:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="drama_id is required")
     store = _get_store(request.app.state.db_path)
     require_drama_owner(store, body.drama_id, get_user_id(request))
     cursor = store._conn.execute(
-        "INSERT INTO glossary (drama_id, type, src, target) VALUES (?, ?, ?, ?)",
+        """INSERT INTO glossary (drama_id, type, src, target) VALUES (?, ?, ?, ?)
+           ON CONFLICT(drama_id, type, src) DO UPDATE SET target=excluded.target""",
         (body.drama_id, body.type, body.src, body.target),
     )
     store._conn.commit()
-    return {"id": cursor.lastrowid, **body.model_dump()}
+    row_id = cursor.lastrowid or store._conn.execute(
+        "SELECT id FROM glossary WHERE drama_id=? AND type=? AND src=?",
+        (body.drama_id, body.type, body.src),
+    ).fetchone()["id"]
+    return {"id": row_id, **body.model_dump()}
 
 
 @router.put("/glossary/{entry_id}")
 async def update_entry(request: Request, entry_id: int, body: GlossaryEntryBody) -> dict:
     """Update an existing glossary entry."""
     store = _get_store(request.app.state.db_path)
-    require_drama_owner(store, body.drama_id, get_user_id(request))
+    user_id = get_user_id(request)
+    # Verify the entry exists and belongs to current user's drama
+    existing = store._conn.execute("SELECT drama_id FROM glossary WHERE id=?", (entry_id,)).fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Glossary entry not found")
+    require_drama_owner(store, existing["drama_id"], user_id)
+    # Also verify target drama ownership if drama_id changed
+    if body.drama_id != existing["drama_id"]:
+        require_drama_owner(store, body.drama_id, user_id)
     store._conn.execute(
         "UPDATE glossary SET drama_id=?, type=?, src=?, target=? WHERE id=?",
         (body.drama_id, body.type, body.src, body.target, entry_id),

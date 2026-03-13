@@ -1,10 +1,10 @@
 """Permission helpers for API routers."""
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 
 from dubora_core.store import DbStore
 
 
-def get_user_id(request: Request) -> int | None:
+def get_user_id(request) -> int | None:
     """Get current user ID. Returns None when auth is disabled."""
     return getattr(request.state, "user_id", None)
 
