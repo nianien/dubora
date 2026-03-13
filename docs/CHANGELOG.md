@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-03-13
+
+### 用户系统 + 多账户隔离
+
+- 新增 `users` + `user_auths` 表，支持 Google OAuth 登录 + dev 模式
+- `dramas` 表添加 `user_id NOT NULL` 列，UNIQUE 约束改为 `UNIQUE(user_id, name)`
+- 登录时自动创建/更新用户记录，cookie 存 `user_id`
+- `AuthMiddleware` 认证通过后注入 `request.state.user_id`
+- 新增权限工具函数：`get_user_id()`, `require_drama_owner()`, `require_episode_owner()`
+- 所有 API 过滤当前用户数据 + 写操作校验所有权（403）
+- Worker API (`/api/worker/*`) 不加权限校验
+- 鉴权未启用时 user_id=None，所有隔离/校验逻辑跳过
+
+### 修复
+
+- cues API 的 GET 端点不再自动创建 drama/episode（改为 lookup + 404）
+- roles PUT 端点不再自动创建 drama（改为 lookup + 404）
+- `list_episodes` 批量 cue/artifact 查询改为 JOIN 过滤，不再全表扫描
+- `update_cue` / `update_utterance` 添加字段白名单，防止 SQL 注入
+- `voice_hash` 计算中 emotion 默认值统一为 `"neutral"`
+- `update_drama` 更新时写入 `updated_at`
+- media API faststart 缓存 key 使用完整路径避免碰撞，temp 文件放在 cache 目录避免跨设备 rename 失败
+- `_derive_stages` 处理空 phases 返回 `"pending"` 而非 `"succeeded"`
+- cues 表移除 `cv` 列，`diff_and_save` 改为直接对比 `_SOURCE_FIELDS`
+- Schema v6: `dictionary` 重命名为 `glossary`，`artifacts` 字段改为 `kind/gcs_path/checksum`
+
 ## 2026-03-12
 
 ### Monorepo 拆包
@@ -11,7 +37,7 @@
 
 ### Worker API + 远程模式
 
-- 新增 Worker API（21 个端点），支持 task worker 通过 HTTP 访问数据库
+- 新增 Worker API（25 个端点），支持 task worker 通过 HTTP 访问数据库
 - 新增 `RemoteStore`，实现与 `DbStore` 相同接口的 HTTP 代理
 - `vsd-pipeline worker --api-url` 支持远程模式，worker 和 web 可部署在不同机器
 - Reactor 调度逻辑集中在 web 侧（`/complete` 和 `/fail` 端点内部运行）

@@ -254,6 +254,10 @@ bash deploy/deploy-pipeline.sh
 | `DB_DIR` | DB 目录，默认 `/data/db` |
 | `WEB_DATA_DIR` | Web 数据目录，默认 `/data/web` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | GCS 凭证路径 |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID（空则 dev 模式，无需登录） |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+| `AUTH_SECRET_KEY` | Cookie 签名密钥（生产环境必须设置强随机值） |
+| `AUTH_ALLOWED_EMAILS` | 允许登录的邮箱白名单，逗号分隔，支持通配符（如 `*@company.com`） |
 | `.env` 文件中的 API keys | 各外部服务凭证 |
 
 ### Pipeline 容器
