@@ -436,15 +436,29 @@ export function TranscriptList() {
                     {cue.text || '(空)'}
                   </div>
                 )}
-                <div
-                  className={`text-xs truncate px-1 py-0.5 rounded mt-0.5 min-h-[20px] leading-[20px] ${
-                    cue.text_en
-                      ? 'text-gray-500'
-                      : 'text-gray-600 italic'
-                  }`}
-                >
-                  {cue.text_en || '暂无翻译'}
-                </div>
+                {isEditing && editingField === 'text_en' ? (
+                  <input
+                    type="text"
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    onBlur={() => handleTextCommit(cue.id)}
+                    onKeyDown={e => handleTextKeyDown(e, cue.id)}
+                    className="w-full bg-gray-800 text-gray-300 px-2 py-0.5 rounded text-xs outline-none ring-1 ring-blue-400 mt-0.5"
+                    placeholder="输入英文翻译..."
+                    autoFocus
+                  />
+                ) : (
+                  <div
+                    className={`text-xs truncate px-1 py-0.5 rounded mt-0.5 min-h-[20px] leading-[20px] cursor-text hover:bg-gray-700/50 ${
+                      cue.text_en
+                        ? 'text-gray-500'
+                        : 'text-gray-600 italic'
+                    }`}
+                    onDoubleClick={e => { e.stopPropagation(); handleDoubleClick(cue, 'text_en') }}
+                  >
+                    {cue.text_en || '暂无翻译'}
+                  </div>
+                )}
               </div>
 
               {/* Duration */}

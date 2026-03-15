@@ -174,7 +174,7 @@ class PipelineReactor:
         if gate_def:
             gate_key = gate_def["key"]
             existing = self.store.get_gate_task(self.episode_id, gate_key)
-            if existing and existing["status"] == "succeeded":
+            if existing and existing["status"] == "succeeded" and not self.from_phase:
                 self._enqueue(next_name)
                 return
             self.store.create_task(self.episode_id, gate_key)
