@@ -192,8 +192,8 @@ class ParsePhase(Phase):
 
             # ── 写入 SRC cues 到 DB（reseg + emotion 修正后的最终结果）──
             if ctx.store and ctx.episode_id:
-                ctx.store.delete_episode_cues(ctx.episode_id)
                 ctx.store.delete_episode_utterances(ctx.episode_id)
+                ctx.store.delete_episode_cues(ctx.episode_id)
 
                 # Store raw ASR speaker cluster ID. Roles are created manually by the user.
                 cue_rows = []

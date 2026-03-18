@@ -78,7 +78,7 @@ class ASRPhase(Phase):
 
         # 获取配置
         phase_config = ctx.config.get("phases", {}).get("asr", {})
-        preset = phase_config.get("preset", ctx.config.get("doubao_asr_preset", "asr_vad_spk"))
+        preset = phase_config.get("preset", ctx.config.get("doubao_asr_preset", "asr_spk_semantic"))
         # 热词：从 DB glossary 表加载人名
         hotwords = None
         if ctx.store and ctx.episode_id:
