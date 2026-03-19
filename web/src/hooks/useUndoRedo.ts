@@ -14,45 +14,36 @@ import { nextTempId } from '../utils/temp-id'
 export function useUndoableOps() {
   const execute = useEditorStore(s => s.execute)
 
-  /** Undoable text edit */
-  const editText = useCallback((id: number, oldText: string, newText: string) => {
-    const cmd: Command = {
-      apply: () => useModelStore.getState().updateCue(id, { text: newText }),
-      inverse: () => useModelStore.getState().updateCue(id, { text: oldText }),
-      description: `Edit text of ${id}`,
-    }
-    execute(cmd)
-  }, [execute])
-
-  /** Undoable speaker change */
-  const changeSpeaker = useCallback((id: number, oldSpeaker: number, newSpeaker: number) => {
-    const cmd: Command = {
-      apply: () => useModelStore.getState().updateCue(id, { speaker: newSpeaker }),
-      inverse: () => useModelStore.getState().updateCue(id, { speaker: oldSpeaker }),
-      description: `Change speaker of ${id}`,
-    }
-    execute(cmd)
-  }, [execute])
-
-  /** Undoable emotion change */
-  const changeEmotion = useCallback((id: number, oldEmotion: string, newEmotion: string) => {
-    const cmd: Command = {
-      apply: () => useModelStore.getState().updateCue(id, { emotion: newEmotion }),
-      inverse: () => useModelStore.getState().updateCue(id, { emotion: oldEmotion }),
-      description: `Change emotion of ${id}`,
-    }
-    execute(cmd)
-  }, [execute])
-
-  /** Undoable time adjustment */
-  const adjustTime = useCallback((id: number, field: 'start_ms' | 'end_ms', oldVal: number, newVal: number) => {
+  /** Generic undoable field update */
+  const updateField = useCallback((id: number, field: string, oldVal: unknown, newVal: unknown) => {
+    if (oldVal === newVal) return
     const cmd: Command = {
       apply: () => useModelStore.getState().updateCue(id, { [field]: newVal }),
       inverse: () => useModelStore.getState().updateCue(id, { [field]: oldVal }),
-      description: `Adjust ${field} of ${id}`,
+      description: `Change ${field} of ${id}`,
     }
     execute(cmd)
   }, [execute])
+
+  /** Undoable text edit */
+  const editText = useCallback((id: number, oldText: string, newText: string) => {
+    updateField(id, 'text', oldText, newText)
+  }, [updateField])
+
+  /** Undoable speaker change */
+  const changeSpeaker = useCallback((id: number, oldSpeaker: number, newSpeaker: number) => {
+    updateField(id, 'speaker', oldSpeaker, newSpeaker)
+  }, [updateField])
+
+  /** Undoable emotion change */
+  const changeEmotion = useCallback((id: number, oldEmotion: string, newEmotion: string) => {
+    updateField(id, 'emotion', oldEmotion, newEmotion)
+  }, [updateField])
+
+  /** Undoable time adjustment */
+  const adjustTime = useCallback((id: number, field: 'start_ms' | 'end_ms', oldVal: number, newVal: number) => {
+    updateField(id, field, oldVal, newVal)
+  }, [updateField])
 
   /** Undoable split: split cue at time position */
   const splitCue = useCallback((id: number, splitMs: number) => {
@@ -122,10 +113,12 @@ export function useUndoableOps() {
     const cue = cues[idx]
     const next = cues[idx + 1]
 
+    // Auto-insert comma if first cue doesn't end with punctuation
+    const needsComma = cue.text.length > 0 && !/[，。！？、；：,.!?;:]$/.test(cue.text)
     const merged: Cue = {
       ...cue,
       end_ms: next.end_ms,
-      text: cue.text + next.text,
+      text: cue.text + (needsComma ? '，' : '') + next.text,
     }
 
     const newCues = [...cues]
@@ -170,5 +163,5 @@ export function useUndoableOps() {
     execute(cmd)
   }, [execute])
 
-  return { editText, changeSpeaker, changeEmotion, adjustTime, splitCue, mergeWithNext, insertCue, deleteCue }
+  return { updateField, editText, changeSpeaker, changeEmotion, adjustTime, splitCue, mergeWithNext, insertCue, deleteCue }
 }

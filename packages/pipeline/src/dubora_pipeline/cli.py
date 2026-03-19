@@ -15,7 +15,7 @@ import sys
 from typing import List
 
 from dubora_core.config.settings import PipelineConfig, load_env_file, get_db_path
-from dubora_core.phase_registry import PHASE_NAMES, PHASE_META, GATE_AFTER, STAGES
+from dubora_core.phase_registry import PHASE_NAMES, PHASE_META, GATES, GATE_AFTER, STAGES
 from dubora_core.store import DbStore
 from dubora_core.submit import submit_pipeline
 from dubora_pipeline.phases import build_phases
@@ -104,6 +104,16 @@ Examples:
         help="Web API URL for remote mode (e.g. http://web:8765)",
     )
 
+    # gate command
+    gate_parser = subparsers.add_parser("gate", help="Pass a pipeline gate to continue execution")
+    gate_parser.add_argument("drama", type=str, help="Drama name")
+    gate_parser.add_argument("episodes", type=str, help="Episode number or range (e.g. 5 or 4-70)")
+    gate_parser.add_argument(
+        "gate_key", type=str, nargs="?", default=None,
+        choices=[g["key"] for g in GATES],
+        help="Gate key (default: auto-detect pending gate)",
+    )
+
     # phases command
     subparsers.add_parser("phases", help="List available phases")
 
@@ -125,6 +135,10 @@ Examples:
         _cmd_phases()
         return
 
+    if args.command == "gate":
+        _cmd_gate(args)
+        return
+
     if args.command == "worker":
         api_url = getattr(args, "api_url", None) or os.environ.get("API_URL")
         _cmd_worker(api_url=api_url)
@@ -136,6 +150,49 @@ Examples:
         _cmd_run_remote(api_url, args)
     else:
         _cmd_run_local(args)
+
+
+def _cmd_gate(args):
+    """Pass a gate to continue pipeline execution."""
+    from dubora_core.events import EventEmitter, PipelineEvent
+    from dubora_core.submit import PipelineReactor
+
+    store = get_store()
+    episodes = resolve_episodes(store, args.drama, args.episodes)
+
+    for ep in episodes:
+        episode_id = ep["id"]
+
+        # Auto-detect pending gate if not specified
+        gate_key = args.gate_key
+        if not gate_key:
+            latest = store.get_latest_task(episode_id)
+            if latest and latest["status"] == "pending" and latest["type"] in {g["key"] for g in GATES}:
+                gate_key = latest["type"]
+            else:
+                warning(f"[ep {ep['number']}] No pending gate found")
+                continue
+
+        task_id = store.pass_gate_task(episode_id, gate_key)
+        if task_id is None:
+            gate_task = store.get_gate_task(episode_id, gate_key)
+            if gate_task and gate_task["status"] == "succeeded":
+                info(f"[ep {ep['number']}] Gate '{gate_key}' already passed")
+                continue
+            task_id = store.create_task(episode_id, gate_key)
+            store.complete_task(task_id)
+
+        # Reactor creates next phase task
+        emitter = EventEmitter()
+        reactor = PipelineReactor(
+            store, emitter, episode_id, PHASE_NAMES, GATE_AFTER,
+        )
+        reactor._on_succeeded(PipelineEvent(
+            kind="task_succeeded",
+            run_id=str(episode_id),
+            data={"type": gate_key},
+        ))
+        success(f"[ep {ep['number']}] Gate '{gate_key}' passed")
 
 
 def _cmd_phases():

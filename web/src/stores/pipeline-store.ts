@@ -153,12 +153,12 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   loadStatus: async (drama, ep) => {
     _currentDrama = drama
     _currentEp = ep
-    // Reset to all-pending to prevent stale action when switching episodes
+    // Reset visual state; hide action button to prevent stale/wrong action
     set({
       phases: defaultPhases,
       gates: defaultGates,
       stages: defaultStages,
-      currentAction: deriveAction(defaultPhases, defaultGates),
+      currentAction: null,
     })
     await get()._fetchStatus(drama, ep)
     // Start polling
@@ -172,14 +172,25 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       )
       const gates = data.gates ?? []
       const stages = data.stages ?? []
-      set({
+      const action = deriveAction(data.phases, gates, data.episode_status)
+      const updates: Partial<PipelineState> = {
         phases: data.phases,
         gates,
         stages,
-        currentAction: deriveAction(data.phases, gates, data.episode_status),
-      })
-    } catch {
-      // keep current state on fetch error
+        currentAction: action,
+      }
+      // Sync isRunning with backend episode_status (authoritative source).
+      // episode_status stays "running" during brief inter-phase gaps, unlike individual phase checks.
+      if (data.episode_status && data.episode_status !== 'running' && get().isRunning) {
+        updates.isRunning = false
+      }
+      set(updates)
+      // Stop polling when pipeline is idle (no execution, no SSE)
+      if (data.episode_status && data.episode_status !== 'running' && !get().isRunning && _pollTimer) {
+        get()._stopPolling()
+      }
+    } catch (err) {
+      console.error('_fetchStatus failed:', err)
     }
   },
 
@@ -310,6 +321,9 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   },
 
   _connectStream: async (drama, ep) => {
+    // Bail out if cancelled before SSE starts (e.g., cancelRun during passGate API await)
+    if (!get().isRunning) return
+
     _abortController = new AbortController()
     const { signal } = _abortController
 
@@ -360,7 +374,6 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
               if (currentEvent === 'gate_awaiting') {
                 await get().loadStatus(drama, ep)
                 _reloadModelData(drama, ep)
-                set({ isRunning: false })
                 return
               }
 
@@ -391,10 +404,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       await get().loadStatus(drama, ep)
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
-        set(s => ({ logs: [...s.logs, 'Pipeline stopped'], isRunning: false }))
-      } else {
-        set({ runError: (err as Error).message, isRunning: false })
+        // Intentional abort from cancelRun / passGate / runPipeline.
+        // Each caller manages its own state; just exit silently.
+        return
       }
+      set({ runError: (err as Error).message, isRunning: false })
       get().loadStatus(drama, ep)
     } finally {
       _abortController = null
@@ -406,14 +420,20 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       _abortController.abort()
       _abortController = null
     }
-    // Also tell backend to kill the process
-    if (_currentDrama && _currentEp) {
-      fetch(
-        `/api/episodes/${encodeURIComponent(_currentDrama)}/${encodeURIComponent(_currentEp)}/pipeline/cancel`,
-        { method: 'POST' },
-      ).catch(() => {})
-    }
     set({ isRunning: false })
+    // Tell backend to kill the process, then poll until state converges
+    if (_currentDrama && _currentEp) {
+      const drama = _currentDrama
+      const ep = _currentEp
+      fetch(
+        `/api/episodes/${encodeURIComponent(drama)}/${encodeURIComponent(ep)}/pipeline/cancel`,
+        { method: 'POST' },
+      )
+        .then(() => get()._fetchStatus(drama, ep))
+        .catch(() => {})
+      // Start polling: backend cancel may take time, keep refreshing until idle
+      get()._startPolling()
+    }
   },
 
   clearLogs: () => set({ logs: [], runError: null }),

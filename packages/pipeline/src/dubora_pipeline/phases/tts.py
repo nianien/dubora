@@ -18,7 +18,8 @@ from pathlib import Path
 from typing import Dict
 
 from dubora_pipeline.phase import Phase
-from dubora_core.store import _compute_voice_hash
+from dubora_core.store import DbStore, _compute_voice_hash
+from dubora_core.manifest import resolve_artifact_path
 from dubora_pipeline.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora_pipeline.processors.tts import run_per_segment as tts_run_per_segment
 from dubora_pipeline.schema.dub_manifest import dub_manifest_from_utterances, DubManifest, DubUtterance, TTSPolicy
@@ -166,6 +167,15 @@ class TTSPhase(Phase):
                     ),
                 )
 
+            # Ensure role sample audio exists for each role
+            self._ensure_role_samples(
+                store=store,
+                episode_id=episode_id,
+                drama_id=drama_id,
+                drama_name=ep["drama_name"],
+                workspace_path=workspace_path,
+            )
+
             # TTS synthesis
             segments_dir = outputs.get("tts.segments_dir")
             segments_dir.mkdir(parents=True, exist_ok=True)
@@ -198,14 +208,11 @@ class TTSPhase(Phase):
                 warning(f"TTS had {tts_report.failed_count} failures: {error_msgs}")
 
             # Save debug files
-            debug_dir = workspace_path / "derived"
-            debug_dir.mkdir(parents=True, exist_ok=True)
-
-            va_path = debug_dir / "voice-assignment.json"
+            va_path = workspace_path / "voice-assignment.json"
             with open(va_path, "w", encoding="utf-8") as f:
                 json.dump(voice_assignment, f, indent=2, ensure_ascii=False)
 
-            report_path = debug_dir / "tts" / "report.json"
+            report_path = workspace_path / "tts" / "report.json"
             report_path.parent.mkdir(parents=True, exist_ok=True)
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(tts_report_to_dict(tts_report), f, indent=2, ensure_ascii=False)
@@ -230,8 +237,7 @@ class TTSPhase(Phase):
                     "rate": seg.rate,
                     "hash": hash_file(seg_file) if seg_file.exists() else "",
                 }
-            segments_index_path = debug_dir / "tts" / "segments.json"
-            segments_index_path.parent.mkdir(parents=True, exist_ok=True)
+            segments_index_path = workspace_path / "tts" / "segments.json"
             with open(segments_index_path, "w", encoding="utf-8") as f:
                 json.dump(segments_index, f, indent=2, ensure_ascii=False)
             info(f"Debug: saved segments index ({len(segments_index)} entries)")
@@ -336,3 +342,105 @@ class TTSPhase(Phase):
             if not roles_map.get(spk_id):
                 unassigned.add(role_names.get(spk_id, str(spk_id)))
         return unassigned
+
+    def _ensure_role_samples(
+        self,
+        *,
+        store: DbStore,
+        episode_id: int,
+        drama_id: int,
+        drama_name: str,
+        workspace_path: Path,
+    ) -> None:
+        """为缺少样本音频的角色从 vocals 中提取参考音频片段。
+
+        选择质量最优的 cue（speech、2-8秒、>=4字），从 vocals.wav 截取并上传 GCS。
+        """
+        roles = store.get_roles(drama_id)
+        roles_needing_sample = [r for r in roles if not r.get("sample_audio")]
+        if not roles_needing_sample:
+            info("All roles already have sample audio, skipping extraction")
+            return
+
+        # Resolve vocals path
+        vocals_path = resolve_artifact_path("extract.vocals", workspace_path)
+        if not vocals_path.exists():
+            warning(f"Vocals file not found at {vocals_path}, skipping role sample extraction")
+            return
+
+        # Probe vocals duration
+        try:
+            audio_duration_ms = _probe_duration_ms(str(vocals_path))
+        except RuntimeError as e:
+            warning(f"Could not probe vocals duration: {e}, skipping role sample extraction")
+            return
+
+        cues = store.get_cues(episode_id)
+
+        # Output directory for role samples (drama-level)
+        roles_dir = workspace_path.parent / "roles"
+        roles_dir.mkdir(parents=True, exist_ok=True)
+
+        PAD_MS = 100
+
+        for role in roles_needing_sample:
+            role_id = role["id"]
+            role_name = role["name"]
+
+            # Filter cues for this role
+            role_cues = [
+                c for c in cues
+                if c.get("speaker") == role_id
+                and c.get("kind") == "speech"
+                and (c["end_ms"] - c["start_ms"]) >= 2000
+                and (c["end_ms"] - c["start_ms"]) <= 8000
+                and len(c.get("text") or "") >= 4
+            ]
+
+            if not role_cues:
+                warning(f"No suitable cue found for role {role_name} (id={role_id}), skipping sample extraction")
+                continue
+
+            # Sort: prefer duration closest to 4-6 seconds (5000ms center)
+            role_cues.sort(key=lambda c: abs((c["end_ms"] - c["start_ms"]) - 5000))
+            best_cue = role_cues[0]
+
+            # Extract audio clip with padding
+            start_s = max(0, (best_cue["start_ms"] - PAD_MS)) / 1000.0
+            end_s = min(audio_duration_ms, (best_cue["end_ms"] + PAD_MS)) / 1000.0
+            duration_s = end_s - start_s
+
+            output_path = roles_dir / f"{role_id}_sample.wav"
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", str(vocals_path),
+                "-ss", f"{start_s:.3f}",
+                "-t", f"{duration_s:.3f}",
+                "-ar", "24000", "-ac", "1",
+                str(output_path),
+            ]
+
+            try:
+                subprocess.run(cmd, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                warning(f"FFmpeg failed extracting sample for role {role_name}: {e.stderr}")
+                continue
+
+            if not output_path.exists():
+                warning(f"Sample file not created for role {role_name}")
+                continue
+
+            from dubora_core.utils.file_store import get_gcs_store
+
+            info(f"Extracted sample for role {role_name} (id={role_id}): "
+                 f"{best_cue['start_ms']}ms-{best_cue['end_ms']}ms -> {output_path.name}")
+
+            # Upload to GCS (best-effort, failure does not abort TTS)
+            gcs = get_gcs_store()
+            gcs_key = f"dramas/{drama_name}/roles/{role_id}_sample.wav"
+            try:
+                gcs.write_file(output_path, gcs_key)
+                info(f"Uploaded role sample to GCS: {gcs_key}")
+                store.update_role_sample_audio(role_id, gcs_key)
+            except Exception as e:
+                warning(f"GCS upload failed for role sample {role_name}: {e}")

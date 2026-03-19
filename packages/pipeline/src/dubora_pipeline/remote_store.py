@@ -159,6 +159,13 @@ class RemoteStore:
         data = r.json().get("name_map", {})
         return {int(k): v for k, v in data.items()}
 
+    def get_roles(self, drama_id: int) -> list[dict]:
+        r = self._get(f"/worker/dramas/{drama_id}/roles")
+        return r.json().get("roles", [])
+
+    def update_role_sample_audio(self, role_id: int, sample_audio: str) -> None:
+        self._patch(f"/worker/roles/{role_id}/sample-audio", json={"sample_audio": sample_audio})
+
     # ── Glossary (by drama_id) ───────────────────────────────────
 
     def get_dict_map(self, drama_id: int, type: str) -> dict[str, str]:

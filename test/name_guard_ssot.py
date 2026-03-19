@@ -6,7 +6,7 @@
     python test/name_guard_ssot.py <subtitle.model.json路径>
 
 示例：
-    python test/name_guard_ssot.py videos/dbqsfy/1/dub/1/subs/subtitle.model.json
+    python test/name_guard_ssot.py data/pipeline/dbqsfy/pipeline/1/subs/subtitle.model.json
 """
 import sys
 import json
@@ -159,10 +159,10 @@ def main():
         epilog="""
 示例：
   # 识别指定文件
-  python test/name_guard_ssot.py videos/dbqsfy/1/dub/1/subs/subtitle.model.json
+  python test/name_guard_ssot.py data/pipeline/dbqsfy/pipeline/1/subs/subtitle.model.json
   
   # 详细模式
-  python test/name_guard_ssot.py videos/dbqsfy/1/dub/1/subs/subtitle.model.json --verbose
+  python test/name_guard_ssot.py data/pipeline/dbqsfy/pipeline/1/subs/subtitle.model.json --verbose
         """
     )
     

@@ -173,11 +173,12 @@ class DbStore:
             CREATE INDEX IF NOT EXISTS idx_cues_episode ON cues(episode_id);
 
             CREATE TABLE IF NOT EXISTS roles (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                drama_id    INTEGER NOT NULL REFERENCES dramas(id),
-                name        TEXT NOT NULL,
-                voice_type  TEXT NOT NULL DEFAULT '',
-                role_type   TEXT NOT NULL DEFAULT 'extra',
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                drama_id      INTEGER NOT NULL REFERENCES dramas(id),
+                name          TEXT NOT NULL,
+                voice_type    TEXT NOT NULL DEFAULT '',
+                role_type     TEXT NOT NULL DEFAULT 'extra',
+                sample_audio  TEXT NOT NULL DEFAULT '',
                 UNIQUE(drama_id, name)
             );
 
@@ -1129,6 +1130,14 @@ class DbStore:
         ).fetchone()
         return row["id"]
 
+    def update_role_sample_audio(self, role_id: int, sample_audio: str) -> None:
+        """更新角色的样本音频 key（GCS key）。"""
+        self._conn.execute(
+            "UPDATE roles SET sample_audio=? WHERE id=?",
+            (sample_audio, role_id),
+        )
+        self._conn.commit()
+
     def get_roles_by_id(self, drama_id: int) -> dict[int, str]:
         """Get {role_id: voice_type} map for a drama. Used by TTS."""
         rows = self._conn.execute(
@@ -1154,7 +1163,7 @@ class DbStore:
             voice_type = role.get("voice_type", "")
             role_type = role.get("role_type", "extra")
             if rid and rid > 0:
-                # Update existing
+                # Update existing (preserve sample_audio)
                 self._conn.execute(
                     "UPDATE roles SET name=?, voice_type=?, role_type=? WHERE id=? AND drama_id=?",
                     (name, voice_type, role_type, rid, drama_id),

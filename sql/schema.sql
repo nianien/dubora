@@ -117,11 +117,12 @@ CREATE TABLE IF NOT EXISTS cues (
 CREATE INDEX IF NOT EXISTS idx_cues_episode ON cues(episode_id);
 
 CREATE TABLE IF NOT EXISTS roles (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    drama_id    INTEGER NOT NULL REFERENCES dramas(id),
-    name        TEXT NOT NULL,
-    voice_type  TEXT NOT NULL DEFAULT '',
-    role_type   TEXT NOT NULL DEFAULT 'extra',
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    drama_id      INTEGER NOT NULL REFERENCES dramas(id),
+    name          TEXT NOT NULL,
+    voice_type    TEXT NOT NULL DEFAULT '',
+    role_type     TEXT NOT NULL DEFAULT 'extra',
+    sample_audio  TEXT NOT NULL DEFAULT '',
     UNIQUE(drama_id, name)
 );
 

@@ -23,7 +23,7 @@ class Artifact:
     """
 
     key: str  # e.g. "extract.audio"
-    relpath: str  # workspace-relative path, e.g. "input/5.wav"
+    relpath: str  # workspace-relative path, e.g. "5.wav"
     kind: str = "bin"  # e.g. "json", "wav", "mp4"
     fingerprint: str = ""  # unused, kept for compatibility
 

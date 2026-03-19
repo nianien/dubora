@@ -21,10 +21,8 @@ RUN pip install --no-cache-dir ./packages/core ./packages/web
 # Copy frontend build output
 COPY --from=frontend /app/web/dist ./web/dist
 
-VOLUME /data/db
-VOLUME /data/web
-ENV DB_DIR=/data/db
-ENV WEB_DATA_DIR=/data/web
+VOLUME /data
+ENV DATA_DIR=/data
 
 EXPOSE 8765
 

@@ -108,7 +108,6 @@ function InlineDropdown({ anchorRef, onClose, children }: {
 export function TranscriptList() {
   const cues = useModelStore(s => s.cues)
   const loaded = useModelStore(s => s.loaded)
-  const updateCue = useModelStore(s => s.updateCue)
   const selectedCueId = useEditorStore(s => s.selectedCueId)
   const selectCue = useEditorStore(s => s.selectCue)
   const setCurrentTime = useEditorStore(s => s.setCurrentTime)
@@ -117,7 +116,7 @@ export function TranscriptList() {
   const isPlaying = useEditorStore(s => s.isPlaying)
   // Read currentTime via ref to avoid re-rendering TranscriptList on every timeupdate (~4/s)
   const currentTimeRef = useRef(useEditorStore.getState().currentTime)
-  const { splitCue, mergeWithNext, insertCue, deleteCue } = useUndoableOps()
+  const { updateField, splitCue, mergeWithNext, insertCue, deleteCue } = useUndoableOps()
 
   const roles = useModelStore(s => s.roles)
   const emotions = useModelStore(s => s.emotions)
@@ -200,17 +199,21 @@ export function TranscriptList() {
     }
   }, [selectCue, setCurrentTime])
 
+  const editOrigRef = useRef('')
+
   const handleDoubleClick = useCallback((cue: Cue, field: 'text' | 'text_en' = 'text') => {
+    const val = field === 'text' ? cue.text : (cue.text_en ?? '')
+    editOrigRef.current = val
     setEditingId(cue.id)
     setEditingField(field)
-    setEditText(field === 'text' ? cue.text : (cue.text_en ?? ''))
+    setEditText(val)
   }, [])
 
   const handleTextCommit = useCallback((id: number) => {
     const trimmed = editText.trim()
-    updateCue(id, { [editingField]: trimmed })
+    updateField(id, editingField, editOrigRef.current, trimmed)
     setEditingId(null)
-  }, [editText, editingField, updateCue])
+  }, [editText, editingField, updateField])
 
   const handleTextKeyDown = useCallback((e: React.KeyboardEvent, id: number) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -267,16 +270,18 @@ export function TranscriptList() {
     const isLast = idx >= cues.length - 1
     const isFirst = idx === 0
     const ct = currentTimeRef.current
-    const canSplit = ct > cue.start_ms && ct < cue.end_ms
+    const playheadInCue = ct > cue.start_ms && ct < cue.end_ms
+    const splitMs = playheadInCue ? ct : Math.round((cue.start_ms + cue.end_ms) / 2)
+    const canSplit = cue.end_ms - cue.start_ms > 100
 
     const prev = !isFirst ? cues[idx - 1] : null
     const next = !isLast ? cues[idx + 1] : null
 
     return [
       {
-        label: '在播放头处分割',
+        label: playheadInCue ? '在播放头处分割' : '从中间分割',
         shortcut: '\u2318B',
-        onClick: () => splitCue(cueId, ct),
+        onClick: () => splitCue(cueId, splitMs),
         disabled: !canSplit,
         dividerAfter: true,
       },
@@ -309,7 +314,7 @@ export function TranscriptList() {
       },
       {
         label: cue.kind === 'singing' ? '设为对白' : '设为歌唱',
-        onClick: () => updateCue(cueId, { kind: cue.kind === 'singing' ? 'speech' : 'singing' }),
+        onClick: () => updateField(cueId, 'kind', cue.kind, cue.kind === 'singing' ? 'speech' : 'singing'),
         dividerAfter: true,
       },
       {
@@ -325,7 +330,7 @@ export function TranscriptList() {
         },
       },
     ]
-  }, [cues, splitCue, mergeWithNext, insertCue, deleteCue, selectCue, makeEmptyCue, updateCue])
+  }, [cues, splitCue, mergeWithNext, insertCue, deleteCue, selectCue, makeEmptyCue, updateField])
 
   if (!loaded) {
     return (
@@ -400,14 +405,14 @@ export function TranscriptList() {
                 emotions={emotions}
                 isOpen={dropdownCueId === cue.id && dropdownType === 'emotion'}
                 onToggle={() => toggleDropdown(cue.id, 'emotion')}
-                onSelect={(emo) => { updateCue(cue.id, { emotion: emo }); closeDropdown() }}
+                onSelect={(emo) => { updateField(cue.id, 'emotion', cue.emotion, emo); closeDropdown() }}
                 onClose={closeDropdown}
               />
 
               {/* Type toggle: speech / singing */}
               {cue.kind === 'singing' && (
                 <button
-                  onClick={e => { e.stopPropagation(); updateCue(cue.id, { kind: 'speech' }) }}
+                  onClick={e => { e.stopPropagation(); updateField(cue.id, 'kind', cue.kind, 'speech') }}
                   className="shrink-0 pt-1 text-xs px-1.5 py-0.5 rounded bg-pink-800 text-pink-200 hover:brightness-125"
                   title="歌唱（点击切换为对白）"
                 >
@@ -510,8 +515,8 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
   onClose: () => void
 }) {
   const anchorRef = useRef<HTMLDivElement>(null)
-  const updateCue = useModelStore(s => s.updateCue)
   const cues = useModelStore(s => s.cues)
+  const { updateField } = useUndoableOps()
 
   const [filter, setFilter] = useState('')
   const [highlightIdx, setHighlightIdx] = useState(-1)
@@ -521,7 +526,7 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
   const speakerName = roles.find(r => r.id === cue.speaker)?.name ?? String(cue.speaker)
 
   const handleRoleSelect = (roleId: number) => {
-    updateCue(cue.id, { speaker: roleId })
+    updateField(cue.id, 'speaker', cue.speaker, roleId)
     onClose()
     setFilter('')
     setHighlightIdx(-1)
@@ -537,12 +542,13 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
     setFilter('')
     setHighlightIdx(-1)
     onClose()
+    const oldSpeaker = cue.speaker
     const doSave = async () => {
       await useModelStore.getState().saveRoles()
       const savedRoles = useModelStore.getState().roles
       const saved = savedRoles.find(r => r.name === trimmed)
       if (saved) {
-        useModelStore.getState().updateCue(cue.id, { speaker: saved.id })
+        updateField(cue.id, 'speaker', oldSpeaker, saved.id)
       }
     }
     doSave()

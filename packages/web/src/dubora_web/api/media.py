@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
-from dubora_core.config.settings import get_web_data_dir, get_pipeline_data_dir, get_faststart_cache_dir, get_gcs_cache_dir
+from dubora_core.config.settings import get_faststart_cache_dir
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -51,9 +51,9 @@ def _needs_faststart(file_path: Path) -> bool:
     return False
 
 
-def _ensure_faststart(file_path: Path) -> Path:
+def _ensure_faststart(file_path: Path, key: str) -> Path:
     """
-    如果 MP4 非 faststart，用 ffmpeg remux 到 .faststart.mp4 缓存文件。
+    如果 MP4 非 faststart，用 ffmpeg remux 到缓存文件。
     只 copy stream 不重编码，耗时极短。返回可直接服务的文件路径。
     """
     if not file_path.suffix.lower() == ".mp4":
@@ -63,9 +63,7 @@ def _ensure_faststart(file_path: Path) -> Path:
         return file_path
 
     cache_dir = get_faststart_cache_dir()
-    # Use full relative path as cache key to avoid collision across dramas
-    safe_name = str(file_path).replace("/", "_").replace("\\", "_")
-    cache_path = cache_dir / f"{safe_name}.faststart.mp4"
+    cache_path = cache_dir / key
     if cache_path.is_file() and cache_path.stat().st_mtime >= file_path.stat().st_mtime:
         return cache_path
 
@@ -73,8 +71,8 @@ def _ensure_faststart(file_path: Path) -> Path:
     tmp_path = None
     try:
         import os
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".mp4", dir=str(cache_dir))
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".mp4", dir=str(cache_path.parent))
         os.close(tmp_fd)
 
         result = subprocess.run(
@@ -103,60 +101,34 @@ def _ensure_faststart(file_path: Path) -> Path:
         return file_path
 
 
-@router.get("/media/{path:path}")
-async def serve_media(request: Request, path: str):
+@router.get("/media/{key:path}")
+async def serve_media(request: Request, key: str):
     """
     静态文件服务，支持 Range header（视频 seek）。
 
-    Multi-root lookup under data_dir:
-      1. workdir/{path}
-      2. uploads/{path}
-      3. gcs/{path}
+    key 即 GCS blob key，通过 GcsFileStore 解析（本地缓存优先，远程下载兜底）。
     """
-    web_dir = get_web_data_dir()
-    pipeline_dir = get_pipeline_data_dir()
+    from dubora_core.utils.file_store import get_gcs_store
+    gcs = get_gcs_store()
 
-    # Try multiple roots: dub under pipeline, uploads/gcs under web
-    file_path = None
-    roots = [
-        (pipeline_dir, "dub"),
-        (web_dir, "uploads"),
-        (web_dir, "gcs"),
-    ]
-    for root, sub in roots:
-        candidate = (root / sub / path).resolve()
-        if not str(candidate).startswith(str(root.resolve())):
-            continue
-        if candidate.is_file():
-            file_path = candidate
-            break
+    try:
+        local = gcs.get(key)
+    except Exception:
+        logger.warning("GCS download failed for: %s", key)
+        local = None
 
-    # 4. GCS download fallback
-    if file_path is None:
-        try:
-            from dubora_core.utils.file_store import _gcs_bucket
-            gcs_local = get_gcs_cache_dir() / path
-            blob = _gcs_bucket().blob(path)
-            if blob.exists():
-                gcs_local.parent.mkdir(parents=True, exist_ok=True)
-                blob.download_to_filename(str(gcs_local))
-                logger.info("Downloaded from GCS: %s", path)
-                file_path = gcs_local
-        except Exception as e:
-            logger.warning("GCS download failed for %s: %s", path, e)
-
-    if file_path is None:
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    if not local or not str(local.resolve()).startswith(str(gcs.cache_dir.resolve())):
+        raise HTTPException(status_code=404, detail=f"File not found: {key}")
 
     # 对 MP4 自动 faststart
-    file_path = _ensure_faststart(file_path)
+    local = _ensure_faststart(local, key)
 
     # 检测 MIME 类型
-    mime_type, _ = mimetypes.guess_type(str(file_path))
+    mime_type, _ = mimetypes.guess_type(str(local))
     if mime_type is None:
         mime_type = "application/octet-stream"
 
-    file_size = file_path.stat().st_size
+    file_size = local.stat().st_size
     range_header = request.headers.get("range")
 
     if range_header:
@@ -168,7 +140,7 @@ async def serve_media(request: Request, path: str):
         content_length = end - start + 1
 
         def iter_file():
-            with open(file_path, "rb") as f:
+            with open(local, "rb") as f:
                 f.seek(start)
                 remaining = content_length
                 while remaining > 0:
@@ -192,7 +164,7 @@ async def serve_media(request: Request, path: str):
 
     # 不带 Range 的完整文件响应
     return FileResponse(
-        path=str(file_path),
+        path=str(local),
         media_type=mime_type,
         headers={
             "Accept-Ranges": "bytes",

@@ -10,7 +10,6 @@ import { nextTempId } from '../utils/temp-id'
 
 export function useKeyboard() {
   const cues = useModelStore(s => s.cues)
-  const updateCue = useModelStore(s => s.updateCue)
   const saveCues = useModelStore(s => s.saveCues)
   const selectedCueId = useEditorStore(s => s.selectedCueId)
   const selectCue = useEditorStore(s => s.selectCue)
@@ -18,7 +17,7 @@ export function useKeyboard() {
   const currentTime = useEditorStore(s => s.currentTime)
   const undo = useEditorStore(s => s.undo)
   const redo = useEditorStore(s => s.redo)
-  const { splitCue, mergeWithNext, insertCue, deleteCue } = useUndoableOps()
+  const { updateField, splitCue, mergeWithNext, insertCue, deleteCue } = useUndoableOps()
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -90,13 +89,11 @@ export function useKeyboard() {
         const midMs = (cue.start_ms + cue.end_ms) / 2
         const editStart = currentTime <= midMs
         if (editStart) {
-          updateCue(cue.id, {
-            start_ms: Math.max(0, Math.min(currentTime, cue.end_ms - 30)),
-          })
+          const newVal = Math.max(0, Math.min(currentTime, cue.end_ms - 30))
+          updateField(cue.id, 'start_ms', cue.start_ms, newVal)
         } else {
-          updateCue(cue.id, {
-            end_ms: Math.max(cue.start_ms + 30, currentTime),
-          })
+          const newVal = Math.max(cue.start_ms + 30, currentTime)
+          updateField(cue.id, 'end_ms', cue.end_ms, newVal)
         }
         return
       }
@@ -112,22 +109,23 @@ export function useKeyboard() {
         const editStart = currentTime <= midMs
         const direction = e.key === 'ArrowLeft' ? -1 : 1
         if (editStart) {
-          updateCue(cue.id, {
-            start_ms: Math.max(0, Math.min(cue.start_ms + direction * 30, cue.end_ms - 30)),
-          })
+          const newVal = Math.max(0, Math.min(cue.start_ms + direction * 30, cue.end_ms - 30))
+          updateField(cue.id, 'start_ms', cue.start_ms, newVal)
         } else {
-          updateCue(cue.id, {
-            end_ms: Math.max(cue.start_ms + 30, cue.end_ms + direction * 30),
-          })
+          const newVal = Math.max(cue.start_ms + 30, cue.end_ms + direction * 30)
+          updateField(cue.id, 'end_ms', cue.end_ms, newVal)
         }
         return
       }
 
-      // Ctrl+B: split cue at current playback time (undoable)
+      // Ctrl+B: split cue at playhead (or midpoint if playhead outside cue)
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault()
         if (selectedCueId == null || selectedIdx < 0) return
-        splitCue(selectedCueId, currentTime)
+        const cue = cues[selectedIdx]
+        const playheadInCue = currentTime > cue.start_ms && currentTime < cue.end_ms
+        const splitMs = playheadInCue ? currentTime : Math.round((cue.start_ms + cue.end_ms) / 2)
+        splitCue(selectedCueId, splitMs)
         return
       }
 
@@ -184,10 +182,10 @@ export function useKeyboard() {
       }
 
       // 1-9: quick speaker switch
-      if (/^[1-9]$/.test(e.key) && selectedCueId != null) {
+      if (/^[1-9]$/.test(e.key) && selectedCueId != null && selectedIdx >= 0) {
         const spkIdx = parseInt(e.key) - 1
         if (spkIdx < speakerList.length) {
-          updateCue(selectedCueId, { speaker: speakerList[spkIdx] })
+          updateField(selectedCueId, 'speaker', cues[selectedIdx].speaker, speakerList[spkIdx])
         }
         return
       }
@@ -196,8 +194,8 @@ export function useKeyboard() {
       const emotionMap: Record<string, string> = {
         n: 'neutral', a: 'angry', s: 'sad', e: 'surprised', i: 'happy', f: 'fearful',
       }
-      if (e.key.toLowerCase() in emotionMap && selectedCueId != null) {
-        updateCue(selectedCueId, { emotion: emotionMap[e.key.toLowerCase()] })
+      if (e.key.toLowerCase() in emotionMap && selectedCueId != null && selectedIdx >= 0) {
+        updateField(selectedCueId, 'emotion', cues[selectedIdx].emotion, emotionMap[e.key.toLowerCase()])
         return
       }
 
@@ -234,5 +232,5 @@ export function useKeyboard() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [cues, selectedCueId, currentTime, selectCue, setCurrentTime, updateCue, saveCues, undo, redo, splitCue, mergeWithNext, insertCue, deleteCue])
+  }, [cues, selectedCueId, currentTime, selectCue, setCurrentTime, saveCues, undo, redo, updateField, splitCue, mergeWithNext, insertCue, deleteCue])
 }

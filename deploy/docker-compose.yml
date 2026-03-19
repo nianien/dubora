@@ -8,13 +8,9 @@ services:
     ports:
       - "8765:8765"
     volumes:
-      - db-data:/data/db
-      - web-data:/data/web
+      - dubora-data:/data
     env_file:
       - ../.env
-    environment:
-      - DB_DIR=/data/db
-      - WEB_DATA_DIR=/data/web
     restart: unless-stopped
 
   pipeline:
@@ -22,11 +18,10 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.pipeline
     volumes:
-      - pipeline-data:/data
+      - dubora-data:/data
     env_file:
       - ../.env
     environment:
-      - PIPELINE_DATA_DIR=/data
       - API_URL=http://web:8765
     command: ["vsd-pipeline", "worker", "--api-url", "http://web:8765"]
     restart: unless-stopped
@@ -35,6 +30,4 @@ services:
         condition: service_healthy
 
 volumes:
-  db-data:
-  web-data:
-  pipeline-data:
+  dubora-data:

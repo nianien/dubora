@@ -196,12 +196,13 @@ class ParsePhase(Phase):
                 ctx.store.delete_episode_cues(ctx.episode_id)
 
                 # Store raw ASR speaker cluster ID. Roles are created manually by the user.
+                _TRAILING_PUNC = "，。,.、；：;:"
                 cue_rows = []
                 for seg in asr_model.segments:
                     cue_rows.append({
                         "start_ms": seg.start_ms,
                         "end_ms": seg.end_ms,
-                        "text": seg.text,
+                        "text": seg.text.strip().rstrip(_TRAILING_PUNC),
                         "speaker": seg.speaker or "0",
                         "emotion": seg.emotion or "neutral",
                         "kind": seg.type if hasattr(seg, "type") and seg.type else "speech",

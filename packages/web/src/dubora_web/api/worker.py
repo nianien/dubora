@@ -360,9 +360,19 @@ async def worker_upsert_glossary_by_drama(drama_id: int, request: Request) -> di
 
 @router.get("/worker/dramas/{drama_id}/roles")
 async def worker_get_roles_by_drama(drama_id: int, request: Request) -> dict:
-    """Get roles by_id + name_map for a drama."""
+    """Get roles by_id + name_map + full list for a drama."""
     store = _get_store(request.app.state.db_path)
     return {
         "by_id": {str(k): v for k, v in store.get_roles_by_id(drama_id).items()},
         "name_map": {str(k): v for k, v in store.get_role_name_map(drama_id).items()},
+        "roles": store.get_roles(drama_id),
     }
+
+
+@router.patch("/worker/roles/{role_id}/sample-audio")
+async def worker_update_role_sample_audio(role_id: int, request: Request) -> dict:
+    """Update a role's sample audio GCS key."""
+    body = await request.json()
+    store = _get_store(request.app.state.db_path)
+    store.update_role_sample_audio(role_id, body["sample_audio"])
+    return {"status": "updated"}

@@ -115,7 +115,7 @@ gcloud compute instances create dubora-pipeline-sg \
 在每台 VM 上创建数据目录：
 ```bash
 gcloud compute ssh nianien@dubora-web-sg --zone=asia-southeast1-a --command="
-  sudo mkdir -p /var/dubora/data/{db,web,pipeline,.gcp}
+  sudo mkdir -p /var/dubora/data/{db,.gcp}
   sudo chown -R \$(id -u):\$(id -g) /var/dubora/data
 "
 ```
@@ -251,8 +251,8 @@ bash deploy/deploy-pipeline.sh
 
 | 变量 | 说明 |
 |------|------|
-| `DB_DIR` | DB 目录，默认 `/data/db` |
-| `WEB_DATA_DIR` | Web 数据目录，默认 `/data/web` |
+| `DATA_DIR` | 数据根目录，默认 `/data` |
+| `DB_DIR` | DB 目录，默认 `DATA_DIR/db`（可独立覆盖） |
 | `GOOGLE_APPLICATION_CREDENTIALS` | GCS 凭证路径 |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID（空则 dev 模式，无需登录） |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
@@ -264,8 +264,8 @@ bash deploy/deploy-pipeline.sh
 
 | 变量 | 说明 |
 |------|------|
+| `DATA_DIR` | 数据根目录，默认 `/data` |
 | `API_URL` | Web API 地址，如 `http://10.148.0.2:8765` |
-| `PIPELINE_DATA_DIR` | Pipeline 数据目录，默认 `/data` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | GCS 凭证路径 |
 | `.env` 文件中的 API keys | 各外部服务凭证 |
 

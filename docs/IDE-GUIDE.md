@@ -478,8 +478,8 @@ Voice Casting 是独立于 ASR 校准的全屏视图，用于管理 DB roles 表
 | utterances (分组) | DB utterances 表 | 由 `calculate_utterances()` 自动管理，TTS 缓存 |
 | roles (角色声线) | DB roles 表 | Voice Casting 页面编辑，剧级共享 |
 | dictionary (术语) | DB dictionary 表 | 人名/术语词典 |
-| `asr-result.json` | `input/` | ASR 原始输出（只读，不要手动修改） |
-| TTS 音频 | `derived/tts/segments/` | 逐句合成的 WAV 文件 |
+| `asr-result.json` | workdir 根目录 | ASR 原始输出（只读，不要手动修改） |
+| TTS 音频 | `tts/segments/` | 逐句合成的 WAV 文件 |
 | `en.srt` | `output/` | burn 阶段从 DB cues.text_en 生成 |
 
 **注意**：
@@ -493,15 +493,12 @@ Voice Casting 是独立于 ASR 校准的全屏视图，用于管理 DB roles 表
 
 ### Q: 打开 IDE 后看不到任何剧集？
 
-检查 `--videos` 参数指向的目录结构是否正确：
+确认剧集数据已通过 Web API 创建，且视频已上传。数据存储在 `DATA_DIR` 下：
 ```
-videos/
-  剧名/
-    1.mp4
-    dub/
-      1/
-        input/
-          asr-result.json
+data/
+  pipeline/剧名/集号/
+    asr-result.json
+  gcs/dramas/剧名/集号.mp4
 ```
 
 ### Q: 选择剧集后没有数据？
@@ -513,7 +510,7 @@ vsd-pipeline run 剧名 集号 --to parse
 
 ### Q: 视频播放不了？
 
-- 确认视频文件位于 `videos/剧名/集号.mp4`（与 dub 目录同级）
+- 视频通过 `/api/media/{key}` 提供，确认 GCS 缓存中存在对应文件
 - 浏览器需支持 H.264 编码
 - 非 faststart 的 MP4 会自动 remux（首次访问较慢）
 

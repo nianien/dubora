@@ -7,9 +7,10 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
-from dubora_core.config.settings import get_workdir, get_gcs_cache_dir
+from dubora_core.config.settings import get_workdir
 from dubora_core.manifest import resolve_artifact_path
 from dubora_core.store import DbStore
+from dubora_core.utils.file_store import get_gcs_store
 from dubora_web.api._helpers import get_user_id, require_episode_owner
 
 router = APIRouter()
@@ -37,25 +38,6 @@ _KIND_MEDIA_TYPE = {
 
 def _get_store(db_path: Path) -> DbStore:
     return DbStore(db_path)
-
-
-def _download_from_gcs(gcs_path: str) -> Path | None:
-    """Download from GCS to local cache, return local path."""
-    try:
-        from dubora_core.utils.file_store import _gcs_bucket
-        local = get_gcs_cache_dir() / gcs_path
-        if local.is_file():
-            return local
-        blob = _gcs_bucket().blob(gcs_path)
-        if not blob.exists():
-            return None
-        local.parent.mkdir(parents=True, exist_ok=True)
-        blob.download_to_filename(str(local))
-        logger.info("Downloaded from GCS: %s", gcs_path)
-        return local
-    except Exception as e:
-        logger.error("GCS download failed for %s: %s", gcs_path, e)
-        return None
 
 
 @router.get("/export/{episode_id}/{filename}")
@@ -95,12 +77,12 @@ async def export_file(request: Request, episode_id: int, filename: str):
                 },
             )
 
-    # 2) GCS download fallback (proxy, not redirect — video elements can't follow cross-origin redirects)
+    # 2) GCS download fallback
     if art["gcs_path"]:
-        gcs_local = _download_from_gcs(art["gcs_path"])
-        if gcs_local and gcs_local.is_file():
+        local = get_gcs_store().get(art["gcs_path"])
+        if local:
             return FileResponse(
-                gcs_local,
+                local,
                 media_type=_KIND_MEDIA_TYPE.get(kind, "application/octet-stream"),
                 headers={"Accept-Ranges": "bytes"},
             )

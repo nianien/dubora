@@ -52,8 +52,8 @@ parse   → DB cues 表 (含 reseg + emotion 修正)
   ── [source_review gate: 人工在 IDE 中校准] ──
 translate → DB cues.text_en (翻译回填) + utterances (分组 + TTS 缓存)
   ── [translation_review gate: 人工审阅翻译] ──
-tts     → derived/tts/segments/ (逐句音频) + DB utterances 更新
-mix     → derived/mix.wav (混音)
+tts     → tts/segments/ (逐句音频) + DB utterances 更新
+mix     → {ep}-mix.wav (混音)
 burn    → output/en.srt (从 DB cues 生成) + output/dubbed.mp4 (成片)
 ```
 
@@ -162,44 +162,38 @@ vsd-web serve --port 8765                            # 启动 Web 服务器
 
 ### 2.6 文件布局
 
-Web 和 Pipeline 数据目录分离（分别通过 `WEB_DATA_DIR` 和 `PIPELINE_DATA_DIR` 配置），DB 独立存放。
+所有数据由 `DATA_DIR`（默认 `data/`）统一管理，`DB_DIR` 可独立覆盖。
 
 ```
-data/
+data/                                    # 数据根 (env: DATA_DIR)
 +-- db/
-|   +-- dubora.db                       # SQLite DB (所有元数据 SSOT, env: DB_DIR)
+|   +-- dubora.db                       # SQLite DB (env: DB_DIR, 默认 DATA_DIR/db)
 |
-+-- web/                                # Web 数据根 (env: WEB_DATA_DIR)
-|   +-- uploads/                        #   上传缓存 (封面/视频)
-|   +-- gcs/                            #   GCS 下载缓存
-|   +-- cache/
-|       +-- faststart/                  #   MP4 faststart remux 缓存
-|       +-- voice-preview/              #   声线试听缓存
++-- pipeline/{剧名}/{集号}/               # 集级 workspace (workdir)
+|   +-- {集号}.wav                      #   提取的音频
+|   +-- {集号}-vocals.wav               #   人声
+|   +-- {集号}-accompaniment.wav        #   伴奏
+|   +-- asr-result.json                 #   ASR 原始输出
+|   +-- voice-assignment.json           #   声线分配快照
+|   +-- {集号}-mix.wav                  #   最终混音
+|   +-- tts/                            #   TTS 产物
+|   |   +-- segments/                   #     逐句 TTS 音频
+|   |   +-- report.json                 #     TTS 报告
+|   |   +-- segments.json               #     段索引
+|   +-- output/                         #   最终交付物（GCS 暂存）
+|   |   +-- {集号}-dubbed.mp4           #     成片
+|   |   +-- {集号}-en.srt               #     英文字幕
+|   |   +-- {集号}-zh.srt               #     中文字幕
+|   +-- .cache/tts/                     #   TTS 临时文件（用完即删）
 |
-+-- pipeline/                           # Pipeline 数据根 (env: PIPELINE_DATA_DIR)
-    +-- dub/{剧名}/{集号}/               #   集级 workspace
-    |   +-- input/                      #     不可变输入（提取后不再修改）
-    |   |   +-- asr-result.json         #       ASR 原始输出
-    |   |   +-- audio.wav               #       提取的音频
-    |   |   +-- vocals.wav              #       人声
-    |   |   +-- accompaniment.wav       #       伴奏
-    |   +-- derived/                    #     可重算的派生产物
-    |   |   +-- tts/segments/           #       逐句 TTS 音频
-    |   |   +-- tts/report.json         #       TTS 报告
-    |   |   +-- voice-assignment.json   #       声线分配快照
-    |   |   +-- mix.wav                 #       最终混音
-    |   +-- output/                     #     最终交付物
-    |   |   +-- en.srt                  #       英文字幕 (burn 阶段生成)
-    |   |   +-- dubbed.mp4             #       成片
-    |   +-- .cache/                     #     内部优化缓存
-    +-- gcs/                            #   Pipeline 侧 GCS 缓存
-
-{视频目录}/{剧名}/                       # 视频源文件（可配置）
-+-- 1.mp4                              # 原视频
-+-- story_background.txt               # 故事背景（可选，翻译 prompt 注入）
++-- gcs/                                # GCS 缓存
++-- tos/                                # TOS 缓存
++-- .cache/
+    +-- faststart/                      # MP4 faststart remux 缓存
+    +-- voice-preview/                  # 声线试听缓存
 ```
 
-目录按语义角色分层：`input/` 是提取的不可变输入，`derived/` 是可重算的中间产物，`output/` 是最终交付。Web 和 Pipeline 可部署在不同机器，各自只需挂载自己的数据目录。
+过程文件直接放 workdir 根目录，只保留 `tts/`（segments 多文件）和 `output/`（GCS 交付物暂存）两个子目录。Web 和 Pipeline 部署时共享同一 `DATA_DIR` volume。
 
 ### 2.7 认证与多账户
 

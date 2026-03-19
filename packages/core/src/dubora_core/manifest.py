@@ -24,22 +24,22 @@ def resolve_artifact_path(key: str, workspace: Path) -> Path:
 
     path_map = {
         "extract": {
-            "audio": "input/{episode_stem}.wav",
-            "vocals": "input/{episode_stem}-vocals.wav",
-            "accompaniment": "input/{episode_stem}-accompaniment.wav",
+            "audio": "{episode_stem}.wav",
+            "vocals": "{episode_stem}-vocals.wav",
+            "accompaniment": "{episode_stem}-accompaniment.wav",
         },
         "asr": {
-            "asr_result": "input/asr-result.json",
+            "asr_result": "asr-result.json",
         },
         "subs": {
             "zh_srt": "output/{episode_stem}-zh.srt",
             "en_srt": "output/{episode_stem}-en.srt",
         },
         "tts": {
-            "segments_dir": "derived/tts/segments",
+            "segments_dir": "tts/segments",
         },
         "mix": {
-            "audio": "derived/{episode_stem}-mix.wav",
+            "audio": "{episode_stem}-mix.wav",
         },
         "burn": {
             "video": "output/{episode_stem}-dubbed.mp4",

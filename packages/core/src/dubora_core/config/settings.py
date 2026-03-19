@@ -68,32 +68,30 @@ def resolve_relative_path(path: str | Path) -> Path:
 
 
 @lru_cache(maxsize=1)
+def get_data_root() -> Path:
+    """DATA_DIR, default data/. Root for all data directories."""
+    raw = os.getenv("DATA_DIR", "data")
+    data_root = resolve_relative_path(raw)
+    data_root.mkdir(parents=True, exist_ok=True)
+    return data_root
+
+
+@lru_cache(maxsize=1)
 def get_db_dir() -> Path:
-    """DB_DIR, default data/db. Auto-creates directory."""
-    raw = os.getenv("DB_DIR", "data/db")
-    db_dir = resolve_relative_path(raw)
+    """DB_DIR, default DATA_DIR/db. Separate env var for independent DB storage."""
+    raw = os.getenv("DB_DIR", "")
+    if raw:
+        db_dir = resolve_relative_path(raw)
+    else:
+        db_dir = get_data_root() / "db"
     db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir
 
 
-@lru_cache(maxsize=1)
-def get_web_data_dir() -> Path:
-    """WEB_DATA_DIR, default data/web. Auto-creates uploads, gcs, cache subdirs."""
-    raw = os.getenv("WEB_DATA_DIR", "data/web")
-    data_dir = resolve_relative_path(raw)
-    for sub in ["uploads", "gcs", "cache/voice-preview", "cache/faststart"]:
-        (data_dir / sub).mkdir(parents=True, exist_ok=True)
-    return data_dir
-
-
-@lru_cache(maxsize=1)
-def get_pipeline_data_dir() -> Path:
-    """PIPELINE_DATA_DIR, default data/pipeline. Auto-creates dub, gcs subdirs."""
-    raw = os.getenv("PIPELINE_DATA_DIR", "data/pipeline")
-    data_dir = resolve_relative_path(raw)
-    for sub in ["dub", "gcs"]:
-        (data_dir / sub).mkdir(parents=True, exist_ok=True)
-    return data_dir
+def get_drama_dir(drama_name: str) -> Path:
+    d = get_data_root() / "pipeline" / drama_name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 def get_db_path() -> Path:
@@ -101,27 +99,20 @@ def get_db_path() -> Path:
 
 
 def get_workdir(drama_name: str, episode_number: int) -> Path:
-    return get_pipeline_data_dir() / "dub" / drama_name / str(episode_number)
+    return get_drama_dir(drama_name) / str(episode_number)
 
-
-def get_upload_cache_dir() -> Path:
-    return get_web_data_dir() / "uploads"
-
-
-def get_gcs_cache_dir() -> Path:
-    return get_web_data_dir() / "gcs"
-
-
-def get_pipeline_gcs_cache_dir() -> Path:
-    return get_pipeline_data_dir() / "gcs"
 
 
 def get_voice_preview_cache_dir() -> Path:
-    return get_web_data_dir() / "cache" / "voice-preview"
+    cache_dir = get_data_root() / ".cache" / "voice-preview"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
 
 
 def get_faststart_cache_dir() -> Path:
-    return get_web_data_dir() / "cache" / "faststart"
+    cache_dir = get_data_root() / ".cache" / "faststart"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
 
 
 def get_openai_key() -> str | None:

@@ -16,8 +16,6 @@ Subtitle Processor 模块（唯一公共入口）
 - render_srt.py: Subtitle Model → SRT 文件（格式渲染）
 - profiles.py: 策略配置
 - srt.py: SRT 格式处理（编解码，Segment ↔ SrtCue）
-- subtitles.py: 向后兼容接口（包含文件 IO，不推荐使用）
-
 数据流：
     ASR raw → asr_post.py → Subtitle Model (Segment[])
                                          ↓

@@ -72,10 +72,8 @@ deploy_to_vm() {
         docker run -d \
             --name ${CONTAINER_NAME} \
             --restart unless-stopped \
-            -v ${DATA_DIR}/pipeline:/data \
-            -v ${DATA_DIR}/.gcp:/data/.gcp:ro \
+            -v ${DATA_DIR}:/data \
             --env-file ~/.env.dubora \
-            -e PIPELINE_DATA_DIR=/data \
             -e API_URL=${API_URL} \
             -e GOOGLE_APPLICATION_CREDENTIALS=/data/.gcp/pikppo-dubora.json \
             ${IMAGE_URL}

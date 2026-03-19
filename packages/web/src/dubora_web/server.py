@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from dubora_core.config.settings import get_web_data_dir, get_pipeline_data_dir, get_db_path, get_upload_cache_dir, get_gcs_cache_dir
+from dubora_core.config.settings import get_data_root, get_db_path
 from dubora_web.api.auth import router as auth_router, auth_enabled, _get_session
 from dubora_web.api.emotions import router as emotions_router
 from dubora_web.api.episodes import router as episodes_router
@@ -25,7 +25,6 @@ from dubora_web.api.cues import router as cues_router
 from dubora_web.api.voices import router as voices_router
 from dubora_web.api.glossary import router as glossary_router
 from dubora_web.api.worker import router as worker_router
-from dubora_core.utils.file_store import FileStore
 
 _AUTH_SKIP_PREFIXES = ("/api/auth/", "/api/health", "/api/worker/")
 
@@ -53,7 +52,7 @@ def create_app(
     Args:
         static_dir: 前端静态文件目录（None 则不挂载）
     """
-    get_web_data_dir()  # ensure subdirs created
+    get_data_root()  # ensure dir created
     app = FastAPI(
         title="ASR Calibration IDE",
         version="1.0.0",
@@ -72,13 +71,6 @@ def create_app(
     )
 
     app.state.db_path = get_db_path()
-
-    # File access layer: local-first, GCS fallback
-    file_store = FileStore()
-    file_store.add_local(get_pipeline_data_dir() / "dub", "/api/media/dub")
-    file_store.add_local(get_upload_cache_dir(), "/api/media")
-    file_store.set_gcs_cache_dir(get_gcs_cache_dir())
-    app.state.file_store = file_store
 
     @app.get("/api/health")
     async def health():

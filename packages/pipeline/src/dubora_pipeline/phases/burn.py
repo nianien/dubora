@@ -1,7 +1,6 @@
 """
 Burn Phase: 生成 SRT 字幕 + 烧录字幕到视频 + 上传 GCS + 写 artifacts 表
 """
-import hashlib
 import logging
 import os
 import subprocess
@@ -10,30 +9,11 @@ from typing import Dict
 
 from dubora_pipeline.phase import Phase
 from dubora_pipeline.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
+from dubora_core.utils.file_store import get_gcs_store
 from dubora_core.utils.logger import info
 from dubora_pipeline.utils.timecode import write_srt_from_segments
 
 logger = logging.getLogger(__name__)
-
-
-def _sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def _upload_gcs(local_path: Path, gcs_path: str) -> bool:
-    """Best-effort upload to GCS. Returns True on success."""
-    try:
-        from dubora_core.utils.file_store import _gcs_bucket
-        blob = _gcs_bucket().blob(gcs_path)
-        blob.upload_from_filename(str(local_path))
-        return True
-    except Exception as e:
-        logger.warning("GCS upload failed for %s: %s", gcs_path, e)
-        return False
 
 
 class BurnPhase(Phase):
@@ -62,7 +42,7 @@ class BurnPhase(Phase):
         流程：
         1. 从 DB cues 生成 en.srt + zh.srt
         2. 使用 ffmpeg 将字幕烧录到视频
-        3. 上传 GCS (best-effort)
+        3. 上传 GCS
         4. 写 artifacts 表
         """
         store = ctx.store
@@ -113,6 +93,15 @@ class BurnPhase(Phase):
         en_segments.sort(key=lambda x: x["start"])
         zh_segments.sort(key=lambda x: x["start"])
 
+        if not en_segments:
+            return PhaseResult(
+                status="failed",
+                error=ErrorInfo(
+                    type="ValueError",
+                    message="No translated cues found. Run translate phase first.",
+                ),
+            )
+
         output_dir = workspace_path / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -123,15 +112,6 @@ class BurnPhase(Phase):
         zh_srt_path = output_dir / f"{ep_number}-zh.srt"
         write_srt_from_segments(zh_segments, str(zh_srt_path), text_key="zh_text")
         info(f"Generated {zh_srt_path.name}: {len(zh_segments)} segments")
-
-        if not en_segments:
-            return PhaseResult(
-                status="failed",
-                error=ErrorInfo(
-                    type="ValueError",
-                    message="No translated cues found. Run translate phase first.",
-                ),
-            )
 
         # 获取 video_path（从 config）
         video_path = ctx.config.get("video_path")
@@ -184,27 +164,40 @@ class BurnPhase(Phase):
 
             info(f"Burn completed: {output_video_path.name} (size: {output_video_path.stat().st_size / 1024 / 1024:.2f} MB)")
 
-            # ── 写 artifacts 表 + GCS 上传 ──
+            # ── Publish deliverables to drama-level dub/ and sub/ ──
+            import shutil
             drama_name = ep_row["drama_name"] if ep_row else "unknown"
-            gcs_prefix = f"videos/{drama_name}/{ep_number}"
+            drama_dir = workspace_path.parent  # {ep} → {drama}
+            dub_dir = drama_dir / "dub"
+            sub_dir = drama_dir / "sub"
+            dub_dir.mkdir(parents=True, exist_ok=True)
+            sub_dir.mkdir(parents=True, exist_ok=True)
 
+            copies = [
+                (output_video_path, dub_dir / f"{ep_number}-dubbed.mp4"),
+                (zh_srt_path, sub_dir / f"{ep_number}-zh.srt"),
+                (en_srt_path, sub_dir / f"{ep_number}-en.srt"),
+            ]
+            for src, dst in copies:
+                shutil.copy2(src, dst)
+            info("Published deliverables to dub/ and sub/")
+
+            # ── GCS upload + write artifacts 表 ──
+            gcs = get_gcs_store()
             deliverables = [
-                ("zh_srt", zh_srt_path, f"{gcs_prefix}-zh.srt"),
-                ("en_srt", en_srt_path, f"{gcs_prefix}-en.srt"),
-                ("dubbed_video", output_video_path, f"{gcs_prefix}-dubbed.mp4"),
+                ("zh_srt",       zh_srt_path,        f"dramas/{drama_name}/sub/{ep_number}-zh.srt"),
+                ("en_srt",       en_srt_path,        f"dramas/{drama_name}/sub/{ep_number}-en.srt"),
+                ("dubbed_video", output_video_path,   f"dramas/{drama_name}/dub/{ep_number}-dubbed.mp4"),
             ]
 
-            for kind, local_abs, gcs_key in deliverables:
-                checksum = _sha256_file(local_abs) if local_abs.is_file() else None
-                uploaded = _upload_gcs(local_abs, gcs_key)
-                if uploaded:
-                    info(f"Uploaded {kind} to GCS: {gcs_key}")
-                else:
-                    info(f"GCS upload skipped/failed for {kind}: {gcs_key}")
+            for kind, src_path, gcs_key in deliverables:
+                gcs.write_file(src_path, gcs_key)
+                checksum = gcs.get_local_sha(gcs_key)
+                info(f"Uploaded {kind} to GCS: {gcs_key}")
                 store.upsert_artifact(
                     episode_id,
                     kind,
-                    gcs_path=gcs_key if uploaded else None,
+                    gcs_path=gcs_key,
                     checksum=checksum,
                 )
 

@@ -4,7 +4,7 @@ Pipeline task execution: poll DB for pending tasks and execute them.
 submit_pipeline and PipelineReactor live in submit.py (lightweight, DB-only).
 This module contains PipelineWorker (heavy, requires phase implementations).
 
-Re-exports for backward compatibility:
+Re-exports:
     from dubora_pipeline.worker import submit_pipeline, PipelineReactor
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
-from dubora_core.config.settings import PipelineConfig, get_workdir as _settings_get_workdir, get_pipeline_gcs_cache_dir
+from dubora_core.config.settings import PipelineConfig, get_workdir as _settings_get_workdir
 from dubora_core.events import EventEmitter, LogListener, PipelineEvent
 from dubora_pipeline.manifest import DbManifest
 from dubora_pipeline.runner import PhaseRunner
@@ -33,31 +33,13 @@ def _get_workdir(drama_name: str, episode_number: int) -> Path:
 
 
 def _resolve_video_path(episode: dict) -> Path | None:
-    """Resolve source video path by priority:
-    1. gcs/{blob_path} — GCS download cache (on pipeline machine)
-    2. Download from GCS → gcs/{blob_path}
-    """
-    blob_path = episode.get("path")
-    if not blob_path:
+    """Resolve source video: local check + GCS download with checksum dedup."""
+    key = episode.get("path")
+    if not key:
         return None
 
-    # 1) GCS download cache
-    gcs_local = get_pipeline_gcs_cache_dir() / blob_path
-    if gcs_local.is_file():
-        return gcs_local
-
-    # 2) Download from GCS
-    try:
-        from dubora_core.utils.file_store import _gcs_bucket
-        blob = _gcs_bucket().blob(blob_path)
-        gcs_local.parent.mkdir(parents=True, exist_ok=True)
-        blob.download_to_filename(str(gcs_local))
-        if gcs_local.is_file():
-            return gcs_local
-    except Exception:
-        pass
-
-    return None
+    from dubora_core.utils.file_store import get_gcs_store
+    return get_gcs_store().get(key)
 
 
 def _parse_context(task: dict) -> dict:

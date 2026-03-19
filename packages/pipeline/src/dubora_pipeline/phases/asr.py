@@ -21,7 +21,7 @@ from typing import Dict
 from dubora_pipeline.phase import Phase
 from dubora_pipeline.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora_pipeline.processors.asr import run as asr_run
-from dubora_pipeline.infra.storage.tos import TosStorage
+from dubora_core.utils.file_store import get_tos_store
 from dubora_core.utils.logger import info
 
 
@@ -101,20 +101,13 @@ class ASRPhase(Phase):
                 if audio_path_str.startswith(("http://", "https://")):
                     audio_url = audio_path_str
                 else:
-                    # 从 video_path 提取系列名
-                    video_path = ctx.config.get("video_path", "")
-                    series = None
-                    if video_path:
-                        video_path_obj = Path(video_path)
-                        if len(video_path_obj.parts) >= 2:
-                            parts = video_path_obj.parts
-                            if "videos" in parts:
-                                idx = parts.index("videos")
-                                if idx + 1 < len(parts):
-                                    series = parts[idx + 1]
-
-                    storage = TosStorage()
-                    audio_url = storage.upload(audio_path, prefix=series)
+                    tos = get_tos_store()
+                    ep = ctx.store.get_episode(ctx.episode_id) if ctx.store and ctx.episode_id else None
+                    drama_name = ep["drama_name"] if ep else "unknown"
+                    ep_number = ep["number"] if ep else "0"
+                    blob_key = f"dramas/{drama_name}/asr/{ep_number}.wav"
+                    tos.write_file(audio_path, blob_key)
+                    audio_url = tos.get_url(blob_key, expires=36000)
 
             # 2. 调用 Processor 层进行 ASR
             result = asr_run(

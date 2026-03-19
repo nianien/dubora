@@ -52,7 +52,7 @@ init_data() {
     vm_ssh "
         sudo mkdir -p ${DATA_DIR}
         sudo chown -R \$(id -u):\$(id -g) ${DATA_DIR%/*}
-        mkdir -p ${DATA_DIR}/{db,web,.gcp}
+        mkdir -p ${DATA_DIR}/{db,.gcp}
     "
 
     log "Stopping container before data sync..."
@@ -96,12 +96,8 @@ deploy_to_vm() {
             --name ${CONTAINER_NAME} \
             --restart unless-stopped \
             -p 80:${PORT} \
-            -v ${DATA_DIR}/db:/data/db \
-            -v ${DATA_DIR}/web:/data/web \
-            -v ${DATA_DIR}/.gcp:/data/.gcp:ro \
+            -v ${DATA_DIR}:/data \
             --env-file ~/.env.dubora \
-            -e DB_DIR=/data/db \
-            -e WEB_DATA_DIR=/data/web \
             -e GOOGLE_APPLICATION_CREDENTIALS=/data/.gcp/pikppo-dubora.json \
             ${IMAGE_URL}
         docker ps --filter name=${CONTAINER_NAME}
