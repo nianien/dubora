@@ -16,7 +16,7 @@ export interface Cue {
   speaker: number       // roles.id FK
   emotion: string
   gender?: string | null
-  kind: 'speech' | 'singing'
+  kind: 'speech' | 'sing'
 }
 
 /** Utterance: self-contained group computed from SRC cues + TTS cache */

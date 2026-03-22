@@ -454,11 +454,11 @@ def main():
     merged = sorted(doubao_utts + filled, key=lambda x: x["start_ms"])
 
     # 歌曲标注：只给命中的段打 sing，其余不加 type
-    singing_texts = [strip_punct(s["text"]) for s in
-                     llm_result.get("primary_sing", []) + llm_result.get("secondary_sing", [])]
+    sing_texts = [strip_punct(s["text"]) for s in
+                  llm_result.get("primary_sing", []) + llm_result.get("secondary_sing", [])]
     for seg in merged:
         sc = strip_punct(seg["text"])
-        if any(st in sc or sc in st for st in singing_texts):
+        if any(st in sc or sc in st for st in sing_texts):
             seg["type"] = "sing"
     print_merged(merged)
 

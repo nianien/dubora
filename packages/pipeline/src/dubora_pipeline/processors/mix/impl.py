@@ -207,7 +207,7 @@ def mix_timeline(
     target_lufs: float = -16.0,
     true_peak: float = -1.0,
     output_path: str,
-    singing_segments: Optional[List[tuple]] = None,
+    sing_segments: Optional[List[tuple]] = None,
 ) -> int:
     """
     Timeline-based mixing using adelay for segment placement.
@@ -332,12 +332,12 @@ def mix_timeline(
         # Single segment - just rename
         filter_parts.append(f"{segment_labels[0]}anull[tts_raw]")
 
-    # Singing segments: extract original vocal windows
-    singing_segments = singing_segments or []
-    singing_vocal_label = None
-    if singing_segments and has_vocals:
-        singing_labels = []
-        for si, (s_start, s_end) in enumerate(singing_segments):
+    # Sing segments: extract original vocal windows
+    sing_segments = sing_segments or []
+    sing_vocal_label = None
+    if sing_segments and has_vocals:
+        sing_labels = []
+        for si, (s_start, s_end) in enumerate(sing_segments):
             s_start_sec = s_start / 1000.0
             s_dur_sec = (s_end - s_start) / 1000.0
             label = f"sing{si}"
@@ -346,16 +346,16 @@ def mix_timeline(
                 f"[{vocals_input_idx}:a]atrim=start={s_start_sec}:duration={s_dur_sec},"
                 f"asetpts=PTS-STARTPTS,adelay={s_start}|{s_start}[{label}]"
             )
-            singing_labels.append(f"[{label}]")
+            sing_labels.append(f"[{label}]")
 
-        if len(singing_labels) > 1:
+        if len(sing_labels) > 1:
             filter_parts.append(
-                f"{''.join(singing_labels)}amix=inputs={len(singing_labels)}:duration=longest:normalize=0[sing_mix]"
+                f"{''.join(sing_labels)}amix=inputs={len(sing_labels)}:duration=longest:normalize=0[sing_mix]"
             )
         else:
-            filter_parts.append(f"{singing_labels[0]}anull[sing_mix]")
-        singing_vocal_label = "[sing_mix]"
-        info(f"Singing segments: {len(singing_segments)} windows, keeping original vocals")
+            filter_parts.append(f"{sing_labels[0]}anull[sing_mix]")
+        sing_vocal_label = "[sing_mix]"
+        info(f"Sing segments: {len(sing_segments)} windows, keeping original vocals")
 
     # Prepare sidechain if needed for ducking
     if not mute_original and mix_mode == "ducking":
@@ -388,19 +388,19 @@ def mix_timeline(
         else:
             filter_parts.append("[orig]anull[orig_duck]")
 
-        if singing_vocal_label:
+        if sing_vocal_label:
             filter_parts.append(
-                f"[bg][orig_duck][tts_mix]{singing_vocal_label}amix=inputs=4:duration=longest:weights=1 1 3 3:normalize=0[mix_raw]"
+                f"[bg][orig_duck][tts_mix]{sing_vocal_label}amix=inputs=4:duration=longest:weights=1 1 3 3:normalize=0[mix_raw]"
             )
         else:
             filter_parts.append(
                 "[bg][orig_duck][tts_mix]amix=inputs=3:duration=longest:weights=1 1 3:normalize=0[mix_raw]"
             )
     else:
-        # Mute original: only BGM + TTS (+ singing vocals if any)
-        if singing_vocal_label:
+        # Mute original: only BGM + TTS (+ sing vocals if any)
+        if sing_vocal_label:
             filter_parts.append(
-                f"[bg][tts_mix]{singing_vocal_label}amix=inputs=3:duration=longest:weights=1 3 3:normalize=0[mix_raw]"
+                f"[bg][tts_mix]{sing_vocal_label}amix=inputs=3:duration=longest:weights=1 3 3:normalize=0[mix_raw]"
             )
         else:
             filter_parts.append(

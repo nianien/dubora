@@ -1,17 +1,14 @@
-"""Parse Phase: 三源 ASR 融合 → DB cues
+"""Parse Phase: ASR 融合 → DB cues
 
 输入：
-- asr.doubao: Doubao VAD 原始响应（word 级时间戳 + speaker + emotion）
-- asr.tencent: 腾讯 ASR 原始响应（逗号级分段 + 说话人 + 情绪）
-- asr.fish: Fish ASR 原始响应（全文 + 字符级时间戳）
+- asr.doubao（必需）
+- asr.tencent / asr.fish（可选，空洞 > 10s 时 asr phase 才会产出）
 
 处理：
-1. 提取 doubao utterances / tencent segments
-2. 构造 primary_text(doubao) + secondary_text(fish) → LLM diff
-3. fuse() 三源融合（Doubao 主干 + 腾讯时间轴填空 + Fish 文本替换）
-4. 歌曲标注（sing）
-5. fill_null_emotions + extend_end_ms
-6. 构建 cue rows → 写文件 + 写 DB
+1. split doubao utterances（标点 + 时间间隔拆分）
+2. 有 fish 时：LLM diff → fuse 三源融合；无 fish 时：只用 doubao
+3. 歌曲标注 + emotion 回填 + end_ms 延长
+4. 构建 cue rows → 写文件 + 写 DB
 """
 import json
 from pathlib import Path
@@ -31,7 +28,7 @@ class ParsePhase(Phase):
     version = "4.0.0"
 
     def requires(self) -> list[str]:
-        return ["asr.doubao", "asr.tencent", "asr.fish"]
+        return ["asr.doubao"]
 
     def provides(self) -> list[str]:
         return []
@@ -43,27 +40,31 @@ class ParsePhase(Phase):
         outputs: ResolvedOutputs,
     ) -> PhaseResult:
         doubao_path = Path(ctx.workspace) / inputs["asr.doubao"].relpath
-        tencent_path = Path(ctx.workspace) / inputs["asr.tencent"].relpath
-        fish_path = Path(ctx.workspace) / inputs["asr.fish"].relpath
+        tencent_path = Path(ctx.workspace) / "asr-tencent.json"
+        fish_path = Path(ctx.workspace) / "asr-fish.json"
 
         from dubora_pipeline.processors.asr.fusion import (
             get_doubao_utterances, split_long_utterances, get_tencent_segments,
-            call_llm_diff, fuse, get_singing_ranges, clamp_overlaps,
+            call_llm_diff, fuse, get_sing_ranges, clamp_overlaps,
             fill_null_emotions, extend_end_ms,
         )
 
         try:
-            # 1. 读取三源数据
+            # 1. 读取数据（tencent/fish 可选）
             with open(doubao_path, "r", encoding="utf-8") as f:
                 doubao_raw = json.load(f)
-            with open(tencent_path, "r", encoding="utf-8") as f:
-                tencent_raw = json.load(f)
-            with open(fish_path, "r", encoding="utf-8") as f:
-                fish_data = json.load(f)
+            tencent_raw = None
+            if tencent_path.exists():
+                with open(tencent_path, "r", encoding="utf-8") as f:
+                    tencent_raw = json.load(f)
+            fish_data = {}
+            if fish_path.exists():
+                with open(fish_path, "r", encoding="utf-8") as f:
+                    fish_data = json.load(f)
 
             total_ms = doubao_raw["audio_info"]["duration"]
             doubao_utts = split_long_utterances(get_doubao_utterances(doubao_raw))
-            tencent_segs = get_tencent_segments(tencent_raw)
+            tencent_segs = get_tencent_segments(tencent_raw) if tencent_raw else []
 
             # 落盘拆分结果供 check
             asr_dir = doubao_path.parent
@@ -115,7 +116,7 @@ class ParsePhase(Phase):
             merged = clamp_overlaps(merged)
 
             # 4. 歌曲标注（用时间范围匹配，不用子串）
-            sing_ranges = get_singing_ranges(
+            sing_ranges = get_sing_ranges(
                 doubao_utts, fish_data,
                 llm_result.get("primary_sing", []),
                 llm_result.get("secondary_sing", []),

@@ -1,10 +1,8 @@
 """
-ASR Phase: 语音识别（可配置多模型并发）
+ASR Phase: 语音识别
 
-根据 asr_models 配置并发调用指定模型，只保存原始结果，不做后处理。
-默认跑 doubao + tencent + fish 三模型。
-
-增量执行：已有 asr-{model}.json 的模型跳过，--force 时全部重跑。
+先跑 doubao，检查空洞总时长。超过 10s 再并发跑 tencent + fish 补充。
+增量执行：已有 asr-{model}.json 的模型跳过。
 
 产出：
   asr-{model}.json: 各模型原始结果
@@ -30,7 +28,7 @@ _MODEL_STORE = {
 
 
 class ASRPhase(Phase):
-    """语音识别 Phase（可配置多模型并发）。"""
+    """语音识别 Phase。"""
 
     name = "asr"
     version = "4.0.0"
@@ -39,7 +37,7 @@ class ASRPhase(Phase):
         return ["extract.audio"]
 
     def provides(self) -> list[str]:
-        return ["asr.doubao", "asr.tencent", "asr.gemini", "asr.openai", "asr.fish"]
+        return ["asr.doubao", "asr.tencent", "asr.fish"]
 
     def run(
         self,
@@ -62,25 +60,8 @@ class ASRPhase(Phase):
                 error=ErrorInfo(type="RuntimeError", message=f"Audio file is empty: {audio_path}"),
             )
 
-        asr_models = ctx.config.get("asr_models", ["doubao"])
         force = ctx.config.get("force", False)
 
-        # 增量跳过：已有结果的模型不再调用（force 时全部重跑）
-        if not force:
-            pending = []
-            for m in asr_models:
-                out = Path(ctx.workspace) / f"asr-{m}.json"
-                if out.exists() and out.stat().st_size > 0:
-                    info(f"ASR: skip {m} (asr-{m}.json exists)")
-                else:
-                    pending.append(m)
-            asr_models = pending
-
-        if not asr_models:
-            info("ASR: all models already have results, nothing to do")
-            return PhaseResult(status="succeeded", outputs=[], metrics={})
-
-        info(f"ASR: models={asr_models}")
         info(f"Audio: {audio_path.name} ({audio_path.stat().st_size / 1024 / 1024:.1f}MB)")
 
         # episode 信息（热词 + blob key）
@@ -98,76 +79,84 @@ class ASRPhase(Phase):
         ep_number = ep["number"] if ep else "0"
         blob_key = f"dramas/{drama_name}/asr/{ep_number}.wav"
 
-        # 按需上传到对应 store
-        stores_needed = {_MODEL_STORE.get(m, "tos") for m in asr_models}
-        urls = {}
-        if "tos" in stores_needed:
-            tos = get_tos_store()
-            tos.write_file(audio_path, blob_key)
-            urls["tos"] = tos.get_url(blob_key, expires=36000)
-        if "gcs" in stores_needed:
-            gcs = get_gcs_store()
-            gcs.write_file(audio_path, blob_key)
-            urls["gcs"] = gcs.get_url(blob_key, expires=36000)
-
         try:
-            tasks = {m: _make_task(m, urls, audio_path, ctx.config, hotwords) for m in asr_models}
-
-            # 并发调用，per-model catch 不互相影响
-            results = {}
-            errors = {}
-            if len(tasks) == 1:
-                model = asr_models[0]
-                try:
-                    results[model] = tasks[model]()
-                except Exception as e:
-                    errors[model] = e
+            # ── 第一步：跑 doubao ──
+            doubao_path = Path(ctx.workspace) / "asr-doubao.json"
+            if not force and doubao_path.exists() and doubao_path.stat().st_size > 0:
+                info("ASR: skip doubao (asr-doubao.json exists)")
+                doubao_result = None
             else:
-                with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
-                    future_map = {pool.submit(fn): m for m, fn in tasks.items()}
-                    for future in as_completed(future_map):
-                        model = future_map[future]
+                info("ASR: running doubao")
+                tos = get_tos_store()
+                tos.write_file(audio_path, blob_key)
+                tos_url = tos.get_url(blob_key, expires=36000)
+                task_fn = _make_task("doubao", {"tos": tos_url}, audio_path, ctx.config, hotwords)
+                doubao_result = task_fn()
+
+            # 保存 doubao 结果
+            actual_outputs = []
+            metrics = {}
+            errors = {}
+            if doubao_result is not None:
+                _save_result("doubao", doubao_result, outputs, ctx.workspace, actual_outputs, metrics)
+
+            # ── 第二步：检查空洞，决定是否跑补充模型 ──
+            extra_models = _check_gaps_and_get_extras(doubao_path)
+
+            if extra_models:
+                # 增量跳过已有结果的
+                if not force:
+                    extra_models = [
+                        m for m in extra_models
+                        if not (Path(ctx.workspace) / f"asr-{m}.json").exists()
+                        or (Path(ctx.workspace) / f"asr-{m}.json").stat().st_size == 0
+                    ]
+
+                if extra_models:
+                    info(f"ASR: running extra models={extra_models}")
+                    # 按需上传
+                    stores_needed = {_MODEL_STORE.get(m, "tos") for m in extra_models}
+                    urls = {}
+                    if "tos" in stores_needed:
+                        tos = get_tos_store()
+                        tos.write_file(audio_path, blob_key)
+                        urls["tos"] = tos.get_url(blob_key, expires=36000)
+                    if "gcs" in stores_needed:
+                        gcs = get_gcs_store()
+                        gcs.write_file(audio_path, blob_key)
+                        urls["gcs"] = gcs.get_url(blob_key, expires=36000)
+
+                    tasks = {m: _make_task(m, urls, audio_path, ctx.config, hotwords) for m in extra_models}
+
+                    if len(tasks) == 1:
+                        model = extra_models[0]
                         try:
-                            results[model] = future.result()
+                            result = tasks[model]()
+                            _save_result(model, result, outputs, ctx.workspace, actual_outputs, metrics)
                         except Exception as e:
                             errors[model] = e
+                    else:
+                        with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
+                            future_map = {pool.submit(fn): m for m, fn in tasks.items()}
+                            for future in as_completed(future_map):
+                                model = future_map[future]
+                                try:
+                                    result = future.result()
+                                    _save_result(model, result, outputs, ctx.workspace, actual_outputs, metrics)
+                                except Exception as e:
+                                    errors[model] = e
 
-            for model, err in errors.items():
-                log_error(f"ASR {model} failed: {err}")
+                    for model, err in errors.items():
+                        log_error(f"ASR {model} failed: {err}")
 
-            if not results:
+            if not actual_outputs and not any(
+                (Path(ctx.workspace) / f"asr-{m}.json").exists() for m in ["doubao", "tencent", "fish"]
+            ):
                 msg = "; ".join(f"{m}: {e}" for m, e in errors.items())
                 return PhaseResult(
                     status="failed",
                     error=ErrorInfo(type="RuntimeError", message=f"All ASR models failed: {msg}"),
                 )
-
-            # 保存成功的模型结果
-            actual_outputs = []
-            metrics = {}
-            for model, result in results.items():
-                artifact_key = f"asr.{model}"
-                out_path = outputs.get(artifact_key)
-                if out_path is None:
-                    out_path = Path(ctx.workspace) / f"asr-{model}.json"
-
-                # doubao 返回 (raw_dict, utterances)，其余返回 dict/list
-                if isinstance(result, tuple):
-                    raw, utts = result
-                    data = raw
-                    metrics[f"{model}_segments"] = len(utts)
-                elif isinstance(result, dict):
-                    data = result
-                    segments = result.get("segments") or result.get("utterances") or []
-                    metrics[f"{model}_segments"] = len(segments)
-                else:
-                    data = {"utterances": result}
-                    metrics[f"{model}_segments"] = len(result)
-
-                with open(out_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                info(f"Saved {artifact_key}: {out_path.name}")
-                actual_outputs.append(artifact_key)
 
             if errors:
                 metrics["failed_models"] = list(errors.keys())
@@ -183,6 +172,63 @@ class ASRPhase(Phase):
                 status="failed",
                 error=ErrorInfo(type=type(e).__name__, message=str(e)),
             )
+
+
+_GAP_THRESHOLD_MS = 10000  # 空洞总时长超过 10s 才调补充模型
+
+
+def _check_gaps_and_get_extras(doubao_path: Path) -> list[str]:
+    """检查 doubao 结果的空洞，决定是否需要补充模型。"""
+    if not doubao_path.exists():
+        return ["tencent", "fish"]
+
+    with open(doubao_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    total_ms = data.get("audio_info", {}).get("duration", 0)
+    utts = data.get("result", {}).get("utterances", [])
+    if not utts or not total_ms:
+        return ["tencent", "fish"]
+
+    from dubora_pipeline.processors.asr.fusion import find_gaps
+    gaps = find_gaps(
+        [{"start_ms": u["start_time"], "end_ms": u["end_time"]} for u in utts],
+        total_ms,
+    )
+    gap_total = sum(e - s for s, e in gaps)
+    info(f"ASR: doubao gaps={len(gaps)}, total_gap={gap_total}ms ({gap_total/1000:.1f}s)")
+
+    if gap_total > _GAP_THRESHOLD_MS:
+        info(f"ASR: gap {gap_total}ms > {_GAP_THRESHOLD_MS}ms, need tencent+fish")
+        return ["tencent", "fish"]
+    else:
+        info(f"ASR: gap {gap_total}ms <= {_GAP_THRESHOLD_MS}ms, skip tencent+fish")
+        return []
+
+
+def _save_result(model: str, result, outputs: ResolvedOutputs, workspace, actual_outputs: list, metrics: dict):
+    """保存单个模型结果到文件。"""
+    artifact_key = f"asr.{model}"
+    out_path = outputs.get(artifact_key)
+    if out_path is None:
+        out_path = Path(workspace) / f"asr-{model}.json"
+
+    if isinstance(result, tuple):
+        raw, utts = result
+        data = raw
+        metrics[f"{model}_segments"] = len(utts)
+    elif isinstance(result, dict):
+        data = result
+        segments = result.get("segments") or result.get("utterances") or []
+        metrics[f"{model}_segments"] = len(segments)
+    else:
+        data = {"utterances": result}
+        metrics[f"{model}_segments"] = len(result)
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    info(f"Saved {artifact_key}: {Path(out_path).name}")
+    actual_outputs.append(artifact_key)
 
 
 def _make_task(model: str, urls: dict, audio_path: Path, config: dict, hotwords=None):

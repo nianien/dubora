@@ -313,8 +313,8 @@ export function TranscriptList() {
         dividerAfter: true,
       },
       {
-        label: cue.kind === 'singing' ? '设为对白' : '设为歌唱',
-        onClick: () => updateField(cueId, 'kind', cue.kind, cue.kind === 'singing' ? 'speech' : 'singing'),
+        label: cue.kind === 'sing' ? '设为对白' : '设为歌唱',
+        onClick: () => updateField(cueId, 'kind', cue.kind, cue.kind === 'sing' ? 'speech' : 'sing'),
         dividerAfter: true,
       },
       {
@@ -409,8 +409,8 @@ export function TranscriptList() {
                 onClose={closeDropdown}
               />
 
-              {/* Type toggle: speech / singing */}
-              {cue.kind === 'singing' && (
+              {/* Type toggle: speech / sing */}
+              {cue.kind === 'sing' && (
                 <button
                   onClick={e => { e.stopPropagation(); updateField(cue.id, 'kind', cue.kind, 'speech') }}
                   className="shrink-0 pt-1 text-xs px-1.5 py-0.5 rounded bg-pink-800 text-pink-200 hover:brightness-125"

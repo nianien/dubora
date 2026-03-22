@@ -110,7 +110,7 @@ def run_timeline(
     true_peak: float = -1.0,
     output_path: str,
     duration_tolerance_ms: int = 50,
-    singing_segments: Optional[list] = None,
+    sing_segments: Optional[list] = None,
 ) -> ProcessorResult:
     """
     Timeline-based mixing using adelay for segment placement.
@@ -158,7 +158,7 @@ def run_timeline(
         target_lufs=target_lufs,
         true_peak=true_peak,
         output_path=output_path,
-        singing_segments=singing_segments,
+        sing_segments=sing_segments,
     )
 
     return ProcessorResult(

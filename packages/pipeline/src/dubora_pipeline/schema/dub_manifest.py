@@ -123,7 +123,7 @@ def dub_manifest_from_utterances(utterances: list[dict], audio_duration_ms: int)
     """
     dub_utts = []
     for u in utterances:
-        if u.get("kind") == "singing":
+        if u.get("kind") == "sing":
             continue
         en_text = u.get("text_en", "").strip()
         if not en_text:

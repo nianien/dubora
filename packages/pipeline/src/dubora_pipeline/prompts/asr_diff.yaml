@@ -28,8 +28,8 @@ system: |
   判断依据：与前后对话在语境上无关联、具有歌词的抒情/叙事风格、可能带韵脚。
   不确定时不标注。
 
-  ## 重要：diff 和 singing 独立判断
-  diff 和 singing 是两个独立维度，互不影响。副本独有的歌词必须同时出现在 diff 和 secondary_sing 中。
+  ## 重要：diff 和 sing 独立判断
+  diff 和 sing 是两个独立维度，互不影响。副本独有的歌词必须同时出现在 diff 和 secondary_sing 中。
 
   ## 输出要求
   - text 必须是对应全文的精确子串，不得改写、合并或补充

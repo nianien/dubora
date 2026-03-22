@@ -259,7 +259,7 @@ CREATE TABLE cues (
     speaker      TEXT NOT NULL DEFAULT '',        -- 实际存 roles.id 的整数字符串
     emotion      TEXT NOT NULL DEFAULT 'neutral',
     gender       TEXT,
-    kind         TEXT NOT NULL DEFAULT 'speech',  -- 'speech' 或 'singing'
+    kind         TEXT NOT NULL DEFAULT 'speech',  -- 'speech' 或 'sing'
     created_at   TEXT NOT NULL,
     updated_at   TEXT NOT NULL
 );
@@ -499,7 +499,7 @@ str_roles_map = {str(k): v for k, v in roles_map.items()}
 **Timeline-First 架构**：
 - 用 FFmpeg `adelay` 滤镜将每段 TTS 精确放置到时间轴位置
 - 伴奏轨 + TTS 轨混合，TTS 播放时伴奏自动压低（ducking，10:1 压缩比）
-- Singing cues (kind='singing') 保留原始人声时间窗
+- Sing cues (kind='sing') 保留原始人声时间窗
 - `apad + atrim` 强制输出与原音频等长
 - 校验输出时长 (tolerance ±50ms)
 

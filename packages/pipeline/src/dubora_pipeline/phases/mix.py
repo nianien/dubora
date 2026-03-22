@@ -109,17 +109,17 @@ class MixPhase(Phase):
         succeeded_utts = [u for u in all_utts if not u.get("tts_error")]
         dub_manifest = dub_manifest_from_utterances(succeeded_utts, audio_duration_ms)
 
-        # Extract singing segments from SRC cues (keep original vocals for these time windows)
+        # Extract sing segments from SRC cues (keep original vocals for these time windows)
         src_cues = store.get_cues(episode_id)
-        singing_segments = [
+        sing_segments = [
             (c["start_ms"], c["end_ms"])
             for c in src_cues
-            if c.get("kind") == "singing"
+            if c.get("kind") == "sing"
         ]
 
         info(f"Loaded {len(all_utts)} utterances from DB, {len(succeeded_utts)} succeeded, {len(dub_manifest.utterances)} with translations")
-        if singing_segments:
-            info(f"Found {len(singing_segments)} singing segments to preserve")
+        if sing_segments:
+            info(f"Found {len(sing_segments)} sing segments to preserve")
 
         # 获取 accompaniment / vocals（可选，路径动态计算）
         from dubora_core.manifest import resolve_artifact_path
@@ -183,7 +183,7 @@ class MixPhase(Phase):
                 true_peak=true_peak,
                 output_path=str(mix_path),
                 duration_tolerance_ms=duration_tolerance_ms,
-                singing_segments=singing_segments,
+                sing_segments=sing_segments,
             )
 
             if not mix_path.exists():

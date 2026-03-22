@@ -240,7 +240,7 @@ def is_duplicate(text: str, doubao_utts: list[dict]) -> bool:
             continue
         if t in u_clean or u_clean in t:
             return True
-        if lcs_ratio(t, u_clean, use_min=True) >= 0.6:
+        if lcs_ratio(t, u_clean) >= 0.6:
             return True
     return False
 
@@ -275,7 +275,7 @@ def _seg_range_ms(char_to_seg: dict, segments: list, start: int, end: int) -> tu
 
 # ── 歌曲时间范围 ─────────────────────────────────────────────────────────
 
-def get_singing_ranges(
+def get_sing_ranges(
     doubao_utts: list[dict],
     fish_data: dict,
     primary_sing: list[dict],
@@ -383,7 +383,7 @@ def _split_fish_by_pause(
     # 最后一段
     chunk = text[prev:]
     if chunk.strip():
-        r = _seg_range_ms(char_to_seg, segments, start + prev, start + end - start)
+        r = _seg_range_ms(char_to_seg, segments, start + prev, end)
         if r is not None:
             result.append({"text": chunk, "start_ms": r[0], "end_ms": r[1]})
     return result
@@ -428,6 +428,7 @@ def fuse(doubao_utts: list[dict], tencent_segs: list[dict],
             filled.append(_make_fish_seg(fs, spk))
             continue
 
+        # 跳过离当前 fish 句太远的 TC 段（>15s），视为 TC 幻觉，丢弃不保留
         while tc_idx < len(gap_tc) and gap_tc[tc_idx]["end_ms"] < fs["start_ms"] - 15000:
             tc_idx += 1
 
@@ -465,6 +466,12 @@ def fuse(doubao_utts: list[dict], tencent_segs: list[dict],
         else:
             filled.append(_make_seg(gap_tc[tc_idx], fs["text"], "tencent+fish"))
             tc_idx += 1
+
+    # 剩余未匹配的 TC 段也保留（腾讯识别到但 Fish 没有的内容）
+    while tc_idx < len(gap_tc):
+        tc = gap_tc[tc_idx]
+        filled.append(_make_seg(tc, tc["text"], "tencent"))
+        tc_idx += 1
 
     info(f"Fusion: filled {len(filled)} segments in gaps")
     return filled
