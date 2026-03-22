@@ -25,36 +25,10 @@ from .types import (
     SegmentList,
     SrtCueList,
 )
-from .subtitle_model import (
-    SubtitleModel,
-    SubtitleCue,
-    SubtitleUtterance,
-    SpeakerInfo,
-    EmotionInfo,
-    SourceText,
-    SpeechRate,
-    SchemaInfo,
-)
-from .asr_model import (
-    AsrModel,
-    AsrSegment,
-    AsrSegmentFlags,
-    AsrMediaInfo,
-    AsrHistory,
-    AsrFingerprint,
-)
 
 __all__ = [
-    # ASR Model
-    "AsrModel",
-    "AsrSegment",
-    "AsrSegmentFlags",
-    "AsrMediaInfo",
-    "AsrHistory",
-    "AsrFingerprint",
-    # Generic types
     "Word",
-    "Utterance",  # ASR 原始响应（schema/types.py）
+    "Utterance",
     "Segment",
     "SrtCue",
     "SubtitleSegment",
@@ -62,13 +36,4 @@ __all__ = [
     "UtteranceList",
     "SegmentList",
     "SrtCueList",
-    # Subtitle Model v1.3
-    "SubtitleModel",
-    "SubtitleCue",
-    "SubtitleUtterance",  # Subtitle Model 中的 Utterance（避免与 ASR Utterance 冲突）
-    "SpeakerInfo",
-    "EmotionInfo",
-    "SourceText",
-    "SpeechRate",
-    "SchemaInfo",
 ]

@@ -65,6 +65,9 @@ def build_phases(config=None) -> list:
     asr_use_vocals = getattr(config, "asr_use_vocals", False) if config else False
     asr_input = "extract.vocals" if asr_use_vocals else "extract.audio"
 
+    asr_models = getattr(config, "asr_models", ["doubao", "tencent", "fish"]) if config else ["doubao", "tencent", "fish"]
+    asr_provides = [f"asr.{m}" for m in asr_models]
+
     return [
         _LazyPhase(
             "dubora_pipeline.phases.extract", "ExtractPhase",
@@ -74,14 +77,14 @@ def build_phases(config=None) -> list:
         ),
         _LazyPhase(
             "dubora_pipeline.phases.asr", "ASRPhase",
-            name="asr", version="1.0.0",
-            requires=[asr_input], provides=["asr.asr_result"],
+            name="asr", version="4.0.0",
+            requires=[asr_input], provides=asr_provides,
             label="语音识别",
         ),
         _LazyPhase(
             "dubora_pipeline.phases.parse", "ParsePhase",
-            name="parse", version="2.0.0",
-            requires=["asr.asr_result"], provides=[],
+            name="parse", version="4.0.0",
+            requires=["asr.doubao", "asr.tencent", "asr.fish"], provides=[],
             label="生成字幕",
         ),
         # ← Gate: source_review (校准)

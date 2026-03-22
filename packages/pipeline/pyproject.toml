@@ -1,4 +1,4 @@
-[project]
+
 name = "dubora-pipeline"
 version = "2.0.0"
 description = "Dubora pipeline: heavy execution phases (extract, asr, tts, etc.)"
@@ -13,6 +13,7 @@ dependencies = [
   "pydub>=0.25.1",
   "tqdm>=4.66.0",
   "tos>=2.6.0",
+  "fish-audio-sdk>=0.1.0",
 ]
 
 [project.scripts]

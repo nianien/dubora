@@ -29,7 +29,11 @@ def resolve_artifact_path(key: str, workspace: Path) -> Path:
             "accompaniment": "{episode_stem}-accompaniment.wav",
         },
         "asr": {
-            "asr_result": "asr-result.json",
+            "doubao": "asr-doubao.json",
+            "tencent": "asr-tencent.json",
+            "gemini": "asr-gemini.json",
+            "openai": "asr-openai.json",
+            "fish": "asr-fish.json",
         },
         "subs": {
             "zh_srt": "output/{episode_stem}-zh.srt",

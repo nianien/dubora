@@ -36,8 +36,8 @@ Gate:                        ↑              ↑
 | Phase | 职责 | 技术 |
 |-------|------|------|
 | extract | 提取音频 + 人声/伴奏分离 | FFmpeg + Demucs v4 |
-| asr | 语音识别 + 说话人分离 | Doubao ASR (ByteDance) |
-| parse | ASR 后处理 → DB cues (含 reseg + emotion) | 本地 + LLM |
+| asr | 双源 ASR：Doubao VAD (word-level) + Gemini (分段/说话人/情绪) | Doubao ASR + Gemini |
+| parse | Gemini 骨架 + Doubao 文本 → LLM 校准 → end_ms 延长 → DB cues | Gemini LLM |
 | translate | 增量翻译 (utterance 级, per-cue 回填) | OpenAI / Gemini |
 | tts | 语音合成 (增量, voice_hash 判脏) + drift_score 检查 | VolcEngine seed-tts-1.0 |
 | mix | 混音 (adelay timeline placement) | FFmpeg |
@@ -47,8 +47,8 @@ Gate:                        ↑              ↑
 
 ```
 extract → audio.wav, vocals.wav, accompaniment.wav (文件)
-asr     → asr-result.json (文件)
-parse   → DB cues 表 (含 reseg + emotion 修正)
+asr     → asr-doubao.json + asr-gemini.json (双源原始响应)
+parse   → asr-calibrated.json (LLM 校准中间结果) → asr-result.json → DB cues 表
   ── [source_review gate: 人工在 IDE 中校准] ──
 translate → DB cues.text_en (翻译回填) + utterances (分组 + TTS 缓存)
   ── [translation_review gate: 人工审阅翻译] ──
@@ -173,7 +173,10 @@ data/                                    # 数据根 (env: DATA_DIR)
 |   +-- {集号}.wav                      #   提取的音频
 |   +-- {集号}-vocals.wav               #   人声
 |   +-- {集号}-accompaniment.wav        #   伴奏
-|   +-- asr-result.json                 #   ASR 原始输出
+|   +-- asr-doubao.json                 #   Doubao VAD 原始响应
+|   +-- asr-gemini.json                 #   Gemini ASR 结果
+|   +-- asr-calibrated.json             #   LLM 校准中间结果（排查用）
+|   +-- asr-result.json                 #   最终 cue rows（parse 产出）
 |   +-- voice-assignment.json           #   声线分配快照
 |   +-- {集号}-mix.wav                  #   最终混音
 |   +-- tts/                            #   TTS 产物
@@ -368,36 +371,41 @@ ASR 输出 speaker="0","1" → parse phase: ensure_role(drama_id, "0") → role.
 
 Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU），但显著提升 ASR 准确率和混音质量。
 
-### 4.2 ASR（语音识别 + 说话人分离）
+### 4.2 ASR（双源语音识别）
 
 | | |
 |---|---|
 | **输入** | `extract.audio`（可配置为 `extract.vocals`） |
-| **输出** | `asr.asr_result` -> JSON (原始 ASR 响应) |
-| **服务** | 豆包大模型 ASR (ByteDance) |
-| **预设** | `asr_spk_semantic`（语义分句 + Speaker Diarization） |
+| **输出** | `asr.doubao` (Doubao VAD 原始响应), `asr.gemini` (Gemini ASR 结果) |
+| **服务** | Doubao ASR (ByteDance) + Google Gemini |
+| **预设** | Doubao: `asr_vad_spk`, Gemini: 配置项 `asr_gemini_model` |
+
+**双源分工**：
+- **Doubao VAD**: word 级时间戳 + 方言文本准确（作为文本 SSOT）
+- **Gemini**: 分段骨架 + 说话人区分 + 情绪标注（文本会被 Doubao 替换）
 
 **流程**：
-1. 音频上传至 TOS（火山引擎对象存储），基于内容哈希去重
-2. 调用豆包 ASR API（submit -> poll query）
-3. 返回 word 级时间戳 + speaker 标签 + emotion/gender
-4. ASR 热词从 DB dictionary 表 (type='name') 自动加载
+1. 音频同时上传至 TOS + GCS（同一个 blob_key）
+2. 并发调用 Doubao VAD + Gemini ASR（各自用 store 获取签名 URL）
+3. 保存双源原始响应：`asr-doubao.json` + `asr-gemini.json`
+4. ASR 热词从 DB glossary 表 (type='name') 自动加载
 
-### 4.3 Parse（ASR 后处理 → DB cues）
+### 4.3 Parse（双源校准 → DB cues）
 
 | | |
 |---|---|
-| **输入** | `asr.asr_result` |
-| **输出** | DB cues 表 (写入 cues) |
-| **核心逻辑** | ASR 结果 → Utterance Normalization → reseg (LLM 断句) → emotion_correct (LLM 情绪修正) → 写 DB |
+| **输入** | `asr.doubao` (Doubao VAD 原始响应), `asr.gemini` (Gemini ASR 结果) |
+| **输出** | DB cues 表 (写入 cues), `asr-calibrated.json` (排查用), `asr-result.json` (最终 cue rows) |
+| **核心逻辑** | Gemini 骨架 + Doubao word 级文本 → 时间窗口截取 → LLM 语义裁剪 → emotion 回填 → end_ms 延长 → 写 DB |
 
 **流程**：
-1. ASR raw JSON → parse_utterances() → segments
-2. Utterance Normalization：基于静音间隔拆分、speaker 变化硬边界、最大时长约束
-3. Reseg (LLM)：对超长段使用 LLM 语义断句
-4. Emotion Correct (LLM)：根据台词语义修正情绪标注
-5. 为每个 speaker 调 `ensure_role()` 创建角色 (speaker name → role.id)
-6. 清空旧 cues + utterances，全量写入新 cues
+1. 读取双源结果：`asr-doubao.json` + `asr-gemini.json`
+2. 时间窗口截取（`extract_vad_windows`）：按 Gemini 每条的 [start_ms-buffer, end_ms+buffer] 从 Doubao word 流截取局部 VAD 文本，生成 `{idx, gemini_text, vad_text}` 配对
+3. LLM 校准（`llm_calibrate`）：LLM 在每条的 vad_text 范围内做语义裁剪替换（VAD 为准，Gemini 可能普通话意译）
+4. 落盘 `asr-calibrated.json`（LLM 原始返回，排查用）
+5. emotion 回填（`fill_null_emotions`）：从相邻同 speaker 段继承
+6. end_ms 延长（`extend_end_ms`）：保证字幕最小显示时长
+7. 清空旧 cues + utterances，全量写入新 cues
 
 Parse 完成后进入 `source_review` 门控，等待人工在 IDE 中校准。
 
@@ -628,11 +636,12 @@ PUT  /episodes/{drama}/roles  → body: {"roles": [{id?, name, voice_type, role_
 
 | 服务 | 用途 | 环境变量 |
 |------|------|---------|
-| **豆包 ASR** | 中文语音识别 + 说话人分离 | `DOUBAO_APPID`, `DOUBAO_ACCESS_TOKEN` |
-| **火山引擎 TOS** | 音频文件存储（ASR 需要） | `TOS_ACCESS_KEY_ID`, `TOS_SECRET_ACCESS_KEY` |
+| **豆包 ASR** | 中文语音识别 (VAD word-level) | `DOUBAO_APPID`, `DOUBAO_ACCESS_TOKEN` |
+| **火山引擎 TOS** | 音频文件存储（Doubao ASR 用） | `TOS_ACCESS_KEY_ID`, `TOS_SECRET_ACCESS_KEY` |
+| **Google Cloud Storage** | 音频文件存储（Gemini ASR 用） | `GCS_*` env vars |
 | **火山引擎 TTS** | 英文语音合成 | 同豆包 credentials |
 | **OpenAI** | 翻译（GPT-4o-mini）、重断句、情绪修正 | `OPENAI_API_KEY` |
-| **Gemini** | 翻译（Gemini 2.0 Flash，默认引擎） | `GEMINI_API_KEY` |
+| **Gemini** | ASR + 校准 + 翻译（Gemini 2.0 Flash） | `GEMINI_API_KEY` |
 | **Demucs** | 人声分离 | 本地 |
 | **FFmpeg** | 音频/视频处理 | 本地 |
 
@@ -740,5 +749,5 @@ vsd-pipeline worker --api-url http://web:8765
 **移除的 Phase**：
 | Phase | 原因 | 替代 |
 |-------|------|------|
-| reseg | 合并到 parse | parse 内部调用 reseg processor |
+| reseg | 已移除 | v3.0 双源校准替代了单源 reseg |
 | align | 职责拆分 | drift check → tts, SRT 生成 → burn |

@@ -109,6 +109,7 @@ class PipelineWorker:
         config_dict = asdict(config)
         config_dict["video_path"] = str(video_path.absolute()) if video_path else ""
         config_dict["phases"] = {}
+        config_dict["force"] = bool(task_ctx.get("force", False))
         ctx = RunContext(
             job_id=str(episode_id),
             workspace=str(workdir),

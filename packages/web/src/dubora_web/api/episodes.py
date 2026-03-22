@@ -200,7 +200,7 @@ async def upload_cover(request: Request, drama_id: int, file: UploadFile) -> dic
         raise HTTPException(status_code=400, detail=f"Only {', '.join(_ALLOWED_IMAGE_EXTS)} allowed")
 
     content = await file.read()
-    key = f"dramas/{drama_name}/0{ext}"
+    key = f"dramas/{drama_name}/videos/0{ext}"
 
     from dubora_core.utils.file_store import get_gcs_store
     gcs = get_gcs_store()
@@ -257,7 +257,7 @@ async def upload_video(request: Request, drama_id: int, file: UploadFile) -> dic
     ep_number = m.group(1)  # stripped leading zeros
 
     content = await file.read()
-    key = f"dramas/{drama_name}/{ep_number}{ext}"
+    key = f"dramas/{drama_name}/videos/{ep_number}{ext}"
 
     from dubora_core.utils.file_store import get_gcs_store
     gcs = get_gcs_store()
@@ -357,7 +357,7 @@ async def list_episodes(request: Request) -> List[dict]:
         ep_id = r["id"]
         workdir = get_workdir(r["drama_name"], r["number"])
 
-        has_asr_result = (workdir / "asr-result.json").is_file()
+        has_asr_result = (workdir / "asr-doubao.json").is_file()
         has_asr_model = ep_id in episodes_with_cues
 
         # video_file should point to original video, not dubbed output

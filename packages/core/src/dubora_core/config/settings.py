@@ -126,9 +126,9 @@ def get_openai_key() -> str | None:
 def get_gemini_key() -> str | None:
     """
     仅从系统环境变量读取。
-    优先使用官方 GEMINI_API_KEY，回退到 GEMINI_KEY。
+    优先使用官方 GEMINI_API_KEY，回退到 GOOGLE_API_KEY。
     """
-    return os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_KEY")
+    return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 
 def get_azure_speech_key() -> str | None:
@@ -150,29 +150,13 @@ def get_azure_speech_region() -> str | None:
 @dataclass
 class PipelineConfig:
     # ── ASR 配置 ──
-    doubao_asr_preset: str = "asr_spk_semantic"
-    doubao_audio_url: str | None = None  # 音频 URL（None = 自动上传 TOS）
     asr_use_vocals: bool = False  # True = 用分离后的 vocals 做 ASR
-
-    # ── SUB 配置 ──
-    doubao_postprofile: str = "axis"  # 后处理策略：axis / axis_default / axis_soft
-    # Utterance Normalization（speech + silence 重建 utterance 边界）
-    utt_norm_silence_split_threshold_ms: int = 450  # 静音切分阈值 (300-600)
-    utt_norm_min_duration_ms: int = 900  # 最小 utterance 时长 (500-1500)
-    utt_norm_max_duration_ms: int = 5000  # 最大 utterance 时长 (5000-12000)
-    utt_norm_trailing_silence_cap_ms: int = 350  # 尾部静音上限 (200-500)
-    utt_norm_keep_gap_as_field: bool = True  # 保留 gap 为独立字段
-
-    # ── RESEG 配置 ──
-    reseg_enabled: bool = True              # 是否启用 LLM 断句
-    reseg_min_chars: int = 6                # 拆分后每段最少中文字数（防止碎片；原句超标时自动放宽到 3）
-    reseg_max_chars_trigger: int = 25       # 触发拆分的字数阈值
-    reseg_max_duration_trigger: int = 6000  # 触发拆分的时长阈值（ms）
+    asr_models: list = field(default_factory=lambda: [m.strip() for m in os.getenv("ASR_MODELS", "doubao,tencent,fish").split(",")])
+    asr_gemini_model: str = field(default_factory=lambda: os.getenv("ASR_GEMINI_MODEL", "gemini-3.1-pro-preview"))
 
     # ── MT 配置 ──
     gemini_model: str = "gemini-2.0-flash"
     openai_model: str = "gpt-4o-mini"
-    openai_temperature: float = 0.3
 
     # ── TTS 配置 ──
     tts_engine: str = "volcengine"  # volcengine / azure

@@ -1,12 +1,13 @@
 """
-ASR Processor 模块（唯一公共入口）
+ASR Processor 模块
 
 公共 API：
-- run(): 唯一对外入口（调用 ASR 服务）
+- transcribe(): Doubao ASR 调用
 
-内部模块（不直接导入）：
-- impl.py: 内部实现
+内部模块：
+- impl.py: Doubao ASR 实现
+- fusion.py: 后处理算法（emotion 回填、end_ms 延长等）
 """
-from .processor import run
+from .impl import transcribe
 
-__all__ = ["run"]
+__all__ = ["transcribe"]

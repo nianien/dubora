@@ -13,7 +13,7 @@ VENV := .venv
 PIP  := $(VENV)/bin/pip
 PY   := $(VENV)/bin/python
 
-.PHONY: help clean install-core install-pipeline install-web install-all install-dev test lint
+.PHONY: help clean install-core install-pipeline install-web install-all install-dev install-test test lint
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -26,6 +26,7 @@ help:
 	@echo "  make install-web       - Install dubora-core + dubora-web"
 	@echo "  make install-all       - Install all three packages (editable)"
 	@echo "  make install-dev       - Dev tools (pytest, ruff)"
+	@echo "  make install-test     - Test dependencies (openai, genai, tencent, etc.)"
 	@echo ""
 	@echo "Dev:"
 	@echo "  make test              - Run tests"
@@ -70,6 +71,10 @@ install-all: install-core
 install-dev:
 	@echo "Installing dev tools..."
 	@$(PIP) install -e ".[dev]"
+
+install-test: install-pipeline
+	@echo "Installing test dependencies..."
+	@$(PIP) install -e ".[test]"
 
 # ============================================================================
 # Dev commands

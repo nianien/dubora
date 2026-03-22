@@ -13,6 +13,13 @@ dev = [
   "black>=23.0.0",
   "ruff>=0.1.0",
 ]
+test = [
+  "dubora-pipeline",
+  "openai>=1.0.0",
+  "tencentcloud-sdk-python-asr>=3.0.0",
+  "dashscope>=1.14.0",
+  "fish-audio-sdk>=0.1.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
