@@ -98,6 +98,11 @@ def get_db_path() -> Path:
     return get_db_dir() / "dubora.db"
 
 
+def get_database_url() -> str:
+    """DB_URL env var. Default: postgresql://localhost:5432/dubora."""
+    return os.getenv("DB_URL", "postgresql://localhost:5432/dubora")
+
+
 def get_workdir(drama_name: str, episode_number: int) -> Path:
     return get_drama_dir(drama_name) / str(episode_number)
 

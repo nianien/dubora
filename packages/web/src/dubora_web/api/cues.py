@@ -14,10 +14,6 @@ from dubora_web.api._helpers import get_user_id
 router = APIRouter()
 
 
-def _get_store(db_path: Path) -> DbStore:
-    return DbStore(db_path)
-
-
 def _resolve_episode(store: DbStore, drama: str, ep: str, user_id: int | None = None) -> int:
     """Lookup episode by drama name + number. Raises 404 if not found."""
     episode = store.get_episode_by_names(drama, int(ep), user_id=user_id)
@@ -29,7 +25,7 @@ def _resolve_episode(store: DbStore, drama: str, ep: str, user_id: int | None = 
 @router.get("/episodes/{drama}/{ep}/cues")
 async def get_cues(request: Request, drama: str, ep: str) -> dict:
     """Get cues for an episode."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     episode_id = _resolve_episode(store, drama, ep, user_id=get_user_id(request))
     cues = store.get_cues(episode_id)
     return {"cues": cues}
@@ -41,7 +37,7 @@ async def put_cues(request: Request, drama: str, ep: str) -> dict:
 
     diff_and_save automatically calls calculate_utterances() at the end.
     """
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     episode_id = _resolve_episode(store, drama, ep, user_id=get_user_id(request))
 
     body = await request.json()
@@ -56,7 +52,7 @@ async def put_cues(request: Request, drama: str, ep: str) -> dict:
 @router.get("/episodes/{drama}/{ep}/utterances")
 async def get_utterances(request: Request, drama: str, ep: str) -> dict:
     """Get enriched utterances for an episode."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     episode_id = _resolve_episode(store, drama, ep, user_id=get_user_id(request))
 
     # Ensure utterances exist (lazy calculate if cues exist but utterances don't)

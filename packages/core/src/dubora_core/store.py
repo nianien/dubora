@@ -1,5 +1,5 @@
 """
-DbStore: SQLite-backed storage for all entity CRUD.
+DbStore: PostgreSQL-backed storage for all entity CRUD.
 
 Tables:
   users             — registered users
@@ -16,10 +16,10 @@ Tables:
   artifacts         — final deliverables (zh_srt, en_srt, dubbed_video) with local + GCS paths
 """
 import json
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from datetime import datetime, timezone
 from hashlib import sha256
-from pathlib import Path
 from typing import Optional
 
 
@@ -46,23 +46,38 @@ def _compute_voice_hash(text_en: str, speaker: str = "", emotion: str = "") -> s
 
 
 class DbStore:
-    """SQLite storage for pipeline state."""
+    """PostgreSQL storage for pipeline state."""
 
-    def __init__(self, db_path: Path):
-        self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=30)
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.execute("PRAGMA busy_timeout=10000")
+    def __init__(self, database_url: str):
+        self._database_url = database_url
+        self._conn = psycopg2.connect(
+            database_url,
+            cursor_factory=psycopg2.extras.RealDictCursor,
+        )
         self._init_schema()
 
+    def _execute(self, sql, params=None):
+        """Execute SQL and return cursor. Auto-reconnects and rolls back on error."""
+        try:
+            cur = self._conn.cursor()
+            cur.execute(sql, params)
+            return cur
+        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+            self._conn = psycopg2.connect(
+                self._database_url,
+                cursor_factory=psycopg2.extras.RealDictCursor,
+            )
+            cur = self._conn.cursor()
+            cur.execute(sql, params)
+            return cur
+        except Exception:
+            self._conn.rollback()
+            raise
+
     def _init_schema(self) -> None:
-        self._conn.executescript("""
+        self._execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 name        TEXT NOT NULL DEFAULT '',
                 email       TEXT NOT NULL UNIQUE,
                 picture     TEXT NOT NULL DEFAULT '',
@@ -71,7 +86,7 @@ class DbStore:
             );
 
             CREATE TABLE IF NOT EXISTS user_auths (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 user_id     INTEGER NOT NULL REFERENCES users(id),
                 provider    TEXT NOT NULL,
                 provider_id TEXT NOT NULL,
@@ -83,7 +98,7 @@ class DbStore:
             );
 
             CREATE TABLE IF NOT EXISTS dramas (
-                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                id               SERIAL PRIMARY KEY,
                 name             TEXT NOT NULL,
                 user_id          INTEGER NOT NULL REFERENCES users(id),
                 synopsis         TEXT NOT NULL DEFAULT '',
@@ -95,7 +110,7 @@ class DbStore:
             );
 
             CREATE TABLE IF NOT EXISTS episodes (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 drama_id    INTEGER NOT NULL REFERENCES dramas(id),
                 number      INTEGER NOT NULL,
                 path        TEXT NOT NULL DEFAULT '',
@@ -106,7 +121,7 @@ class DbStore:
             );
 
             CREATE TABLE IF NOT EXISTS tasks (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 drama_id    INTEGER NOT NULL,
                 episode_id  INTEGER NOT NULL REFERENCES episodes(id),
                 type        TEXT NOT NULL,
@@ -119,7 +134,7 @@ class DbStore:
             );
 
             CREATE TABLE IF NOT EXISTS events (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 task_id     INTEGER NOT NULL REFERENCES tasks(id),
                 ts          TEXT NOT NULL,
                 kind        TEXT NOT NULL,
@@ -128,7 +143,7 @@ class DbStore:
             CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
 
             CREATE TABLE IF NOT EXISTS utterances (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                id              SERIAL PRIMARY KEY,
                 episode_id      INTEGER NOT NULL REFERENCES episodes(id),
                 text_cn         TEXT NOT NULL DEFAULT '',
                 text_en         TEXT NOT NULL DEFAULT '',
@@ -150,14 +165,8 @@ class DbStore:
             );
             CREATE INDEX IF NOT EXISTS idx_utterances_episode ON utterances(episode_id);
 
-            CREATE TABLE IF NOT EXISTS utterance_cues (
-                utterance_id INTEGER NOT NULL REFERENCES utterances(id),
-                cue_id       INTEGER NOT NULL REFERENCES cues(id),
-                PRIMARY KEY (utterance_id, cue_id)
-            );
-
             CREATE TABLE IF NOT EXISTS cues (
-                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                id           SERIAL PRIMARY KEY,
                 episode_id   INTEGER NOT NULL REFERENCES episodes(id),
                 text         TEXT NOT NULL DEFAULT '',
                 text_en      TEXT NOT NULL DEFAULT '',
@@ -172,8 +181,14 @@ class DbStore:
             );
             CREATE INDEX IF NOT EXISTS idx_cues_episode ON cues(episode_id);
 
+            CREATE TABLE IF NOT EXISTS utterance_cues (
+                utterance_id INTEGER NOT NULL REFERENCES utterances(id),
+                cue_id       INTEGER NOT NULL REFERENCES cues(id),
+                PRIMARY KEY (utterance_id, cue_id)
+            );
+
             CREATE TABLE IF NOT EXISTS roles (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                id            SERIAL PRIMARY KEY,
                 drama_id      INTEGER NOT NULL REFERENCES dramas(id),
                 name          TEXT NOT NULL,
                 voice_type    TEXT NOT NULL DEFAULT '',
@@ -183,7 +198,7 @@ class DbStore:
             );
 
             CREATE TABLE IF NOT EXISTS glossary (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 drama_id    INTEGER NOT NULL REFERENCES dramas(id),
                 type        TEXT NOT NULL,
                 src         TEXT NOT NULL,
@@ -192,7 +207,7 @@ class DbStore:
             );
 
             CREATE TABLE IF NOT EXISTS artifacts (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 episode_id  INTEGER NOT NULL REFERENCES episodes(id),
                 kind        TEXT NOT NULL,
                 gcs_path    TEXT,
@@ -201,6 +216,7 @@ class DbStore:
                 UNIQUE(episode_id, kind)
             );
         """)
+        self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()
@@ -210,16 +226,16 @@ class DbStore:
     def upsert_user(self, *, email: str, name: str = "", picture: str = "") -> int:
         """Insert or update a user by email. Returns user_id."""
         now = _now_iso()
-        self._conn.execute(
+        self._execute(
             """INSERT INTO users (email, name, picture, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?)
+               VALUES (%s, %s, %s, %s, %s)
                ON CONFLICT(email) DO UPDATE SET
                    name=excluded.name, picture=excluded.picture,
                    updated_at=excluded.updated_at""",
             (email, name, picture, now, now),
         )
         self._conn.commit()
-        row = self._conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+        row = self._execute("SELECT id FROM users WHERE email=%s", (email,)).fetchone()
         return row["id"]
 
     def upsert_user_auth(
@@ -228,24 +244,24 @@ class DbStore:
     ) -> int:
         """Insert or update a user auth record. Returns user_auth id."""
         now = _now_iso()
-        self._conn.execute(
+        self._execute(
             """INSERT INTO user_auths (user_id, provider, provider_id, email, raw, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT(provider, provider_id) DO UPDATE SET
                    user_id=excluded.user_id, email=excluded.email,
                    raw=excluded.raw, updated_at=excluded.updated_at""",
             (user_id, provider, provider_id, email, raw, now, now),
         )
         self._conn.commit()
-        row = self._conn.execute(
-            "SELECT id FROM user_auths WHERE provider=? AND provider_id=?",
+        row = self._execute(
+            "SELECT id FROM user_auths WHERE provider=%s AND provider_id=%s",
             (provider, provider_id),
         ).fetchone()
         return row["id"]
 
     def get_user(self, user_id: int) -> Optional[dict]:
         """Get user by id."""
-        row = self._conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        row = self._execute("SELECT * FROM users WHERE id=%s", (user_id,)).fetchone()
         return dict(row) if row else None
 
     # ── Dramas & Episodes ─────────────────────────────────────
@@ -253,138 +269,142 @@ class DbStore:
     def ensure_drama(self, *, name: str, synopsis: str = "", user_id: int) -> int:
         """Insert or update a drama. Returns the drama id."""
         now = _now_iso()
-        self._conn.execute(
+        self._execute(
             """INSERT INTO dramas (name, user_id, synopsis, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?)
+               VALUES (%s, %s, %s, %s, %s)
                ON CONFLICT(user_id, name) DO UPDATE SET
                    updated_at=excluded.updated_at""",
             (name, user_id, synopsis, now, now),
         )
         self._conn.commit()
-        row = self._conn.execute(
-            "SELECT id FROM dramas WHERE name=? AND user_id=?", (name, user_id),
+        row = self._execute(
+            "SELECT id FROM dramas WHERE name=%s AND user_id=%s", (name, user_id),
         ).fetchone()
         return row["id"]
 
     def ensure_episode(self, *, drama_id: int, number: int, path: str = "") -> int:
         """Insert or update an episode. Returns the episode id."""
         now = _now_iso()
-        self._conn.execute(
+        self._execute(
             """INSERT INTO episodes (drama_id, number, path, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?)
+               VALUES (%s, %s, %s, %s, %s)
                ON CONFLICT(drama_id, number) DO UPDATE SET
                    path = CASE WHEN excluded.path != '' THEN excluded.path ELSE episodes.path END,
                    updated_at=excluded.updated_at""",
             (drama_id, number, path, now, now),
         )
         # Keep total_episodes in sync
-        self._conn.execute(
+        self._execute(
             """UPDATE dramas SET total_episodes = (
-                   SELECT COUNT(*) FROM episodes WHERE drama_id = ?
-               ) WHERE id = ?""",
+                   SELECT COUNT(*) FROM episodes WHERE drama_id = %s
+               ) WHERE id = %s""",
             (drama_id, drama_id),
         )
         self._conn.commit()
-        row = self._conn.execute(
-            "SELECT id FROM episodes WHERE drama_id=? AND number=?",
+        row = self._execute(
+            "SELECT id FROM episodes WHERE drama_id=%s AND number=%s",
             (drama_id, number),
         ).fetchone()
         return row["id"]
 
     def get_drama_by_name(self, name: str, user_id: int | None = None) -> Optional[dict]:
         if user_id is not None:
-            row = self._conn.execute(
-                "SELECT * FROM dramas WHERE name=? AND user_id=?", (name, user_id),
+            row = self._execute(
+                "SELECT * FROM dramas WHERE name=%s AND user_id=%s", (name, user_id),
             ).fetchone()
         else:
-            row = self._conn.execute(
-                "SELECT * FROM dramas WHERE name=?", (name,),
+            row = self._execute(
+                "SELECT * FROM dramas WHERE name=%s", (name,),
             ).fetchone()
         return dict(row) if row else None
 
     def get_episode_by_names(self, drama_name: str, episode_number: int, user_id: int | None = None) -> Optional[dict]:
         if user_id is not None:
-            row = self._conn.execute(
+            row = self._execute(
                 """SELECT e.*, d.name AS drama_name
                    FROM episodes e
                    JOIN dramas d ON e.drama_id = d.id
-                   WHERE d.name=? AND e.number=? AND d.user_id=?""",
+                   WHERE d.name=%s AND e.number=%s AND d.user_id=%s""",
                 (drama_name, episode_number, user_id),
             ).fetchone()
         else:
-            row = self._conn.execute(
+            row = self._execute(
                 """SELECT e.*, d.name AS drama_name
                    FROM episodes e
                    JOIN dramas d ON e.drama_id = d.id
-                   WHERE d.name=? AND e.number=?""",
+                   WHERE d.name=%s AND e.number=%s""",
                 (drama_name, episode_number),
             ).fetchone()
         return dict(row) if row else None
 
     def update_episode_status(self, episode_id: int, status: str) -> None:
-        self._conn.execute(
-            "UPDATE episodes SET status=?, updated_at=? WHERE id=?",
+        self._execute(
+            "UPDATE episodes SET status=%s, updated_at=%s WHERE id=%s",
             (status, _now_iso(), episode_id),
         )
         self._conn.commit()
 
     def get_episode(self, episode_id: int) -> Optional[dict]:
-        row = self._conn.execute(
+        row = self._execute(
             """SELECT e.*, d.name AS drama_name
                FROM episodes e
                JOIN dramas d ON e.drama_id = d.id
-               WHERE e.id=?""",
+               WHERE e.id=%s""",
             (episode_id,),
         ).fetchone()
         return dict(row) if row else None
 
     def get_episodes(self, drama_id: int) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT * FROM episodes WHERE drama_id=? ORDER BY number",
+        rows = self._execute(
+            "SELECT * FROM episodes WHERE drama_id=%s ORDER BY number",
             (drama_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
     def get_drama_synopsis(self, drama_id: int) -> str:
         """Get drama synopsis by drama_id."""
-        row = self._conn.execute(
-            "SELECT synopsis FROM dramas WHERE id=?", (drama_id,),
+        row = self._execute(
+            "SELECT synopsis FROM dramas WHERE id=%s", (drama_id,),
         ).fetchone()
-        return (row[0] or "").strip() if row else ""
+        return (row["synopsis"] or "").strip() if row else ""
 
     # ── Task queue ────────────────────────────────────────────
 
     def create_task(
         self, episode_id: int, task_type: str, *, context: Optional[dict] = None,
     ) -> int:
-        ep = self._conn.execute(
-            "SELECT drama_id FROM episodes WHERE id=?", (episode_id,),
+        ep = self._execute(
+            "SELECT drama_id FROM episodes WHERE id=%s", (episode_id,),
         ).fetchone()
         drama_id = ep["drama_id"] if ep else 0
         now = _now_iso()
-        cur = self._conn.execute(
+        cur = self._execute(
             """INSERT INTO tasks (drama_id, episode_id, type, status, context, created_at)
-               VALUES (?, ?, ?, 'pending', ?, ?)""",
+               VALUES (%s, %s, %s, 'pending', %s, %s)
+               RETURNING id""",
             (drama_id, episode_id, task_type,
              json.dumps(context or {}, ensure_ascii=False), now),
         )
+        row_id = cur.fetchone()["id"]
         self._conn.commit()
-        return cur.lastrowid
+        return row_id
 
     def claim_next_task(
         self, episode_id: int, *, executable_types: Optional[list[str]] = None,
     ) -> Optional[dict]:
         if executable_types:
-            placeholders = ",".join("?" for _ in executable_types)
-            row = self._conn.execute(
+            placeholders = ",".join("%s" for _ in executable_types)
+            row = self._execute(
                 f"""SELECT * FROM tasks
-                    WHERE episode_id=? AND status='pending' AND type IN ({placeholders})
-                    ORDER BY id LIMIT 1""",
+                    WHERE episode_id=%s AND status='pending' AND type IN ({placeholders})
+                    ORDER BY id LIMIT 1
+                    FOR UPDATE SKIP LOCKED""",
                 [episode_id, *executable_types],
             ).fetchone()
         else:
-            row = self._conn.execute(
-                "SELECT * FROM tasks WHERE episode_id=? AND status='pending' ORDER BY id LIMIT 1",
+            row = self._execute(
+                """SELECT * FROM tasks WHERE episode_id=%s AND status='pending'
+                   ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED""",
                 (episode_id,),
             ).fetchone()
         return self._claim_row(row)
@@ -392,11 +412,12 @@ class DbStore:
     def claim_any_pending_task(
         self, *, executable_types: list[str],
     ) -> Optional[dict]:
-        placeholders = ",".join("?" for _ in executable_types)
-        row = self._conn.execute(
+        placeholders = ",".join("%s" for _ in executable_types)
+        row = self._execute(
             f"""SELECT * FROM tasks
                 WHERE status='pending' AND type IN ({placeholders})
-                ORDER BY id LIMIT 1""",
+                ORDER BY id LIMIT 1
+                FOR UPDATE SKIP LOCKED""",
             executable_types,
         ).fetchone()
         return self._claim_row(row)
@@ -405,8 +426,8 @@ class DbStore:
         if row is None:
             return None
         now = _now_iso()
-        self._conn.execute(
-            "UPDATE tasks SET status='running', claimed_at=? WHERE id=?",
+        self._execute(
+            "UPDATE tasks SET status='running', claimed_at=%s WHERE id=%s",
             (now, row["id"]),
         )
         self._conn.commit()
@@ -416,46 +437,46 @@ class DbStore:
         return d
 
     def complete_task(self, task_id: int) -> None:
-        self._conn.execute(
-            "UPDATE tasks SET status='succeeded', finished_at=? WHERE id=?",
+        self._execute(
+            "UPDATE tasks SET status='succeeded', finished_at=%s WHERE id=%s",
             (_now_iso(), task_id),
         )
         self._conn.commit()
 
     def fail_task(self, task_id: int, *, error: Optional[str] = None) -> None:
-        self._conn.execute(
-            "UPDATE tasks SET status='failed', finished_at=?, error=? WHERE id=?",
+        self._execute(
+            "UPDATE tasks SET status='failed', finished_at=%s, error=%s WHERE id=%s",
             (_now_iso(), error, task_id),
         )
         self._conn.commit()
 
     def pass_gate_task(self, episode_id: int, gate_key: str) -> Optional[int]:
-        row = self._conn.execute(
+        row = self._execute(
             """SELECT id FROM tasks
-               WHERE episode_id=? AND type=? AND status='pending'
+               WHERE episode_id=%s AND type=%s AND status='pending'
                ORDER BY id DESC LIMIT 1""",
             (episode_id, gate_key),
         ).fetchone()
         if row is None:
             return None
-        self._conn.execute(
-            "UPDATE tasks SET status='succeeded', finished_at=? WHERE id=?",
+        self._execute(
+            "UPDATE tasks SET status='succeeded', finished_at=%s WHERE id=%s",
             (_now_iso(), row["id"]),
         )
         self._conn.commit()
         return row["id"]
 
     def delete_pending_tasks(self, episode_id: int) -> int:
-        cur = self._conn.execute(
-            "DELETE FROM tasks WHERE episode_id=? AND status='pending'",
+        cur = self._execute(
+            "DELETE FROM tasks WHERE episode_id=%s AND status='pending'",
             (episode_id,),
         )
         self._conn.commit()
         return cur.rowcount
 
     def has_running_tasks(self, episode_id: int) -> bool:
-        row = self._conn.execute(
-            "SELECT 1 FROM tasks WHERE episode_id=? AND status='running' LIMIT 1",
+        row = self._execute(
+            "SELECT 1 FROM tasks WHERE episode_id=%s AND status='running' LIMIT 1",
             (episode_id,),
         ).fetchone()
         return row is not None
@@ -474,29 +495,29 @@ class DbStore:
         return "ready"
 
     def get_latest_task(self, episode_id: int) -> Optional[dict]:
-        row = self._conn.execute(
-            "SELECT * FROM tasks WHERE episode_id=? ORDER BY id DESC LIMIT 1",
+        row = self._execute(
+            "SELECT * FROM tasks WHERE episode_id=%s ORDER BY id DESC LIMIT 1",
             (episode_id,),
         ).fetchone()
         return dict(row) if row else None
 
     def get_tasks(self, episode_id: int) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT * FROM tasks WHERE episode_id=? ORDER BY id",
+        rows = self._execute(
+            "SELECT * FROM tasks WHERE episode_id=%s ORDER BY id",
             (episode_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
     def update_task_context(self, task_id: int, updates: dict) -> None:
-        row = self._conn.execute(
-            "SELECT context FROM tasks WHERE id=?", (task_id,),
+        row = self._execute(
+            "SELECT context FROM tasks WHERE id=%s", (task_id,),
         ).fetchone()
         if row is None:
             return
         ctx = json.loads(row["context"] or "{}")
         ctx.update(updates)
-        self._conn.execute(
-            "UPDATE tasks SET context=? WHERE id=?",
+        self._execute(
+            "UPDATE tasks SET context=%s WHERE id=%s",
             (json.dumps(ctx, ensure_ascii=False), task_id),
         )
         self._conn.commit()
@@ -504,18 +525,18 @@ class DbStore:
     def get_latest_succeeded_task(
         self, episode_id: int, task_type: str,
     ) -> Optional[dict]:
-        row = self._conn.execute(
+        row = self._execute(
             """SELECT * FROM tasks
-               WHERE episode_id=? AND type=? AND status='succeeded'
+               WHERE episode_id=%s AND type=%s AND status='succeeded'
                ORDER BY id DESC LIMIT 1""",
             (episode_id, task_type),
         ).fetchone()
         return dict(row) if row else None
 
     def get_gate_task(self, episode_id: int, gate_key: str) -> Optional[dict]:
-        row = self._conn.execute(
+        row = self._execute(
             """SELECT * FROM tasks
-               WHERE episode_id=? AND type=?
+               WHERE episode_id=%s AND type=%s
                ORDER BY id DESC LIMIT 1""",
             (episode_id, gate_key),
         ).fetchone()
@@ -561,10 +582,10 @@ class DbStore:
         types_to_delete = ordered[gate_idx:]
 
         if types_to_delete:
-            placeholders = ",".join("?" for _ in types_to_delete)
-            self._conn.execute(
+            placeholders = ",".join("%s" for _ in types_to_delete)
+            self._execute(
                 f"""DELETE FROM tasks
-                    WHERE episode_id=? AND type IN ({placeholders})""",
+                    WHERE episode_id=%s AND type IN ({placeholders})""",
                 [episode_id, *types_to_delete],
             )
 
@@ -577,17 +598,17 @@ class DbStore:
     # ── Events (audit log) ────────────────────────────────────
 
     def insert_event(self, task_id: int, kind: str, data: Optional[dict] = None) -> None:
-        self._conn.execute(
-            "INSERT INTO events (task_id, ts, kind, data) VALUES (?, ?, ?, ?)",
+        self._execute(
+            "INSERT INTO events (task_id, ts, kind, data) VALUES (%s, %s, %s, %s)",
             (task_id, _now_iso(), kind, json.dumps(data or {}, ensure_ascii=False)),
         )
         self._conn.commit()
 
     def get_events_for_episode(self, episode_id: int) -> list[dict]:
-        rows = self._conn.execute(
+        rows = self._execute(
             """SELECT e.* FROM events e
                JOIN tasks t ON e.task_id = t.id
-               WHERE t.episode_id=?
+               WHERE t.episode_id=%s
                ORDER BY e.id""",
             (episode_id,),
         ).fetchall()
@@ -597,8 +618,8 @@ class DbStore:
 
     def has_cues(self, episode_id: int) -> bool:
         """Check if an episode has any cues."""
-        row = self._conn.execute(
-            "SELECT 1 FROM cues WHERE episode_id = ? LIMIT 1",
+        row = self._execute(
+            "SELECT 1 FROM cues WHERE episode_id = %s LIMIT 1",
             (episode_id,),
         ).fetchone()
         return row is not None
@@ -608,11 +629,12 @@ class DbStore:
         now = _now_iso()
         ids = []
         for row in rows:
-            cur = self._conn.execute(
+            cur = self._execute(
                 """INSERT INTO cues
                    (episode_id, text, text_en, start_ms, end_ms,
                     speaker, emotion, gender, kind, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   RETURNING id""",
                 (
                     episode_id,
                     row.get("text", ""),
@@ -626,13 +648,13 @@ class DbStore:
                     now, now,
                 ),
             )
-            ids.append(cur.lastrowid)
+            ids.append(cur.fetchone()["id"])
         self._conn.commit()
         return ids
 
     @staticmethod
     def _cast_speaker(d: dict) -> dict:
-        """Cast speaker field from TEXT to int (SQLite stores as TEXT, app layer uses int)."""
+        """Cast speaker field from TEXT to int (stored as TEXT, app layer uses int)."""
         try:
             d["speaker"] = int(d["speaker"])
         except (ValueError, TypeError, KeyError):
@@ -641,8 +663,8 @@ class DbStore:
 
     def get_cues(self, episode_id: int) -> list[dict]:
         """Get all cues for an episode, ordered by start_ms."""
-        rows = self._conn.execute(
-            "SELECT * FROM cues WHERE episode_id=? ORDER BY start_ms",
+        rows = self._execute(
+            "SELECT * FROM cues WHERE episode_id=%s ORDER BY start_ms",
             (episode_id,),
         ).fetchall()
         return [self._cast_speaker(dict(r)) for r in rows]
@@ -655,10 +677,10 @@ class DbStore:
         if not fields:
             return
         fields["updated_at"] = _now_iso()
-        set_clause = ", ".join(f"{k}=?" for k in fields)
+        set_clause = ", ".join(f"{k}=%s" for k in fields)
         values = list(fields.values()) + [cue_id]
-        self._conn.execute(
-            f"UPDATE cues SET {set_clause} WHERE id=?",
+        self._execute(
+            f"UPDATE cues SET {set_clause} WHERE id=%s",
             values,
         )
         self._conn.commit()
@@ -667,12 +689,12 @@ class DbStore:
         """Batch delete cues and their junction links."""
         if not ids:
             return
-        placeholders = ",".join("?" for _ in ids)
-        self._conn.execute(
+        placeholders = ",".join("%s" for _ in ids)
+        self._execute(
             f"DELETE FROM utterance_cues WHERE cue_id IN ({placeholders})",
             ids,
         )
-        self._conn.execute(
+        self._execute(
             f"DELETE FROM cues WHERE id IN ({placeholders})",
             ids,
         )
@@ -680,8 +702,8 @@ class DbStore:
 
     def delete_episode_cues(self, episode_id: int) -> int:
         """Delete all cues for an episode."""
-        cur = self._conn.execute(
-            "DELETE FROM cues WHERE episode_id=?",
+        cur = self._execute(
+            "DELETE FROM cues WHERE episode_id=%s",
             (episode_id,),
         )
         self._conn.commit()
@@ -765,10 +787,10 @@ class DbStore:
 
     def get_cues_for_utterance(self, utterance_id: int) -> list[dict]:
         """Get SRC cues linked to an utterance, ordered by start_ms."""
-        rows = self._conn.execute(
+        rows = self._execute(
             """SELECT c.* FROM cues c
                JOIN utterance_cues uc ON uc.cue_id = c.id
-               WHERE uc.utterance_id = ?
+               WHERE uc.utterance_id = %s
                ORDER BY c.start_ms""",
             (utterance_id,),
         ).fetchall()
@@ -780,20 +802,20 @@ class DbStore:
         text_cn and text_en are read directly from DB (redundant caches).
         start_ms and end_ms are computed from linked cues via junction table.
         """
-        utts = self._conn.execute(
-            "SELECT * FROM utterances WHERE episode_id=? ORDER BY id",
+        utts = self._execute(
+            "SELECT * FROM utterances WHERE episode_id=%s ORDER BY id",
             (episode_id,),
         ).fetchall()
         if not utts:
             return []
 
         # Batch-load cue times for start_ms/end_ms computation
-        all_links = self._conn.execute(
+        all_links = self._execute(
             """SELECT uc.utterance_id, c.start_ms, c.end_ms
                FROM utterance_cues uc
                JOIN cues c ON uc.cue_id = c.id
                JOIN utterances u ON uc.utterance_id = u.id
-               WHERE u.episode_id = ?
+               WHERE u.episode_id = %s
                ORDER BY uc.utterance_id, c.start_ms""",
             (episode_id,),
         ).fetchall()
@@ -801,7 +823,7 @@ class DbStore:
         from collections import defaultdict
         cue_times: dict[int, list[tuple[int, int]]] = defaultdict(list)
         for row in all_links:
-            cue_times[row[0]].append((row[1], row[2]))
+            cue_times[row["utterance_id"]].append((row["start_ms"], row["end_ms"]))
 
         result = []
         for r in utts:
@@ -879,10 +901,10 @@ class DbStore:
             if not isinstance(fields["tts_policy"], str):
                 fields["tts_policy"] = json.dumps(fields["tts_policy"], ensure_ascii=False)
         fields["updated_at"] = _now_iso()
-        set_clause = ", ".join(f"{k}=?" for k in fields)
+        set_clause = ", ".join(f"{k}=%s" for k in fields)
         values = list(fields.values()) + [utterance_id]
-        self._conn.execute(
-            f"UPDATE utterances SET {set_clause} WHERE id=?",
+        self._execute(
+            f"UPDATE utterances SET {set_clause} WHERE id=%s",
             values,
         )
         self._conn.commit()
@@ -891,12 +913,12 @@ class DbStore:
         """Batch delete utterances and their junction links."""
         if not ids:
             return
-        placeholders = ",".join("?" for _ in ids)
-        self._conn.execute(
+        placeholders = ",".join("%s" for _ in ids)
+        self._execute(
             f"DELETE FROM utterance_cues WHERE utterance_id IN ({placeholders})",
             ids,
         )
-        self._conn.execute(
+        self._execute(
             f"DELETE FROM utterances WHERE id IN ({placeholders})",
             ids,
         )
@@ -904,13 +926,13 @@ class DbStore:
 
     def delete_episode_utterances(self, episode_id: int) -> int:
         """Delete all utterances and junction links for an episode."""
-        self._conn.execute(
+        self._execute(
             """DELETE FROM utterance_cues WHERE utterance_id IN
-               (SELECT id FROM utterances WHERE episode_id=?)""",
+               (SELECT id FROM utterances WHERE episode_id=%s)""",
             (episode_id,),
         )
-        cur = self._conn.execute(
-            "DELETE FROM utterances WHERE episode_id=?",
+        cur = self._execute(
+            "DELETE FROM utterances WHERE episode_id=%s",
             (episode_id,),
         )
         self._conn.commit()
@@ -922,8 +944,8 @@ class DbStore:
         Also recalculates voice_hash for utterances whose text_en changed.
         Called after user edits cue text_en (translation_review).
         """
-        utts = self._conn.execute(
-            "SELECT * FROM utterances WHERE episode_id=?",
+        utts = self._execute(
+            "SELECT * FROM utterances WHERE episode_id=%s",
             (episode_id,),
         ).fetchall()
         now = _now_iso()
@@ -945,10 +967,10 @@ class DbStore:
                 )
             if updates:
                 updates["updated_at"] = now
-                set_clause = ", ".join(f"{k}=?" for k in updates)
+                set_clause = ", ".join(f"{k}=%s" for k in updates)
                 values = list(updates.values()) + [utt["id"]]
-                self._conn.execute(
-                    f"UPDATE utterances SET {set_clause} WHERE id=?", values,
+                self._execute(
+                    f"UPDATE utterances SET {set_clause} WHERE id=%s", values,
                 )
         self._conn.commit()
 
@@ -967,8 +989,8 @@ class DbStore:
 
         source_hash 不在此处更新 — 由 translate phase 在翻译成功后写入。
         """
-        src_cues = self._conn.execute(
-            "SELECT * FROM cues WHERE episode_id=? ORDER BY start_ms",
+        src_cues = self._execute(
+            "SELECT * FROM cues WHERE episode_id=%s ORDER BY start_ms",
             (episode_id,),
         ).fetchall()
         src_cues = [dict(r) for r in src_cues]
@@ -1003,19 +1025,19 @@ class DbStore:
             new_groups_with_ids.append((cue_ids, group))
 
         # ── Step 3: Load existing utterance → cue_id sets ──
-        existing_utts = self._conn.execute(
-            "SELECT * FROM utterances WHERE episode_id=? ORDER BY id",
+        existing_utts = self._execute(
+            "SELECT * FROM utterances WHERE episode_id=%s ORDER BY id",
             (episode_id,),
         ).fetchall()
         existing_utts = [dict(r) for r in existing_utts]
 
         existing_cue_sets: dict[int, frozenset[int]] = {}
         for utt in existing_utts:
-            links = self._conn.execute(
-                "SELECT cue_id FROM utterance_cues WHERE utterance_id=?",
+            links = self._execute(
+                "SELECT cue_id FROM utterance_cues WHERE utterance_id=%s",
                 (utt["id"],),
             ).fetchall()
-            existing_cue_sets[utt["id"]] = frozenset(r[0] for r in links)
+            existing_cue_sets[utt["id"]] = frozenset(r["cue_id"] for r in links)
 
         # Build reverse map: cue_id_set → existing utterance
         cue_set_to_utt: dict[frozenset[int], dict] = {}
@@ -1046,32 +1068,33 @@ class DbStore:
                 old_hash = matched_utt.get("source_hash") or ""
                 new_source_hash = matched_utt.get("source_hash") if current_hash == old_hash else None
 
-                self._conn.execute(
+                self._execute(
                     """UPDATE utterances
-                       SET text_cn=?, speaker=?, emotion=?, gender=?, kind=?,
-                           source_hash=?, updated_at=?
-                       WHERE id=?""",
+                       SET text_cn=%s, speaker=%s, emotion=%s, gender=%s, kind=%s,
+                           source_hash=%s, updated_at=%s
+                       WHERE id=%s""",
                     (text_cn, speaker, emotion, gender, kind,
                      new_source_hash, now, matched_utt["id"]),
                 )
 
                 # Rebuild junction links (idempotent)
-                self._conn.execute(
-                    "DELETE FROM utterance_cues WHERE utterance_id=?",
+                self._execute(
+                    "DELETE FROM utterance_cues WHERE utterance_id=%s",
                     (matched_utt["id"],),
                 )
                 for cue in group:
-                    self._conn.execute(
-                        "INSERT INTO utterance_cues (utterance_id, cue_id) VALUES (?, ?)",
+                    self._execute(
+                        "INSERT INTO utterance_cues (utterance_id, cue_id) VALUES (%s, %s)",
                         (matched_utt["id"], cue["id"]),
                     )
             else:
                 # New utterance — source_hash=NULL (never translated)
-                cur = self._conn.execute(
+                cur = self._execute(
                     """INSERT INTO utterances
                        (episode_id, text_cn, speaker, emotion, gender, kind,
                         created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                       RETURNING id""",
                     (
                         episode_id,
                         text_cn,
@@ -1082,10 +1105,10 @@ class DbStore:
                         now, now,
                     ),
                 )
-                utt_id = cur.lastrowid
+                utt_id = cur.fetchone()["id"]
                 for cue in group:
-                    self._conn.execute(
-                        "INSERT INTO utterance_cues (utterance_id, cue_id) VALUES (?, ?)",
+                    self._execute(
+                        "INSERT INTO utterance_cues (utterance_id, cue_id) VALUES (%s, %s)",
                         (utt_id, cue["id"]),
                     )
 
@@ -1101,58 +1124,58 @@ class DbStore:
 
     def get_roles(self, drama_id: int) -> list[dict]:
         """Get all roles for a drama."""
-        rows = self._conn.execute(
-            "SELECT * FROM roles WHERE drama_id=? ORDER BY name",
+        rows = self._execute(
+            "SELECT * FROM roles WHERE drama_id=%s ORDER BY name",
             (drama_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
     def get_roles_map(self, drama_id: int) -> dict[str, str]:
         """Get {name: voice_type} map for a drama. Legacy compatibility."""
-        rows = self._conn.execute(
-            "SELECT name, voice_type FROM roles WHERE drama_id=?",
+        rows = self._execute(
+            "SELECT name, voice_type FROM roles WHERE drama_id=%s",
             (drama_id,),
         ).fetchall()
-        return {r[0]: r[1] for r in rows}
+        return {r["name"]: r["voice_type"] for r in rows}
 
     def ensure_role(self, drama_id: int, name: str, voice_type: str = "", role_type: str = "extra") -> int:
         """Upsert a role by name. Returns role.id."""
-        self._conn.execute(
+        self._execute(
             """INSERT INTO roles (drama_id, name, voice_type, role_type)
-               VALUES (?, ?, ?, ?)
+               VALUES (%s, %s, %s, %s)
                ON CONFLICT(drama_id, name) DO NOTHING""",
             (drama_id, name, voice_type, role_type),
         )
         self._conn.commit()
-        row = self._conn.execute(
-            "SELECT id FROM roles WHERE drama_id=? AND name=?",
+        row = self._execute(
+            "SELECT id FROM roles WHERE drama_id=%s AND name=%s",
             (drama_id, name),
         ).fetchone()
         return row["id"]
 
     def update_role_sample_audio(self, role_id: int, sample_audio: str) -> None:
         """更新角色的样本音频 key（GCS key）。"""
-        self._conn.execute(
-            "UPDATE roles SET sample_audio=? WHERE id=?",
+        self._execute(
+            "UPDATE roles SET sample_audio=%s WHERE id=%s",
             (sample_audio, role_id),
         )
         self._conn.commit()
 
     def get_roles_by_id(self, drama_id: int) -> dict[int, str]:
         """Get {role_id: voice_type} map for a drama. Used by TTS."""
-        rows = self._conn.execute(
-            "SELECT id, voice_type FROM roles WHERE drama_id=?",
+        rows = self._execute(
+            "SELECT id, voice_type FROM roles WHERE drama_id=%s",
             (drama_id,),
         ).fetchall()
-        return {r[0]: r[1] for r in rows}
+        return {r["id"]: r["voice_type"] for r in rows}
 
     def get_role_name_map(self, drama_id: int) -> dict[int, str]:
         """Get {role_id: name} map for a drama. Used for display."""
-        rows = self._conn.execute(
-            "SELECT id, name FROM roles WHERE drama_id=?",
+        rows = self._execute(
+            "SELECT id, name FROM roles WHERE drama_id=%s",
             (drama_id,),
         ).fetchall()
-        return {r[0]: r[1] for r in rows}
+        return {r["id"]: r["name"] for r in rows}
 
     def set_roles_by_list(self, drama_id: int, roles: list[dict]) -> list[dict]:
         """Upsert roles from list of {id?, name, voice_type, role_type?}. Returns updated list."""
@@ -1164,44 +1187,44 @@ class DbStore:
             role_type = role.get("role_type", "extra")
             if rid and rid > 0:
                 # Update existing (preserve sample_audio)
-                self._conn.execute(
-                    "UPDATE roles SET name=?, voice_type=?, role_type=? WHERE id=? AND drama_id=?",
+                self._execute(
+                    "UPDATE roles SET name=%s, voice_type=%s, role_type=%s WHERE id=%s AND drama_id=%s",
                     (name, voice_type, role_type, rid, drama_id),
                 )
                 seen_ids.add(rid)
             else:
                 # Insert new
-                cur = self._conn.execute(
+                self._execute(
                     """INSERT INTO roles (drama_id, name, voice_type, role_type)
-                       VALUES (?, ?, ?, ?)
+                       VALUES (%s, %s, %s, %s)
                        ON CONFLICT(drama_id, name) DO UPDATE SET voice_type=excluded.voice_type, role_type=excluded.role_type""",
                     (drama_id, name, voice_type, role_type),
                 )
-                row = self._conn.execute(
-                    "SELECT id FROM roles WHERE drama_id=? AND name=?",
+                row = self._execute(
+                    "SELECT id FROM roles WHERE drama_id=%s AND name=%s",
                     (drama_id, name),
                 ).fetchone()
                 if row:
                     seen_ids.add(row["id"])
         # Delete roles not in the incoming list, but keep roles still referenced by cues
         if seen_ids:
-            placeholders = ",".join("?" for _ in seen_ids)
-            self._conn.execute(
-                f"""DELETE FROM roles WHERE drama_id=? AND id NOT IN ({placeholders})
+            placeholders = ",".join("%s" for _ in seen_ids)
+            self._execute(
+                f"""DELETE FROM roles WHERE drama_id=%s AND id NOT IN ({placeholders})
                     AND CAST(id AS TEXT) NOT IN (
                         SELECT DISTINCT c.speaker FROM cues c
                         JOIN episodes e ON c.episode_id = e.id
-                        WHERE e.drama_id = ?
+                        WHERE e.drama_id = %s
                     )""",
                 [drama_id, *seen_ids, drama_id],
             )
         else:
-            self._conn.execute(
-                """DELETE FROM roles WHERE drama_id=?
+            self._execute(
+                """DELETE FROM roles WHERE drama_id=%s
                    AND CAST(id AS TEXT) NOT IN (
                        SELECT DISTINCT c.speaker FROM cues c
                        JOIN episodes e ON c.episode_id = e.id
-                       WHERE e.drama_id = ?
+                       WHERE e.drama_id = %s
                    )""",
                 (drama_id, drama_id),
             )
@@ -1209,27 +1232,27 @@ class DbStore:
         return self.get_roles(drama_id)
 
     def upsert_role(self, drama_id: int, name: str, voice_type: str, role_type: str = "extra") -> None:
-        self._conn.execute(
+        self._execute(
             """INSERT INTO roles (drama_id, name, voice_type, role_type)
-               VALUES (?, ?, ?, ?)
+               VALUES (%s, %s, %s, %s)
                ON CONFLICT(drama_id, name) DO UPDATE SET voice_type=excluded.voice_type, role_type=excluded.role_type""",
             (drama_id, name, voice_type, role_type),
         )
         self._conn.commit()
 
     def delete_role(self, drama_id: int, name: str) -> None:
-        self._conn.execute(
-            "DELETE FROM roles WHERE drama_id=? AND name=?",
+        self._execute(
+            "DELETE FROM roles WHERE drama_id=%s AND name=%s",
             (drama_id, name),
         )
         self._conn.commit()
 
     def set_roles(self, drama_id: int, roles: dict[str, str]) -> None:
         """Full replace: delete all then insert."""
-        self._conn.execute("DELETE FROM roles WHERE drama_id=?", (drama_id,))
+        self._execute("DELETE FROM roles WHERE drama_id=%s", (drama_id,))
         for name, voice_type in roles.items():
-            self._conn.execute(
-                "INSERT INTO roles (drama_id, name, voice_type) VALUES (?, ?, ?)",
+            self._execute(
+                "INSERT INTO roles (drama_id, name, voice_type) VALUES (%s, %s, %s)",
                 (drama_id, name, voice_type),
             )
         self._conn.commit()
@@ -1238,29 +1261,29 @@ class DbStore:
 
     def get_dict_entries(self, drama_id: int, type: Optional[str] = None) -> list[dict]:
         if type:
-            rows = self._conn.execute(
-                "SELECT * FROM glossary WHERE drama_id=? AND type=? ORDER BY src",
+            rows = self._execute(
+                "SELECT * FROM glossary WHERE drama_id=%s AND type=%s ORDER BY src",
                 (drama_id, type),
             ).fetchall()
         else:
-            rows = self._conn.execute(
-                "SELECT * FROM glossary WHERE drama_id=? ORDER BY type, src",
+            rows = self._execute(
+                "SELECT * FROM glossary WHERE drama_id=%s ORDER BY type, src",
                 (drama_id,),
             ).fetchall()
         return [dict(r) for r in rows]
 
     def get_dict_map(self, drama_id: int, type: str) -> dict[str, str]:
         """Get {src: target} map for a drama + type."""
-        rows = self._conn.execute(
-            "SELECT src, target FROM glossary WHERE drama_id=? AND type=?",
+        rows = self._execute(
+            "SELECT src, target FROM glossary WHERE drama_id=%s AND type=%s",
             (drama_id, type),
         ).fetchall()
-        return {r[0]: r[1] for r in rows}
+        return {r["src"]: r["target"] for r in rows}
 
     def upsert_dict_entry(self, drama_id: int, type: str, src: str, target: str) -> None:
-        self._conn.execute(
+        self._execute(
             """INSERT INTO glossary (drama_id, type, src, target)
-               VALUES (?, ?, ?, ?)
+               VALUES (%s, %s, %s, %s)
                ON CONFLICT(drama_id, type, src) DO UPDATE SET target=excluded.target""",
             (drama_id, type, src, target),
         )
@@ -1268,13 +1291,13 @@ class DbStore:
 
     def set_dict_entries(self, drama_id: int, type: str, entries: dict[str, str]) -> None:
         """Full replace for a given type."""
-        self._conn.execute(
-            "DELETE FROM glossary WHERE drama_id=? AND type=?",
+        self._execute(
+            "DELETE FROM glossary WHERE drama_id=%s AND type=%s",
             (drama_id, type),
         )
         for src, target in entries.items():
-            self._conn.execute(
-                "INSERT INTO glossary (drama_id, type, src, target) VALUES (?, ?, ?, ?)",
+            self._execute(
+                "INSERT INTO glossary (drama_id, type, src, target) VALUES (%s, %s, %s, %s)",
                 (drama_id, type, src, target),
             )
         self._conn.commit()
@@ -1291,9 +1314,9 @@ class DbStore:
     ) -> None:
         """Insert or update an artifact record."""
         now = _now_iso()
-        self._conn.execute(
+        self._execute(
             """INSERT INTO artifacts (episode_id, kind, gcs_path, checksum, created_at)
-               VALUES (?, ?, ?, ?, ?)
+               VALUES (%s, %s, %s, %s, %s)
                ON CONFLICT(episode_id, kind) DO UPDATE SET
                    gcs_path   = COALESCE(excluded.gcs_path, artifacts.gcs_path),
                    checksum   = COALESCE(excluded.checksum, artifacts.checksum),
@@ -1303,23 +1326,22 @@ class DbStore:
         self._conn.commit()
 
     def get_artifact(self, episode_id: int, kind: str) -> Optional[dict]:
-        row = self._conn.execute(
-            "SELECT * FROM artifacts WHERE episode_id=? AND kind=?",
+        row = self._execute(
+            "SELECT * FROM artifacts WHERE episode_id=%s AND kind=%s",
             (episode_id, kind),
         ).fetchone()
         return dict(row) if row else None
 
     def get_artifacts(self, episode_id: int) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT * FROM artifacts WHERE episode_id=? ORDER BY kind",
+        rows = self._execute(
+            "SELECT * FROM artifacts WHERE episode_id=%s ORDER BY kind",
             (episode_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
     def delete_artifacts(self, episode_id: int) -> None:
-        self._conn.execute(
-            "DELETE FROM artifacts WHERE episode_id=?",
+        self._execute(
+            "DELETE FROM artifacts WHERE episode_id=%s",
             (episode_id,),
         )
         self._conn.commit()
-

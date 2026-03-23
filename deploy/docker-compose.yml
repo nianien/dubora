@@ -26,8 +26,7 @@ services:
     command: ["vsd-pipeline", "worker", "--api-url", "http://web:8765"]
     restart: unless-stopped
     depends_on:
-      web:
-        condition: service_healthy
+      - web
 
 volumes:
   dubora-data:

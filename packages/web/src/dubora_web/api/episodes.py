@@ -9,7 +9,6 @@ from fastapi import APIRouter, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from dubora_core.config.settings import get_workdir
-from dubora_core.store import DbStore
 from dubora_web.api._helpers import get_user_id, require_drama_owner
 
 router = APIRouter()
@@ -30,10 +29,6 @@ def _resolve_media_url(key: str) -> str | None:
         return None
 
 
-def _get_store(db_path: Path) -> DbStore:
-    return DbStore(db_path)
-
-
 @router.get("/dramas")
 async def list_dramas(
     request: Request,
@@ -44,7 +39,7 @@ async def list_dramas(
     sort: str = "updated_at",
 ) -> dict:
     """Return dramas with pagination, search, and filtering."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     user_id = get_user_id(request)
 
     # Base query with episode aggregation
@@ -62,11 +57,11 @@ async def list_dramas(
     params: list = []
 
     if user_id is not None:
-        where_clauses.append("d.user_id = ?")
+        where_clauses.append("d.user_id = %s")
         params.append(user_id)
 
     if search:
-        where_clauses.append("d.name LIKE ?")
+        where_clauses.append("d.name LIKE %s")
         params.append(f"%{search}%")
 
     if where_clauses:
@@ -84,8 +79,8 @@ async def list_dramas(
         base += " HAVING started_count = 0"
 
     # Count total before pagination
-    count_sql = f"SELECT COUNT(*) AS cnt FROM ({base})"
-    total = store._conn.execute(count_sql, params).fetchone()["cnt"]
+    count_sql = f"SELECT COUNT(*) AS cnt FROM ({base}) AS sub"
+    total = store._execute(count_sql, params).fetchone()["cnt"]
 
     # Sorting
     sort_map = {
@@ -104,10 +99,10 @@ async def list_dramas(
     elif page_size > 100:
         page_size = 100
     offset = (page - 1) * page_size
-    base += " LIMIT ? OFFSET ?"
+    base += " LIMIT %s OFFSET %s"
     params.extend([page_size, offset])
 
-    rows = store._conn.execute(base, params).fetchall()
+    rows = store._execute(base, params).fetchall()
     items = []
     for r in rows:
         d = dict(r)
@@ -129,14 +124,14 @@ class CreateDramaBody(BaseModel):
 @router.post("/dramas")
 async def create_drama(request: Request, body: CreateDramaBody) -> dict:
     """Create a new drama with optional episodes and synopsis."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     user_id = get_user_id(request)
     drama_id = store.ensure_drama(name=body.name, synopsis=body.synopsis, user_id=user_id)
 
     # Set total_episodes
     if body.total_episodes > 0:
-        store._conn.execute(
-            "UPDATE dramas SET total_episodes=? WHERE id=?",
+        store._execute(
+            "UPDATE dramas SET total_episodes=%s WHERE id=%s",
             (body.total_episodes, drama_id),
         )
         # Batch-create episode records
@@ -155,27 +150,27 @@ class UpdateDramaBody(BaseModel):
 @router.put("/dramas/{drama_id}")
 async def update_drama(request: Request, drama_id: int, body: UpdateDramaBody) -> dict:
     """Update drama fields."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     require_drama_owner(store, drama_id, get_user_id(request))
     updates: list[str] = []
     params: list = []
     if body.synopsis is not None:
-        updates.append("synopsis=?")
+        updates.append("synopsis=%s")
         params.append(body.synopsis)
     if body.cover_image is not None:
-        updates.append("cover_image=?")
+        updates.append("cover_image=%s")
         params.append(body.cover_image)
     if updates:
         from datetime import datetime, timezone
-        updates.append("updated_at=?")
+        updates.append("updated_at=%s")
         params.append(datetime.now(timezone.utc).isoformat())
         params.append(drama_id)
-        store._conn.execute(
-            f"UPDATE dramas SET {', '.join(updates)} WHERE id=?",
+        store._execute(
+            f"UPDATE dramas SET {', '.join(updates)} WHERE id=%s",
             params,
         )
         store._conn.commit()
-    row = store._conn.execute("SELECT * FROM dramas WHERE id=?", (drama_id,)).fetchone()
+    row = store._execute("SELECT * FROM dramas WHERE id=%s", (drama_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Drama not found")
     return dict(row)
@@ -187,9 +182,9 @@ _ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 @router.post("/dramas/{drama_id}/cover")
 async def upload_cover(request: Request, drama_id: int, file: UploadFile) -> dict:
     """Upload a cover image for a drama. Saves as dramas/{drama_name}/0{ext}."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     require_drama_owner(store, drama_id, get_user_id(request))
-    row = store._conn.execute("SELECT id, name FROM dramas WHERE id=?", (drama_id,)).fetchone()
+    row = store._execute("SELECT id, name FROM dramas WHERE id=%s", (drama_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Drama not found")
     drama_name = row["name"]
@@ -211,8 +206,8 @@ async def upload_cover(request: Request, drama_id: int, file: UploadFile) -> dic
         logger.warning("GCS upload skipped for cover: %s", key)
 
     # Update DB
-    store._conn.execute(
-        "UPDATE dramas SET cover_image=? WHERE id=?",
+    store._execute(
+        "UPDATE dramas SET cover_image=%s WHERE id=%s",
         (key, drama_id),
     )
     store._conn.commit()
@@ -232,9 +227,9 @@ async def upload_video(request: Request, drama_id: int, file: UploadFile) -> dic
     """
     import re
 
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     require_drama_owner(store, drama_id, get_user_id(request))
-    row = store._conn.execute("SELECT id, name FROM dramas WHERE id=?", (drama_id,)).fetchone()
+    row = store._execute("SELECT id, name FROM dramas WHERE id=%s", (drama_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Drama not found")
     drama_name = row["name"]
@@ -293,22 +288,22 @@ async def list_episodes(request: Request) -> List[dict]:
       }
     ]
     """
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     user_id = get_user_id(request)
 
     if user_id is not None:
-        rows = store._conn.execute(
+        rows = store._execute(
             """SELECT e.id, e.number, e.path, e.status, e.drama_id,
                       e.updated_at,
                       d.name AS drama_name
                FROM episodes e
                JOIN dramas d ON e.drama_id = d.id
-               WHERE d.user_id = ?
+               WHERE d.user_id = %s
                ORDER BY d.id, e.number""",
             (user_id,),
         ).fetchall()
     else:
-        rows = store._conn.execute(
+        rows = store._execute(
             """SELECT e.id, e.number, e.path, e.status, e.drama_id,
                       e.updated_at,
                       d.name AS drama_name
@@ -322,30 +317,30 @@ async def list_episodes(request: Request) -> List[dict]:
 
     # Batch-query which episodes have SRC cues in DB
     if user_id is not None:
-        cue_rows = store._conn.execute(
+        cue_rows = store._execute(
             """SELECT DISTINCT c.episode_id FROM cues c
                JOIN episodes e ON c.episode_id = e.id
                JOIN dramas d ON e.drama_id = d.id
-               WHERE d.user_id = ?""",
+               WHERE d.user_id = %s""",
             (user_id,),
         ).fetchall()
     else:
-        cue_rows = store._conn.execute(
+        cue_rows = store._execute(
             "SELECT DISTINCT episode_id FROM cues",
         ).fetchall()
     episodes_with_cues: set[int] = {r["episode_id"] for r in cue_rows}
 
     # Batch-query artifacts: {episode_id: set(kind)}
     if user_id is not None:
-        art_rows = store._conn.execute(
+        art_rows = store._execute(
             """SELECT a.episode_id, a.kind FROM artifacts a
                JOIN episodes e ON a.episode_id = e.id
                JOIN dramas d ON e.drama_id = d.id
-               WHERE d.user_id = ?""",
+               WHERE d.user_id = %s""",
             (user_id,),
         ).fetchall()
     else:
-        art_rows = store._conn.execute(
+        art_rows = store._execute(
             "SELECT episode_id, kind FROM artifacts",
         ).fetchall()
     art_set: dict[int, set[str]] = {}

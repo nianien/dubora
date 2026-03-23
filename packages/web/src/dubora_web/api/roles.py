@@ -11,10 +11,6 @@ from dubora_web.api._helpers import get_user_id
 router = APIRouter()
 
 
-def _get_store(db_path) -> DbStore:
-    return DbStore(db_path)
-
-
 def _resolve_drama(store: DbStore, drama: str, user_id: int | None) -> dict:
     """Lookup drama by name. Raises 404 if not found."""
     row = store.get_drama_by_name(drama, user_id=user_id)
@@ -26,7 +22,7 @@ def _resolve_drama(store: DbStore, drama: str, user_id: int | None) -> dict:
 @router.get("/episodes/{drama}/roles")
 async def get_roles(drama: str, request: Request) -> dict:
     """读取角色映射（从 DB），返回 {roles: [{id, name, voice_type}]}"""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     user_id = get_user_id(request)
     drama_row = store.get_drama_by_name(drama, user_id=user_id)
     if not drama_row:
@@ -49,7 +45,7 @@ class RolesBody(BaseModel):
 @router.put("/episodes/{drama}/roles")
 async def put_roles(drama: str, body: RolesBody, request: Request) -> dict:
     """保存角色映射（到 DB），有 id 更新，无 id 新建"""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     user_id = get_user_id(request)
     drama_row = _resolve_drama(store, drama, user_id)
     role_dicts = [r.model_dump() for r in body.roles]

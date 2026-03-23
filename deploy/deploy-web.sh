@@ -1,8 +1,7 @@
 #!/bin/bash
 # 部署 web 服务到 GCP COS VM
-# Usage: bash deploy/deploy-web.sh [--build] [--init]
+# Usage: bash deploy/deploy-web.sh [--build]
 #   --build  构建新镜像（不传则复用已有镜像）
-#   --init   同步本地 DB 到 VM
 #   无参数    仅部署容器（拉取已有镜像 + 上传 .env + 重启）
 set -euo pipefail
 
@@ -40,37 +39,6 @@ check_prerequisites() {
     [ -f "$PROJECT_DIR/.env" ] || fail ".env not found"
 }
 
-# ── 同步本地 DB 到 VM ────────────────────────────────────
-init_data() {
-    LOCAL_DB="$PROJECT_DIR/data/db/dubora.db"
-
-    if [ ! -f "$LOCAL_DB" ]; then
-        fail "Local DB not found: $LOCAL_DB"
-    fi
-
-    log "Preparing data directories..."
-    vm_ssh "
-        sudo mkdir -p ${DATA_DIR}
-        sudo chown -R \$(id -u):\$(id -g) ${DATA_DIR%/*}
-        mkdir -p ${DATA_DIR}/{db,.gcp}
-    "
-
-    log "Stopping container before data sync..."
-    vm_ssh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
-
-    log "Uploading dubora.db to VM..."
-    vm_scp "$LOCAL_DB" "${DATA_DIR}/db/dubora.db"
-
-    # Sync GCS credentials if available
-    local GCP_CRED="$PROJECT_DIR/.gcp/pikppo-dubora.json"
-    if [ -f "$GCP_CRED" ]; then
-        log "Uploading GCS credentials..."
-        vm_scp "$GCP_CRED" "${DATA_DIR}/.gcp/pikppo-dubora.json"
-    fi
-
-    log "Data synced."
-}
-
 # ── 构建镜像 ─────────────────────────────────────────────
 build_image() {
     log "Building web image via Cloud Build..."
@@ -82,6 +50,13 @@ build_image() {
 deploy_to_vm() {
     log "Uploading .env..."
     vm_scp "$PROJECT_DIR/.env" "~/.env.dubora"
+
+    log "Preparing data directories..."
+    vm_ssh "
+        sudo mkdir -p ${DATA_DIR}
+        sudo chown -R \$(id -u):\$(id -g) ${DATA_DIR%/*}
+        mkdir -p ${DATA_DIR}/.gcp
+    "
 
     log "Deploying container..."
     log "Authenticating Docker on VM..."
@@ -114,10 +89,10 @@ usage() {
 Usage: bash deploy/deploy-web.sh [OPTIONS]
 
 Deploy dubora-web to GCP VM (${VM_NAME})
+DB is PostgreSQL (Cloud SQL), configured via DB_URL in .env.
 
 Options:
   --build   Build new Docker image via Cloud Build
-  --init    Sync local SQLite DB to VM (stops container first)
   --help    Show this help
 
 Without options: pull existing image + upload .env + restart container.
@@ -125,24 +100,20 @@ Without options: pull existing image + upload .env + restart container.
 Examples:
   bash deploy/deploy-web.sh                # Deploy only
   bash deploy/deploy-web.sh --build        # Build + deploy
-  bash deploy/deploy-web.sh --build --init # Build + sync DB + deploy
 EOF
     exit 0
 }
 
 # ── 主流程 ────────────────────────────────────────────────
 BUILD=false
-INIT=false
 for arg in "$@"; do
     case "$arg" in
         --build) BUILD=true ;;
-        --init)  INIT=true ;;
         --help|-h) usage ;;
         *)       fail "Unknown argument: $arg" ;;
     esac
 done
 
 check_prerequisites
-if $INIT; then init_data; fi
 if $BUILD; then build_image; fi
 deploy_to_vm

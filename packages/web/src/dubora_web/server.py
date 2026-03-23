@@ -13,7 +13,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from dubora_core.config.settings import get_data_root, get_db_path
+from dubora_core.config.settings import get_data_root, get_database_url
+from dubora_core.store import DbStore
 from dubora_web.api.auth import router as auth_router, auth_enabled, _get_session
 from dubora_web.api.emotions import router as emotions_router
 from dubora_web.api.episodes import router as episodes_router
@@ -70,7 +71,8 @@ def create_app(
         allow_headers=["*"],
     )
 
-    app.state.db_path = get_db_path()
+    app.state.database_url = get_database_url()
+    app.state.store = DbStore(app.state.database_url)
 
     @app.get("/api/health")
     async def health():

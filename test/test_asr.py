@@ -22,6 +22,7 @@ _PROVIDERS = {
     "paraformer": ("providers.asr_paraformer", "ParaformerASRProvider"),
     "funasr":     ("providers.asr_funasr",     "FunASRProvider"),
     "fish":       ("providers.asr_fish",       "FishASRProvider"),
+    "xfyun":      ("providers.asr_xfyun",      "XfyunASRProvider"),
 }
 
 _EPILOG = """\
@@ -35,6 +36,7 @@ _EPILOG = """\
   %(prog)s -m paraformer                                     -i audio.wav
   %(prog)s -m funasr     --funasr-device cuda:0              -i audio.wav
   %(prog)s -m fish                                           -i audio.wav
+  %(prog)s -m xfyun                                          -i audio.wav
 
 环境变量:
   doubao      DOUBAO_APPID, DOUBAO_ACCESS_TOKEN
@@ -44,6 +46,7 @@ _EPILOG = """\
   tencent     TENCENT_SECRET_ID, TENCENT_SECRET_KEY
   paraformer  DASHSCOPE_API_KEY
   fish        FISH_API_KEY
+  xfyun       XFYUN_APPID, XFYUN_SECRET_KEY
 """
 
 
@@ -52,6 +55,8 @@ def create_provider(args):
     mod_path, cls_name = _PROVIDERS[args.model]
     cls = getattr(importlib.import_module(mod_path), cls_name)
 
+    if args.model == "xfyun":
+        return cls(speaker_number=args.xfyun_speakers)
     if args.model == "funasr":
         return cls(model_name=args.funasr_model, device=args.funasr_device)
     if args.model == "gemini":
@@ -135,6 +140,10 @@ def main():
                       choices=["qwen3-asr-flash-filetrans", "qwen3-asr-flash"],
                       help="模型 (默认 qwen3-asr-flash-filetrans)")
 
+    xfyun = parser.add_argument_group("xfyun")
+    xfyun.add_argument("--xfyun-speakers", type=int, default=0,
+                        help="发音人数 (0=盲分, 默认 0)")
+
     funasr = parser.add_argument_group("funasr")
     funasr.add_argument("--funasr-model", default="paraformer-zh",
                         choices=["paraformer-zh", "paraformer-en", "paraformer-zh-streaming"],
@@ -154,6 +163,10 @@ def main():
         kwargs = {"preset": args.doubao_preset}
         if args.doubao_hotwords:
             kwargs["hotwords"] = args.doubao_hotwords
+    elif args.model == "xfyun" and not args.input.startswith("http"):
+        import wave
+        with wave.open(args.input, 'rb') as wf:
+            kwargs["duration_ms"] = int(round(wf.getnframes() / wf.getframerate() * 1000))
 
     result = provider.transcribe(audio_input, **kwargs)
     json_str = json.dumps(result, ensure_ascii=False, indent=2)

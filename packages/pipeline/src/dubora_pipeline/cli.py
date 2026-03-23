@@ -14,7 +14,7 @@ import re
 import sys
 from typing import List
 
-from dubora_core.config.settings import PipelineConfig, load_env_file, get_db_path
+from dubora_core.config.settings import PipelineConfig, load_env_file, get_database_url
 from dubora_core.phase_registry import PHASE_NAMES, PHASE_META, GATES, GATE_AFTER, STAGES
 from dubora_core.store import DbStore
 from dubora_core.submit import submit_pipeline
@@ -32,11 +32,7 @@ def expand_episode_range(ep_arg: str) -> List[str]:
 
 
 def get_store() -> DbStore:
-    p = get_db_path()
-    if not p.exists():
-        error(f"Pipeline DB not found: {p}")
-        sys.exit(1)
-    return DbStore(p)
+    return DbStore(get_database_url())
 
 
 def resolve_episodes(store: DbStore, drama_name: str, ep_arg: str) -> list[dict]:

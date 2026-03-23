@@ -23,8 +23,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
-from dubora_core.config.settings import get_db_path
-from dubora_core.store import DbStore
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -88,7 +86,7 @@ async def me(request: Request):
         return {"authenticated": False, "user": None}
     user_id = session.get("user_id")
     if user_id:
-        store = DbStore(get_db_path())
+        store = request.app.state.store
         user = store.get_user(user_id)
         if user:
             return {"authenticated": True, "user": {
@@ -110,7 +108,7 @@ async def logout():
 @router.get("/google/login")
 async def google_login(request: Request):
     if not auth_enabled():
-        store = DbStore(get_db_path())
+        store = request.app.state.store
         user_id = store.upsert_user(email="dev@localhost", name="Dev Mode")
         store.upsert_user_auth(
             user_id=user_id, provider="dev", provider_id="dev@localhost",
@@ -170,7 +168,7 @@ async def google_callback(request: Request, code: str = ""):
             status_code=403,
         )
 
-    store = DbStore(get_db_path())
+    store = request.app.state.store
     user_id = store.upsert_user(email=email, name=name, picture=picture)
     store.upsert_user_auth(
         user_id=user_id, provider="google", provider_id=email,

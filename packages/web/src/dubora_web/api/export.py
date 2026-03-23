@@ -9,7 +9,6 @@ from fastapi.responses import FileResponse
 
 from dubora_core.config.settings import get_workdir
 from dubora_core.manifest import resolve_artifact_path
-from dubora_core.store import DbStore
 from dubora_core.utils.file_store import get_gcs_store
 from dubora_web.api._helpers import get_user_id, require_episode_owner
 
@@ -36,10 +35,6 @@ _KIND_MEDIA_TYPE = {
 }
 
 
-def _get_store(db_path: Path) -> DbStore:
-    return DbStore(db_path)
-
-
 @router.get("/export/{episode_id}/{filename}")
 async def export_file(request: Request, episode_id: int, filename: str):
     """统一下载入口：zh.srt / en.srt / dubbed.mp4。
@@ -50,7 +45,7 @@ async def export_file(request: Request, episode_id: int, filename: str):
     if not kind:
         raise HTTPException(status_code=400, detail=f"Unknown filename: {filename}")
 
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     require_episode_owner(store, episode_id, get_user_id(request))
     ep_row = store.get_episode(episode_id)
     if not ep_row:

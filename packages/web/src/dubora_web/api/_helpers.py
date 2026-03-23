@@ -16,8 +16,8 @@ def require_drama_owner(store: DbStore, drama_id: int, user_id: int | None) -> N
     """
     if user_id is None:
         return
-    row = store._conn.execute(
-        "SELECT user_id FROM dramas WHERE id=?", (drama_id,),
+    row = store._execute(
+        "SELECT user_id FROM dramas WHERE id=%s", (drama_id,),
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Drama not found")
@@ -32,10 +32,10 @@ def require_episode_owner(store: DbStore, episode_id: int, user_id: int | None) 
     """
     if user_id is None:
         return
-    row = store._conn.execute(
+    row = store._execute(
         """SELECT d.user_id FROM episodes e
            JOIN dramas d ON e.drama_id = d.id
-           WHERE e.id=?""",
+           WHERE e.id=%s""",
         (episode_id,),
     ).fetchone()
     if row is None:

@@ -12,16 +12,11 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from dubora_core.events import EventEmitter, PipelineEvent
 from dubora_core.phase_registry import PHASE_NAMES, GATE_AFTER
-from dubora_core.store import DbStore
 from dubora_core.submit import PipelineReactor, submit_pipeline
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-def _get_store(db_path: Path) -> DbStore:
-    return DbStore(db_path)
 
 
 # ── Task lifecycle ───────────────────────────────────────────────
@@ -31,7 +26,7 @@ def _get_store(db_path: Path) -> DbStore:
 async def worker_submit(request: Request) -> dict:
     """Submit a pipeline (replaces vsd-pipeline run direct DB access)."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
 
     drama_name = body["drama"]
     episode_numbers = body["episodes"]  # list of int
@@ -60,7 +55,7 @@ async def worker_submit(request: Request) -> dict:
 async def worker_claim(request: Request) -> dict:
     """Claim next pending task (atomic: pending -> running)."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
 
     executable_types = body.get("executable_types", PHASE_NAMES)
     task = store.claim_any_pending_task(executable_types=executable_types)
@@ -72,7 +67,7 @@ async def worker_claim(request: Request) -> dict:
 async def worker_complete_task(task_id: int, request: Request) -> dict:
     """Mark task as succeeded, run reactor to create next task."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
 
     store.complete_task(task_id)
 
@@ -100,7 +95,7 @@ async def worker_complete_task(task_id: int, request: Request) -> dict:
 async def worker_fail_task(task_id: int, request: Request) -> dict:
     """Mark task as failed, run reactor to update episode status."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
 
     error_msg = body.get("error")
     store.fail_task(task_id, error=error_msg)
@@ -129,7 +124,7 @@ async def worker_fail_task(task_id: int, request: Request) -> dict:
 @router.get("/worker/episodes/{episode_id}")
 async def worker_get_episode(episode_id: int, request: Request) -> dict:
     """Get episode + drama info."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     ep = store.get_episode(episode_id)
     if ep is None:
         raise HTTPException(status_code=404, detail="Episode not found")
@@ -145,7 +140,7 @@ async def worker_get_cues(
     utterance_id: Optional[int] = Query(None),
 ) -> dict:
     """Get cues for an episode, optionally filtered by utterance_id."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     if utterance_id is not None:
         cues = store.get_cues_for_utterance(utterance_id)
     else:
@@ -160,7 +155,7 @@ async def worker_get_utterances(
     dirty: Optional[str] = Query(None),
 ) -> dict:
     """Get utterances, optionally only dirty ones for translate or tts."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     if dirty == "translate":
         utts = store.get_dirty_utterances_for_translate(episode_id)
     elif dirty == "tts":
@@ -173,7 +168,7 @@ async def worker_get_utterances(
 @router.get("/worker/episodes/{episode_id}/roles")
 async def worker_get_roles(episode_id: int, request: Request) -> dict:
     """Get roles for the episode's drama (by_id + name_map)."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     ep = store.get_episode(episode_id)
     if ep is None:
         raise HTTPException(status_code=404, detail="Episode not found")
@@ -191,7 +186,7 @@ async def worker_get_glossary(
     type: Optional[str] = Query(None),
 ) -> dict:
     """Get glossary entries or dict map for the episode's drama."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     ep = store.get_episode(episode_id)
     if ep is None:
         raise HTTPException(status_code=404, detail="Episode not found")
@@ -208,7 +203,7 @@ async def worker_latest_succeeded_task(
     type: str = Query(...),
 ) -> dict:
     """Get the latest succeeded task of a given type."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     task = store.get_latest_succeeded_task(episode_id, type)
     return {"task": task}
 
@@ -216,7 +211,7 @@ async def worker_latest_succeeded_task(
 @router.get("/worker/episodes/{episode_id}/has-cues")
 async def worker_has_cues(episode_id: int, request: Request) -> dict:
     """Check if episode has any cues."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     return {"has_cues": store.has_cues(episode_id)}
 
 
@@ -227,7 +222,7 @@ async def worker_has_cues(episode_id: int, request: Request) -> dict:
 async def worker_insert_cues(episode_id: int, request: Request) -> dict:
     """Batch insert cues."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     cue_ids = store.insert_cues(episode_id, body["cues"])
     return {"cue_ids": cue_ids}
 
@@ -235,7 +230,7 @@ async def worker_insert_cues(episode_id: int, request: Request) -> dict:
 @router.delete("/worker/episodes/{episode_id}/cues")
 async def worker_delete_episode_cues(episode_id: int, request: Request) -> dict:
     """Delete all cues for an episode."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     count = store.delete_episode_cues(episode_id)
     return {"deleted": count}
 
@@ -243,7 +238,7 @@ async def worker_delete_episode_cues(episode_id: int, request: Request) -> dict:
 @router.delete("/worker/episodes/{episode_id}/utterances")
 async def worker_delete_episode_utterances(episode_id: int, request: Request) -> dict:
     """Delete all utterances for an episode."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     count = store.delete_episode_utterances(episode_id)
     return {"deleted": count}
 
@@ -252,7 +247,7 @@ async def worker_delete_episode_utterances(episode_id: int, request: Request) ->
 async def worker_update_cue(cue_id: int, request: Request) -> dict:
     """Update a single cue's fields."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     store.update_cue(cue_id, **body)
     return {"status": "updated"}
 
@@ -261,7 +256,7 @@ async def worker_update_cue(cue_id: int, request: Request) -> dict:
 async def worker_update_utterance(utterance_id: int, request: Request) -> dict:
     """Update a single utterance's fields."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     store.update_utterance(utterance_id, **body)
     return {"status": "updated"}
 
@@ -270,7 +265,7 @@ async def worker_update_utterance(utterance_id: int, request: Request) -> dict:
 async def worker_calculate_utterances(episode_id: int, request: Request) -> dict:
     """Recalculate utterance grouping from cues."""
     body = await request.json() if await request.body() else {}
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     max_gap_ms = body.get("max_gap_ms", 500)
     max_duration_ms = body.get("max_duration_ms", 10000)
     utts = store.calculate_utterances(
@@ -283,7 +278,7 @@ async def worker_calculate_utterances(episode_id: int, request: Request) -> dict
 async def worker_upsert_glossary(episode_id: int, request: Request) -> dict:
     """Upsert a glossary entry for the episode's drama."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     ep = store.get_episode(episode_id)
     if ep is None:
         raise HTTPException(status_code=404, detail="Episode not found")
@@ -296,7 +291,7 @@ async def worker_upsert_glossary(episode_id: int, request: Request) -> dict:
 async def worker_upsert_artifact(episode_id: int, request: Request) -> dict:
     """Upsert an artifact record."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     store.upsert_artifact(
         episode_id, body["kind"],
         gcs_path=body.get("gcs_path"),
@@ -309,7 +304,7 @@ async def worker_upsert_artifact(episode_id: int, request: Request) -> dict:
 async def worker_update_task_context(task_id: int, request: Request) -> dict:
     """Merge updates into task context JSON."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     store.update_task_context(task_id, body)
     return {"status": "updated"}
 
@@ -317,7 +312,7 @@ async def worker_update_task_context(task_id: int, request: Request) -> dict:
 @router.get("/worker/episodes/{episode_id}/drama-synopsis")
 async def worker_get_drama_synopsis(episode_id: int, request: Request) -> dict:
     """Get drama synopsis for an episode."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     ep = store.get_episode(episode_id)
     if ep is None:
         raise HTTPException(status_code=404, detail="Episode not found")
@@ -332,7 +327,7 @@ async def worker_get_drama_synopsis(episode_id: int, request: Request) -> dict:
 @router.get("/worker/dramas/{drama_id}/synopsis")
 async def worker_get_synopsis_by_drama(drama_id: int, request: Request) -> dict:
     """Get drama synopsis by drama_id."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     return {"synopsis": store.get_drama_synopsis(drama_id)}
 
 
@@ -343,7 +338,7 @@ async def worker_get_glossary_by_drama(
     type: Optional[str] = Query(None),
 ) -> dict:
     """Get glossary dict map or entries for a drama."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     if type:
         return {"map": store.get_dict_map(drama_id, type)}
     return {"entries": store.get_dict_entries(drama_id)}
@@ -353,7 +348,7 @@ async def worker_get_glossary_by_drama(
 async def worker_upsert_glossary_by_drama(drama_id: int, request: Request) -> dict:
     """Upsert a glossary entry by drama_id."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     store.upsert_dict_entry(drama_id, body["type"], body["src"], body["target"])
     return {"status": "upserted"}
 
@@ -361,7 +356,7 @@ async def worker_upsert_glossary_by_drama(drama_id: int, request: Request) -> di
 @router.get("/worker/dramas/{drama_id}/roles")
 async def worker_get_roles_by_drama(drama_id: int, request: Request) -> dict:
     """Get roles by_id + name_map + full list for a drama."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     return {
         "by_id": {str(k): v for k, v in store.get_roles_by_id(drama_id).items()},
         "name_map": {str(k): v for k, v in store.get_role_name_map(drama_id).items()},
@@ -373,6 +368,6 @@ async def worker_get_roles_by_drama(drama_id: int, request: Request) -> dict:
 async def worker_update_role_sample_audio(role_id: int, request: Request) -> dict:
     """Update a role's sample audio GCS key."""
     body = await request.json()
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     store.update_role_sample_audio(role_id, body["sample_audio"])
     return {"status": "updated"}

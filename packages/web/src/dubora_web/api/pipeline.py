@@ -25,10 +25,6 @@ router = APIRouter()
 PHASES_META = [{"name": m["name"], "label": m["label"]} for m in PHASE_META]
 
 
-def _get_store(db_path: Path) -> DbStore:
-    return DbStore(db_path)
-
-
 def _derive_phase_status(store: DbStore, episode_id: int, episode_status: str = "") -> list[dict]:
     tasks = store.get_tasks(episode_id)
     task_map: dict[str, dict] = {}
@@ -127,7 +123,7 @@ def _derive_stages(phases: list[dict]) -> list[dict]:
 
 @router.get("/episodes/{drama}/{ep}/pipeline/status")
 async def pipeline_status(request: Request, drama: str, ep: str) -> dict:
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     user_id = get_user_id(request)
 
     episode = store.get_episode_by_names(drama, int(ep), user_id=user_id)
@@ -162,7 +158,7 @@ async def pipeline_status(request: Request, drama: str, ep: str) -> dict:
 @router.post("/episodes/{drama}/{ep}/pipeline/run")
 async def run_pipeline(request: Request, drama: str, ep: str) -> dict:
     """Submit pipeline tasks to DB. Worker process executes them."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
 
     episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
@@ -194,7 +190,7 @@ async def pipeline_stream(request: Request, drama: str, ep: str):
         def sse(event: str, data: dict) -> str:
             return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
-        store = _get_store(request.app.state.db_path)
+        store = request.app.state.store
         episode = store.get_episode_by_names(drama, int(ep), user_id=user_id)
         if episode is None:
             yield sse("error", {"message": f"Episode not found: {drama}/{ep}"})
@@ -266,7 +262,7 @@ async def pipeline_stream(request: Request, drama: str, ep: str):
 
 @router.post("/episodes/{drama}/{ep}/pipeline/cancel")
 async def cancel_pipeline(request: Request, drama: str, ep: str) -> dict:
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
 
     episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
@@ -285,7 +281,7 @@ async def cancel_pipeline(request: Request, drama: str, ep: str) -> dict:
 
 @router.post("/episodes/{drama}/{ep}/pipeline/gate/{gate_key}/pass")
 async def pass_gate(request: Request, drama: str, ep: str, gate_key: str) -> dict:
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
 
     episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
@@ -326,7 +322,7 @@ async def pass_gate(request: Request, drama: str, ep: str, gate_key: str) -> dic
 @router.post("/episodes/{drama}/{ep}/pipeline/gate/{gate_key}/reset")
 async def reset_gate(request: Request, drama: str, ep: str, gate_key: str) -> dict:
     """Reset pipeline back to a gate. Deletes downstream tasks, creates pending gate task."""
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
 
     episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
@@ -342,7 +338,7 @@ async def reset_gate(request: Request, drama: str, ep: str, gate_key: str) -> di
 
 @router.get("/episodes/{drama}/{ep}/pipeline/events")
 async def get_pipeline_events(request: Request, drama: str, ep: str) -> dict:
-    store = _get_store(request.app.state.db_path)
+    store = request.app.state.store
     episode = store.get_episode_by_names(drama, int(ep), user_id=get_user_id(request))
     if episode is None:
         return {"events": []}

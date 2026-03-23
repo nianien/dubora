@@ -12,7 +12,6 @@
 │  │ dubora-web 容器                 ││
 │  │  FastAPI + React 前端           ││
 │  │  Worker API (21 端点)           ││
-│  │  SQLite DB (/data/db/)          ││
 │  └─────────────────────────────────┘│
 │  Port 80 → 8765                     │
 │  Volume: /var/dubora/data → /data    │
@@ -29,10 +28,18 @@
 │  └─────────────────────────────────┘│
 │  Volume: /var/dubora/data → /data    │
 └─────────────────────────────────────┘
+
+               ┌─────────────────────┐
+               │  Cloud SQL (PG)     │
+               │  PostgreSQL 实例     │
+               │  DB_URL 连接        │
+               └─────────────────────┘
+                       ▲
+                       │ DB_URL (web 容器连接)
 ```
 
-- **web** 跑在便宜机器，拥有 SQLite DB，暴露 Worker API
-- **pipeline** 跑在贵机器（GPU/高 CPU），通过 HTTP API 读写数据库
+- **web** 跑在便宜机器，通过 `DB_URL` 连接 Cloud SQL PostgreSQL
+- **pipeline** 跑在贵机器（GPU/高 CPU），通过 HTTP API 读写数据库，不直连 DB
 - 视频文件通过 GCS 存取，两台机器都挂载 GCS 凭证
 
 ## 2. 前置条件
@@ -43,15 +50,39 @@
 - 区域: `asia-southeast1-a`
 - Artifact Registry 仓库: `asia-east1-docker.pkg.dev/pikppo/dubora/`
 
-### 2.2 本地环境
+### 2.2 Cloud SQL PostgreSQL
+
+创建 Cloud SQL 实例（如果还没有）：
+
+```bash
+gcloud sql instances create dubora-pg \
+  --database-version=POSTGRES_15 \
+  --tier=db-f1-micro \
+  --region=asia-southeast1 \
+  --authorized-networks=0.0.0.0/0  # 生产环境应限制为 VM IP
+
+# 创建数据库和用户
+gcloud sql databases create dubora --instance=dubora-pg
+gcloud sql users set-password postgres --instance=dubora-pg --password=<PASSWORD>
+```
+
+获取连接 IP 后，在 `.env` 中设置：
+```
+DB_URL=postgresql://postgres:<PASSWORD>@<CLOUD_SQL_IP>:5432/dubora
+```
+
+> 应用启动时会自动执行 `CREATE TABLE IF NOT EXISTS`，无需手动建表。
+
+### 2.3 本地环境
 
 ```bash
 # gcloud CLI
 gcloud auth login
 gcloud config set project pikppo
 
-# 确认 .env 文件存在（含 API keys）
+# 确认 .env 文件存在（含 API keys + DB_URL）
 cat .env
+# DB_URL=postgresql://...
 # DOUBAO_APPID=...
 # DOUBAO_ACCESS_TOKEN=...
 # OPENAI_API_KEY=...
@@ -59,7 +90,7 @@ cat .env
 # ...
 ```
 
-### 2.3 GCS 凭证
+### 2.4 GCS 凭证
 
 GCS 服务账号 JSON 凭证需放在 VM 的 `/var/dubora/data/.gcp/pikppo-dubora.json`。
 
@@ -87,10 +118,6 @@ gcloud compute instances create dubora-web-sg \
   --image-family=cos-stable \
   --image-project=cos-cloud \
   --boot-disk-size=20GB
-
-# 挂载数据盘（如需独立磁盘）
-# gcloud compute disks create dubora-data --size=50GB --zone=asia-southeast1-a
-# gcloud compute instances attach-disk dubora-web-sg --disk=dubora-data --zone=asia-southeast1-a
 ```
 
 确保防火墙规则允许 HTTP 流量：
@@ -115,7 +142,7 @@ gcloud compute instances create dubora-pipeline-sg \
 在每台 VM 上创建数据目录：
 ```bash
 gcloud compute ssh nianien@dubora-web-sg --zone=asia-southeast1-a --command="
-  sudo mkdir -p /var/dubora/data/{db,.gcp}
+  sudo mkdir -p /var/dubora/data/.gcp
   sudo chown -R \$(id -u):\$(id -g) /var/dubora/data
 "
 ```
@@ -131,14 +158,11 @@ bash deploy/deploy-web.sh
 # 构建镜像 + 部署
 bash deploy/deploy-web.sh --build
 
-# 构建 + 同步本地 DB + 部署
-bash deploy/deploy-web.sh --build --init
-
 # 查看帮助
 bash deploy/deploy-web.sh --help
 ```
 
-`--init` 会将本地 `data/db/dubora.db` 上传到 VM，适用于首次部署或 DB 重置。
+Web 容器通过 `.env` 中的 `DB_URL` 连接 Cloud SQL，启动时自动建表。
 
 ### 4.2 部署 Pipeline
 
@@ -222,11 +246,15 @@ gcloud compute ssh nianien@dubora-web-sg --zone=asia-southeast1-a \
 ### 6.4 查看 DB
 
 ```bash
+# 从本地连接 Cloud SQL
+psql "$DB_URL"
+
+# 或从 web 容器内连接
 gcloud compute ssh nianien@dubora-web-sg --zone=asia-southeast1-a \
   --command="docker exec dubora-web python -c \"
-import sqlite3
-conn = sqlite3.connect('/data/db/dubora.db')
-for r in conn.execute('SELECT id, drama_name, number, status FROM episodes'):
+from dubora_core.store import DbStore
+store = DbStore()
+for r in store.conn.execute('SELECT id, drama_name, number, status FROM episodes').fetchall():
     print(r)
 \""
 ```
@@ -251,8 +279,8 @@ bash deploy/deploy-pipeline.sh
 
 | 变量 | 说明 |
 |------|------|
+| `DB_URL` | PostgreSQL 连接串，如 `postgresql://user:pass@host:5432/dubora` |
 | `DATA_DIR` | 数据根目录，默认 `/data` |
-| `DB_DIR` | DB 目录，默认 `DATA_DIR/db`（可独立覆盖） |
 | `GOOGLE_APPLICATION_CREDENTIALS` | GCS 凭证路径 |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID（空则 dev 模式，无需登录） |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
@@ -269,6 +297,8 @@ bash deploy/deploy-pipeline.sh
 | `GOOGLE_APPLICATION_CREDENTIALS` | GCS 凭证路径 |
 | `.env` 文件中的 API keys | 各外部服务凭证 |
 
+> Pipeline 走 RemoteStore (HTTP)，不需要 `DB_URL`。`.env` 中有 `DB_URL` 也无害。
+
 ## 8. 故障排查
 
 ### 网站无法访问
@@ -276,6 +306,13 @@ bash deploy/deploy-pipeline.sh
 1. 检查 VM 是否有 `http-server` 网络标签
 2. 检查容器是否在运行: `docker ps`
 3. 检查应用日志: `docker logs dubora-web`
+
+### DB 连接失败
+
+1. 确认 `.env` 中 `DB_URL` 格式正确: `postgresql://user:pass@host:5432/dbname`
+2. 检查 Cloud SQL 实例是否在运行: `gcloud sql instances describe dubora-pg`
+3. 检查 Cloud SQL 授权网络是否包含 web VM 的外网 IP
+4. 从 web 容器内测试连接: `docker exec dubora-web python -c "from dubora_core.store import DbStore; DbStore()"`
 
 ### 封面/视频不显示
 
