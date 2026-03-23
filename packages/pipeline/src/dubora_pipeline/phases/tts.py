@@ -145,9 +145,12 @@ class TTSPhase(Phase):
             info(f"Built manifest from {len(dub_manifest.utterances)} dirty utterances for TTS")
 
             if not dub_manifest.utterances:
+                info("No synthesizable utterances after filtering, TTS is a no-op")
+                self._write_noop_outputs(outputs, workspace_path)
                 return PhaseResult(
-                    status="failed",
-                    error=ErrorInfo(type="ValueError", message="No utterances to synthesize."),
+                    status="succeeded",
+                    outputs=["tts.segments_dir"],
+                    metrics={"total_segments": 0, "success_count": 0, "failed_count": 0, "incremental": True},
                 )
 
             # Voice assignment check (DB-backed, id-keyed)

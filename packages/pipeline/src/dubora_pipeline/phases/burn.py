@@ -86,6 +86,8 @@ class BurnPhase(Phase):
             text_en = (cue.get("text_en") or "").strip()
             text_cn = (cue.get("text") or "").strip()
             if text_en:
+                if cue.get("kind") == "sing":
+                    text_en = f"\u266a{text_en}\u266a"
                 en_segments.append({"start": start, "end": end, "en_text": text_en})
             if text_cn:
                 zh_segments.append({"start": start, "end": end, "zh_text": text_cn})

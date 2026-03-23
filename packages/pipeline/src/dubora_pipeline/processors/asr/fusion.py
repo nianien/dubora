@@ -6,42 +6,17 @@ Doubao 主干 + 腾讯时间轴填空 + Fish 文本替换。
 - get_doubao_utterances(): 提取 Doubao 统一段
 - get_tencent_segments(): 提取腾讯逗号级分段
 - call_llm_diff(): LLM 比对主/副本文本差异
-- fuse(): 三源融合核心
+- call_llm_align(): LLM 对齐 Fish 文本到腾讯时间窗口
+- build_align_input(): 构建 LLM 对齐输入
+- apply_alignment(): 应用 LLM 对齐结果
 - fill_null_emotions(): emotion 回填
 - extend_end_ms(): end_ms 延长
+- clamp_overlaps(): 重叠修复
 """
 import json
 import re
 
 from dubora_core.utils.logger import info, warning
-
-_PUNC_RE = re.compile(r'[，。！？、；：""''（）…—\s,\.!?\-\[\]【】]')
-_FISH_PUNC_RE = re.compile(r'[，。！？、；：""''（）…—\s,\.!?\-]')
-_MIN_IN_GAP_MS = 300
-
-
-# ── 文本工具 ─────────────────────────────────────────────────────────────
-
-def strip_punct(s: str) -> str:
-    return _PUNC_RE.sub('', s)
-
-
-def lcs_ratio(a: str, b: str, use_min: bool = False) -> float:
-    """最长公共子序列 / 串长度。use_min=True 用较短串，False 用较长串。"""
-    a, b = strip_punct(a), strip_punct(b)
-    if not a or not b:
-        return 0.0
-    m, n = len(a), len(b)
-    prev = [0] * (n + 1)
-    for i in range(1, m + 1):
-        curr = [0] * (n + 1)
-        for j in range(1, n + 1):
-            if a[i - 1] == b[j - 1]:
-                curr[j] = prev[j - 1] + 1
-            else:
-                curr[j] = max(prev[j], curr[j - 1])
-        prev = curr
-    return prev[n] / (min(m, n) if use_min else max(m, n))
 
 
 # ── 提取各源数据 ─────────────────────────────────────────────────────────
@@ -178,7 +153,7 @@ def get_tencent_segments(data: dict) -> list[dict]:
 # ── LLM diff ─────────────────────────────────────────────────────────────
 
 def call_llm_diff(primary_text: str, secondary_text: str, *, model_name: str, api_key: str) -> dict:
-    """调 Gemini 比对主/副本 ASR 全文，返回 {diff, primary_sing, secondary_sing}。"""
+    """调 Gemini 比对主/副本 ASR 全文，返回 {diff}。"""
     from google import genai
     from google.genai import types
     from dubora_pipeline.prompts import load_prompt
@@ -207,8 +182,48 @@ def call_llm_diff(primary_text: str, secondary_text: str, *, model_name: str, ap
     )
     result = json.loads(response.text)
     diff_count = len(result.get("diff", []))
-    sing_count = len(result.get("primary_sing", [])) + len(result.get("secondary_sing", []))
-    info(f"LLM diff: {diff_count} diffs, {sing_count} sing segments")
+    info(f"LLM diff: {diff_count} diffs")
+    return result
+
+
+# ── LLM align ────────────────────────────────────────────────────────────
+
+def call_llm_align(align_input: dict, *, model_name: str, api_key: str) -> dict:
+    """调 Gemini 对齐 Fish 文本到腾讯时间窗口，返回 {aligned, unmatched_windows}。"""
+    from google import genai
+    from google.genai import types
+    from dubora_pipeline.prompts import load_prompt
+
+    input_json = json.dumps(align_input, ensure_ascii=False, indent=2)
+    rendered = load_prompt("asr_align", input_json=input_json)
+
+    client = genai.Client(api_key=api_key)
+    info(f"LLM align: calling {model_name}...")
+    response = client.models.generate_content(
+        model=model_name,
+        contents=[
+            types.Content(
+                parts=[types.Part.from_text(text=rendered.user)],
+                role="user",
+            ),
+        ],
+        config=types.GenerateContentConfig(
+            system_instruction=rendered.system,
+            response_mime_type="application/json",
+            temperature=0.1,
+        ),
+    )
+    raw = json.loads(response.text)
+    # LLM 可能直接返回数组，兼容处理
+    if isinstance(raw, list):
+        result = {"aligned": raw, "unmatched_windows": []}
+    else:
+        result = raw
+    aligned = result.get("aligned", [])
+    unmatched = result.get("unmatched_windows", [])
+    info(f"LLM align: {len(aligned)} aligned, {len(unmatched)} unmatched tencent")
+    for u in unmatched:
+        info(f"  unmatched TC: {u.get('start_ms')}~{u.get('end_ms')}ms \"{u.get('text')}\" ({u.get('reason')})")
     return result
 
 
@@ -230,285 +245,193 @@ def seg_in_gap(seg: dict, gap_start: int, gap_end: int, tolerance: int = 300) ->
     return seg["start_ms"] >= gap_start - tolerance and seg["end_ms"] <= gap_end + tolerance
 
 
-def is_duplicate(text: str, doubao_utts: list[dict]) -> bool:
-    t = strip_punct(text)
-    if not t:
-        return True
-    for u in doubao_utts:
-        u_clean = strip_punct(u["text"])
-        if not u_clean:
-            continue
-        if t in u_clean or u_clean in t:
-            return True
-        if lcs_ratio(t, u_clean) >= 0.6:
-            return True
-    return False
+# ── 核心融合 ─────────────────────────────────────────────────────────────
 
+def _extract_fish_timestamps(fish_data: dict, llm_diff: list) -> list[dict]:
+    """从 Fish ASR 数据提取 diff 条目的时间戳（近似参考）。"""
+    full_text = fish_data.get("text", "")
+    segments = fish_data.get("segments") or []
+    if not full_text or not segments:
+        return [{"text": d["text"]} for d in llm_diff]
 
-# ── Fish 字符→segment 映射 ──────────────────────────────────────────────
-
-def _build_char_to_seg(full_text: str, segments: list[dict]) -> dict[int, int]:
-    """构建 Fish 全文字符位置 → segment 索引的映射（跳过标点）。"""
+    # 字符位置 → segment 索引（跳过标点）
+    punct_re = re.compile(r'[，。！？、；：""''（）…—\s,\.!?\-\[\]【】]')
     char_to_seg = {}
     seg_idx = 0
     for i, ch in enumerate(full_text):
-        if _FISH_PUNC_RE.match(ch):
+        if punct_re.match(ch):
             continue
         if seg_idx < len(segments) and segments[seg_idx]["text"] == ch:
             char_to_seg[i] = seg_idx
             seg_idx += 1
-    return char_to_seg
-
-
-def _seg_range_ms(char_to_seg: dict, segments: list, start: int, end: int) -> tuple[int, int] | None:
-    """通过字符偏移范围查找对应的时间范围。找不到返回 None。"""
-    first = last = None
-    for i in range(start, end):
-        if i in char_to_seg:
-            if first is None:
-                first = char_to_seg[i]
-            last = char_to_seg[i]
-    if first is not None:
-        return int(segments[first]["start"] * 1000), int(segments[last]["end"] * 1000)
-    return None
-
-
-# ── 歌曲时间范围 ─────────────────────────────────────────────────────────
-
-def get_sing_ranges(
-    doubao_utts: list[dict],
-    fish_data: dict,
-    primary_sing: list[dict],
-    secondary_sing: list[dict],
-) -> list[tuple[int, int]]:
-    """将 LLM 返回的歌曲字符偏移转为时间范围 (start_ms, end_ms)。"""
-    ranges = []
-
-    # primary_sing: 字符偏移基于 doubao 拼接文本
-    if primary_sing:
-        char_to_utt = []
-        for i, u in enumerate(doubao_utts):
-            for _ in u["text"]:
-                char_to_utt.append(i)
-        for s in primary_sing:
-            sc, ec = s["start"], s["end"] - 1
-            if 0 <= sc < len(char_to_utt) and 0 <= ec < len(char_to_utt):
-                ranges.append((doubao_utts[char_to_utt[sc]]["start_ms"],
-                               doubao_utts[char_to_utt[ec]]["end_ms"]))
-
-    # secondary_sing: 字符偏移基于 fish 全文
-    if secondary_sing:
-        full_text = fish_data.get("text", "")
-        segments = fish_data.get("segments") or []
-        if full_text and segments:
-            char_to_seg = _build_char_to_seg(full_text, segments)
-            for s in secondary_sing:
-                r = _seg_range_ms(char_to_seg, segments, s["start"], s["end"])
-                if r:
-                    ranges.append(r)
-
-    return ranges
-
-
-# ── Fish 独有句子构建 ────────────────────────────────────────────────────
-
-def _build_fish_unique(fish_data: dict, llm_diff: list, pause_ms: int = 500) -> list[dict]:
-    """用 LLM diff 的 start/end 定位独有文本的时间范围。
-
-    在标点处如果前后字符时间间隔 > pause_ms 则拆分。
-    """
-    full_text = fish_data.get("text", "")
-    segments = fish_data.get("segments") or []
-    if not full_text or not segments:
-        return []
-
-    char_to_seg = _build_char_to_seg(full_text, segments)
 
     result = []
     for d in llm_diff:
         text = d["text"]
         start, end = d["start"], d["end"]
-        if full_text[start:end] != text:
-            warning(f"LLM diff 校验失败: [{start}:{end}] = \"{full_text[start:end]}\" != \"{text}\"")
+        if start < len(full_text) and full_text[start:end] != text:
+            warning(f"LLM diff offset mismatch: [{start}:{end}] != \"{text}\"")
+            result.append({"text": text})
             continue
-        # 在标点处按时间间隔拆分
-        splits = _split_fish_by_pause(full_text, segments, char_to_seg, start, end, pause_ms)
-        result.extend(splits)
+        first_seg = last_seg = None
+        for i in range(start, end):
+            if i in char_to_seg:
+                if first_seg is None:
+                    first_seg = char_to_seg[i]
+                last_seg = char_to_seg[i]
+        if first_seg is not None:
+            result.append({
+                "text": text,
+                "start_ms": int(segments[first_seg]["start"] * 1000),
+                "end_ms": int(segments[last_seg]["end"] * 1000),
+            })
+        else:
+            result.append({"text": text})
     return result
 
 
-def _split_fish_by_pause(
-    full_text: str, segments: list, char_to_seg: dict,
-    start: int, end: int, pause_ms: int,
-) -> list[dict]:
-    """Fish 句子在标点处按时间间隔拆分。"""
-    text = full_text[start:end]
-    # 找标点位置（相对 full_text 的偏移）
-    split_points = []
-    for i, ch in enumerate(text):
-        if ch in _ALL_PUNCTS:
-            abs_pos = start + i
-            # 标点前最后一个有映射的字符
-            prev_seg = None
-            for p in range(abs_pos, start - 1, -1):
-                if p in char_to_seg:
-                    prev_seg = char_to_seg[p]
-                    break
-            # 标点后第一个有映射的字符
-            next_seg = None
-            for p in range(abs_pos + 1, end):
-                if p in char_to_seg:
-                    next_seg = char_to_seg[p]
-                    break
-            if prev_seg is not None and next_seg is not None:
-                gap = int(segments[next_seg]["start"] * 1000) - int(segments[prev_seg]["end"] * 1000)
-                if gap > pause_ms:
-                    split_points.append(i + 1)  # 标点后断开
+def build_align_input(doubao_utts: list[dict], tencent_segs: list[dict],
+                      llm_diff: list, total_ms: int,
+                      fish_data: dict | None = None) -> dict | None:
+    """构建 LLM 对齐输入。无需对齐时返回 None。"""
+    if not llm_diff:
+        info("Fusion: no fish unique texts, skip")
+        return None
 
-    if not split_points:
-        r = _seg_range_ms(char_to_seg, segments, start, end)
-        if r is not None:
-            return [{"text": text, "start_ms": r[0], "end_ms": r[1]}]
-        return []
+    text_unique = _extract_fish_timestamps(fish_data, llm_diff) if fish_data else [{"text": d["text"]} for d in llm_diff]
 
-    result = []
-    prev = 0
-    for sp in split_points:
-        chunk = text[prev:sp]
-        if chunk.strip():
-            r = _seg_range_ms(char_to_seg, segments, start + prev, start + sp)
-            if r is not None:
-                result.append({"text": chunk, "start_ms": r[0], "end_ms": r[1]})
-        prev = sp
-    # 最后一段
-    chunk = text[prev:]
-    if chunk.strip():
-        r = _seg_range_ms(char_to_seg, segments, start + prev, end)
-        if r is not None:
-            result.append({"text": chunk, "start_ms": r[0], "end_ms": r[1]})
-    return result
+    gaps = find_gaps(doubao_utts, total_ms)
+
+    gaps_data = []
+    for i, (gs, ge) in enumerate(gaps):
+        segs = [s for s in tencent_segs if seg_in_gap(s, gs, ge)]
+        if not segs:
+            continue
+        gaps_data.append({
+            "gap_id": i + 1,
+            "start_ms": gs,
+            "end_ms": ge,
+            "windows": [
+                {"start_ms": s["start_ms"], "end_ms": s["end_ms"], "text": s["text"]}
+                for s in segs
+            ],
+        })
+
+    info(f"Fusion: {len(gaps)} gaps, {len(gaps_data)} with tencent, {len(text_unique)} fish unique")
+
+    if not gaps_data:
+        info("Fusion: no gaps with tencent data, skip alignment")
+        return None
+
+    return {"gaps": gaps_data, "text_unique": text_unique}
 
 
-# ── 核心融合 ─────────────────────────────────────────────────────────────
-
-def fuse(doubao_utts: list[dict], tencent_segs: list[dict],
-         fish_data: dict, llm_diff: list, total_ms: int) -> list[dict]:
-    """三源融合：Doubao 主干 + 腾讯时间轴填空 + Fish 文本替换。
+def apply_alignment(aligned: list[dict], tencent_segs: list[dict],
+                    doubao_utts: list[dict], total_ms: int) -> list[dict]:
+    """将 LLM 对齐结果转为 segment 列表。
 
     返回间隙中填充的段（不含 Doubao 原始段，调用方自行合并）。
+    未匹配的 fish 段通过前后锚点间的空闲 TC 窗口分配，无空闲窗口则丢弃。
     """
     gaps = find_gaps(doubao_utts, total_ms)
-    fish_unique = _build_fish_unique(fish_data, llm_diff)
 
+    # 收集所有 gap 内的 TC 窗口
     gap_tc = []
     for gs, ge in gaps:
-        segs = [s for s in tencent_segs if seg_in_gap(s, gs, ge)]
-        segs = [s for s in segs if not is_duplicate(s["text"], doubao_utts)]
-        # tolerance 负责选进来，看 gap 内绝对时长决定保留，clamp 压回去
-        clamped = []
-        for s in segs:
-            in_gap_ms = min(s["end_ms"], ge) - max(s["start_ms"], gs)
-            if in_gap_ms < _MIN_IN_GAP_MS:
-                continue
-            s = dict(s)  # 不 mutate 原始 tencent_segs
-            s["start_ms"] = max(s["start_ms"], gs)
-            s["end_ms"] = min(s["end_ms"], ge)
-            clamped.append(s)
-        segs = clamped
-        gap_tc.extend(segs)
+        for s in tencent_segs:
+            if seg_in_gap(s, gs, ge):
+                gap_tc.append(s)
+    gap_tc.sort(key=lambda x: x["start_ms"])
 
-    info(f"Fusion: {len(gaps)} gaps, {len(fish_unique)} fish unique, {len(gap_tc)} gap TC segments")
-
+    # 第一遍：构建 filled，记录已用 TC 窗口
     filled = []
-    tc_idx = 0
+    tc_used = set()
+    for seg in aligned:
+        text = seg["text"]
+        start_ms = seg.get("start_ms")
+        end_ms = seg.get("end_ms")
+        source = seg.get("source", "text")
 
-    for fs in fish_unique:
-        if tc_idx >= len(gap_tc):
-            spk = _find_nearest_speaker(fs["start_ms"], doubao_utts + filled)
-            filled.append(_make_fish_seg(fs, spk))
+        if source == "window+text" and start_ms is not None and end_ms is not None:
+            speaker = _find_speaker_by_time(start_ms, end_ms, tencent_segs)
+            filled.append({
+                "start_ms": start_ms, "end_ms": end_ms,
+                "text": text, "speaker": speaker,
+                "emotion": None, "gender": None, "source": source,
+            })
+            tc_used.add((start_ms, end_ms))
+        else:
+            filled.append({
+                "start_ms": None, "end_ms": None,
+                "text": text, "speaker": None,
+                "emotion": None, "gender": None, "source": "text",
+            })
+
+    # 第二遍：未匹配 fish 段 → 找前后锚点间空闲 TC 窗口
+    result = []
+    i = 0
+    while i < len(filled):
+        if filled[i]["start_ms"] is not None:
+            result.append(filled[i])
+            i += 1
             continue
 
-        # 跳过离当前 fish 句太远的 TC 段（>15s），视为 TC 幻觉，丢弃不保留
-        while tc_idx < len(gap_tc) and gap_tc[tc_idx]["end_ms"] < fs["start_ms"] - 15000:
-            tc_idx += 1
+        # 收集连续 null 段
+        group_start = i
+        while i < len(filled) and filled[i]["start_ms"] is None:
+            i += 1
+        null_group = filled[group_start:i]
 
-        if tc_idx >= len(gap_tc):
-            spk = _find_nearest_speaker(fs["start_ms"], doubao_utts + filled)
-            filled.append(_make_fish_seg(fs, spk))
-            continue
-
-        if gap_tc[tc_idx]["start_ms"] > fs["end_ms"] + 15000:
-            spk = _find_nearest_speaker(fs["start_ms"], doubao_utts + filled)
-            filled.append(_make_fish_seg(fs, spk))
-            continue
-
-        best_ratio = 0.0
-        best_end = tc_idx
-        for j in range(tc_idx, min(tc_idx + 6, len(gap_tc))):
-            group_text = "".join(s["text"] for s in gap_tc[tc_idx:j + 1])
-            ratio = lcs_ratio(fs["text"], group_text)
-            if ratio > best_ratio:
-                best_ratio = ratio
-                best_end = j
-            if best_ratio >= 0.7:
+        # 前锚点 end_ms
+        prev_end = 0
+        for j in range(group_start - 1, -1, -1):
+            if filled[j]["end_ms"] is not None:
+                prev_end = filled[j]["end_ms"]
                 break
 
-        if best_ratio >= 0.4:
-            group = gap_tc[tc_idx:best_end + 1]
-            merged = {
-                "start_ms": group[0]["start_ms"],
-                "end_ms": group[-1]["end_ms"],
-                "speaker": group[0]["speaker"],
-                "emotion": group[0].get("emotion"),
-            }
-            filled.append(_make_seg(merged, fs["text"], "tencent+fish"))
-            tc_idx = best_end + 1
-        else:
-            filled.append(_make_seg(gap_tc[tc_idx], fs["text"], "tencent+fish"))
-            tc_idx += 1
+        # 后锚点 start_ms
+        next_start = float("inf")
+        for j in range(i, len(filled)):
+            if filled[j]["start_ms"] is not None:
+                next_start = filled[j]["start_ms"]
+                break
 
-    # 剩余未匹配的 TC 段也保留（腾讯识别到但 Fish 没有的内容）
-    while tc_idx < len(gap_tc):
-        tc = gap_tc[tc_idx]
-        filled.append(_make_seg(tc, tc["text"], "tencent"))
-        tc_idx += 1
+        # 空闲 TC 窗口：在锚点之间且未被使用
+        free_tc = [
+            tc for tc in gap_tc
+            if tc["start_ms"] >= prev_end
+            and tc["end_ms"] <= next_start
+            and (tc["start_ms"], tc["end_ms"]) not in tc_used
+        ]
+        free_tc.sort(key=lambda x: x["start_ms"])
 
-    info(f"Fusion: filled {len(filled)} segments in gaps")
-    return filled
+        # 按顺序分配空闲窗口，无窗口则丢弃
+        for k, fish_seg in enumerate(null_group):
+            if k < len(free_tc):
+                tc = free_tc[k]
+                fish_seg["start_ms"] = tc["start_ms"]
+                fish_seg["end_ms"] = tc["end_ms"]
+                fish_seg["speaker"] = tc.get("speaker", "?")
+                fish_seg["source"] = "window+text"
+                tc_used.add((tc["start_ms"], tc["end_ms"]))
+                result.append(fish_seg)
+                info(f"Fusion: fish \"{fish_seg['text']}\" → TC {tc['start_ms']}~{tc['end_ms']}ms")
+            else:
+                info(f"Fusion: discard fish \"{fish_seg['text']}\" (no free TC window)")
 
-
-def _make_seg(tc_seg: dict, text: str, source: str) -> dict:
-    return {
-        "start_ms": tc_seg["start_ms"],
-        "end_ms": tc_seg["end_ms"],
-        "text": text,
-        "speaker": tc_seg["speaker"],
-        "emotion": tc_seg.get("emotion"),
-        "gender": None,
-        "source": source,
-    }
+    info(f"Fusion: filled {len(result)} segments")
+    return result
 
 
-def _make_fish_seg(fs: dict, speaker: str) -> dict:
-    return {
-        "start_ms": fs["start_ms"],
-        "end_ms": fs["end_ms"],
-        "text": fs["text"],
-        "speaker": speaker,
-        "emotion": None,
-        "gender": None,
-        "source": "fish",
-    }
-
-
-def _find_nearest_speaker(target_ms: int, segments: list[dict]) -> str:
-    best_dist = float('inf')
+def _find_speaker_by_time(start_ms: int, end_ms: int, tencent_segs: list[dict]) -> str:
+    """按时间重叠找腾讯段的 speaker。"""
+    best_overlap = 0
     best_spk = "?"
-    for seg in segments:
-        dist = min(abs(seg["start_ms"] - target_ms), abs(seg["end_ms"] - target_ms))
-        if dist < best_dist:
-            best_dist = dist
-            best_spk = seg["speaker"]
+    for s in tencent_segs:
+        overlap = min(end_ms, s["end_ms"]) - max(start_ms, s["start_ms"])
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_spk = s["speaker"]
     return best_spk
 
 

@@ -832,8 +832,6 @@ class DbStore:
         utts = self.get_utterances(episode_id)
         dirty = []
         for utt in utts:
-            if utt.get("kind") == "sing":
-                continue
             # Never translated
             if not utt.get("source_hash"):
                 dirty.append(utt)
@@ -854,6 +852,8 @@ class DbStore:
         utts = self.get_utterances(episode_id)
         dirty = []
         for utt in utts:
+            if utt.get("kind") == "sing":
+                continue
             text_en = utt.get("text_en", "")
             if not text_en:
                 continue

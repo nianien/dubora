@@ -7,7 +7,7 @@
 处理：
 1. split doubao utterances（标点 + 时间间隔拆分）
 2. 有 fish 时：LLM diff → fuse 三源融合；无 fish 时：只用 doubao
-3. 歌曲标注 + emotion 回填 + end_ms 延长
+3. emotion 回填 + end_ms 延长
 4. 构建 cue rows → 写文件 + 写 DB
 """
 import json
@@ -45,8 +45,8 @@ class ParsePhase(Phase):
 
         from dubora_pipeline.processors.asr.fusion import (
             get_doubao_utterances, split_long_utterances, get_tencent_segments,
-            call_llm_diff, fuse, get_sing_ranges, clamp_overlaps,
-            fill_null_emotions, extend_end_ms,
+            call_llm_diff, build_align_input, call_llm_align, apply_alignment,
+            clamp_overlaps, fill_null_emotions, extend_end_ms,
         )
 
         try:
@@ -81,6 +81,9 @@ class ParsePhase(Phase):
                 )
 
             # 2. LLM diff: 主本(doubao) vs 副本(fish)，已有缓存则跳过
+            gemini_key = get_gemini_key()
+            gemini_model = ctx.config.get("asr_gemini_model", "gemini-3.1-pro-preview")
+
             diff_path = asr_dir / "asr-llm-diff.json"
             if diff_path.exists() and diff_path.stat().st_size > 0:
                 info("Parse: loading cached LLM diff")
@@ -91,8 +94,6 @@ class ParsePhase(Phase):
                 secondary_text = fish_data["text"]
                 info(f"LLM diff input primary ({len(primary_text)} chars): {primary_text}")
                 info(f"LLM diff input secondary ({len(secondary_text)} chars): {secondary_text}")
-                gemini_key = get_gemini_key()
-                gemini_model = ctx.config.get("asr_gemini_model", "gemini-3.1-pro-preview")
 
                 if not gemini_key:
                     return PhaseResult(
@@ -110,27 +111,40 @@ class ParsePhase(Phase):
 
             llm_diff = llm_result.get("diff", [])
 
-            # 3. 三源融合
-            filled = fuse(doubao_utts, tencent_segs, fish_data, llm_diff, total_ms)
+            # 3. 三源融合（LLM 对齐 Fish 文本到腾讯时间窗口）
+            align_input_path = asr_dir / "asr-llm-align-input.json"
+            align_path = asr_dir / "asr-llm-align.json"
+            align_input = build_align_input(doubao_utts, tencent_segs, llm_diff, total_ms, fish_data)
+
+            if align_input is None:
+                align_result = {}
+            elif align_path.exists() and align_path.stat().st_size > 0:
+                info("Parse: loading cached LLM align")
+                with open(align_path, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                align_result = {"aligned": raw, "unmatched_windows": []} if isinstance(raw, list) else raw
+            elif not gemini_key:
+                return PhaseResult(
+                    status="failed",
+                    error=ErrorInfo(type="ConfigError", message="GEMINI_API_KEY not set"),
+                )
+            else:
+                with open(align_input_path, "w", encoding="utf-8") as f:
+                    json.dump(align_input, f, indent=2, ensure_ascii=False)
+                align_result = call_llm_align(align_input, model_name=gemini_model, api_key=gemini_key)
+                with open(align_path, "w", encoding="utf-8") as f:
+                    json.dump(align_result, f, indent=2, ensure_ascii=False)
+
+            aligned = align_result.get("aligned", [])
+            filled = apply_alignment(aligned, tencent_segs, doubao_utts, total_ms) if aligned else []
             merged = sorted(doubao_utts + filled, key=lambda x: x["start_ms"])
             merged = clamp_overlaps(merged)
 
-            # 4. 歌曲标注（用时间范围匹配，不用子串）
-            sing_ranges = get_sing_ranges(
-                doubao_utts, fish_data,
-                llm_result.get("primary_sing", []),
-                llm_result.get("secondary_sing", []),
-            )
-            for seg in merged:
-                mid = (seg["start_ms"] + seg["end_ms"]) // 2
-                if any(s <= mid <= e for s, e in sing_ranges):
-                    seg["type"] = "sing"
-
-            # 5. emotion 回填 + end_ms 延长
+            # 4. emotion 回填 + end_ms 延长
             fill_null_emotions(merged)
             merged = extend_end_ms(merged)
 
-            # 6. 构建 cue rows
+            # 5. 构建 cue rows
             _TRAILING_PUNC = "，。,.、；：;:"
             cue_rows = []
             for u in merged:
