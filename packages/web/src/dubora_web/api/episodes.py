@@ -69,14 +69,14 @@ async def list_dramas(
 
     base += " GROUP BY d.id"
 
-    # Status filtering via HAVING on aggregated counts
+    # Status filtering via HAVING (PG disallows alias refs in HAVING)
     if status == "running":
-        # 进行中：有集已开始但未全部完成
-        base += " HAVING started_count > 0 AND succeeded_count < episode_count"
+        base += """ HAVING SUM(CASE WHEN e.status NOT IN ('ready') AND e.status IS NOT NULL THEN 1 ELSE 0 END) > 0
+                       AND SUM(CASE WHEN e.status = 'succeeded' THEN 1 ELSE 0 END) < COUNT(e.id)"""
     elif status == "completed":
-        base += " HAVING episode_count > 0 AND succeeded_count = episode_count"
+        base += " HAVING COUNT(e.id) > 0 AND SUM(CASE WHEN e.status = 'succeeded' THEN 1 ELSE 0 END) = COUNT(e.id)"
     elif status == "not_started":
-        base += " HAVING started_count = 0"
+        base += " HAVING SUM(CASE WHEN e.status NOT IN ('ready') AND e.status IS NOT NULL THEN 1 ELSE 0 END) = 0"
 
     # Count total before pagination
     count_sql = f"SELECT COUNT(*) AS cnt FROM ({base}) AS sub"
