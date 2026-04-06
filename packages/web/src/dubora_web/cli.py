@@ -47,12 +47,14 @@ def _auto_build_frontend(web_dir: Path, dist_dir: Path):
             needs_build = True
         else:
             dist_mtime = index_html.stat().st_mtime
-            src_dir = web_dir / "src"
-            if src_dir.is_dir():
-                for f in src_dir.rglob("*"):
-                    if f.is_file() and f.stat().st_mtime > dist_mtime:
-                        needs_build = True
-                        break
+            for check_dir in [web_dir / "src", web_dir / "public"]:
+                if needs_build:
+                    break
+                if check_dir.is_dir():
+                    for f in check_dir.rglob("*"):
+                        if f.is_file() and f.stat().st_mtime > dist_mtime:
+                            needs_build = True
+                            break
 
     if not needs_build:
         return
