@@ -1,11 +1,16 @@
 """
 ASR Phase: 语音识别
 
-先跑 doubao，检查空洞总时长。超过 10s 再并发跑 tencent + fish 补充。
+支持两种模式（由 ASR_PRIMARY 配置决定）：
+
+- doubao 主轴（多源融合）：先跑 doubao，gap > 10s 时并发跑 tencent + fish 补充
+- 其他主轴（单源直通）：只跑 primary 模型，输出供 parse 直接消费
+
 增量执行：已有 asr-{model}.json 的模型跳过。
 
 产出：
-  asr-{model}.json: 各模型原始结果
+  asr-{primary}.json: 主模型结果（必需）
+  asr-tencent.json / asr-fish.json: 仅 doubao 主轴 + gap > 10s 时产出
 """
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -31,13 +36,13 @@ class ASRPhase(Phase):
     """语音识别 Phase。"""
 
     name = "asr"
-    version = "4.0.0"
+    version = "4.1.0"
 
     def requires(self) -> list[str]:
         return ["extract.audio"]
 
     def provides(self) -> list[str]:
-        return ["asr.doubao", "asr.tencent", "asr.fish"]
+        return []  # 实际由 _LazyPhase 动态指定 [f"asr.{primary}"]
 
     def run(
         self,
@@ -60,9 +65,10 @@ class ASRPhase(Phase):
                 error=ErrorInfo(type="RuntimeError", message=f"Audio file is empty: {audio_path}"),
             )
 
+        primary = ctx.config.get("asr_primary", "doubao")
         force = ctx.config.get("force", False)
 
-        info(f"Audio: {audio_path.name} ({audio_path.stat().st_size / 1024 / 1024:.1f}MB)")
+        info(f"Audio: {audio_path.name} ({audio_path.stat().st_size / 1024 / 1024:.1f}MB), primary={primary}")
 
         # episode 信息（热词 + blob key）
         ep = None
@@ -80,32 +86,25 @@ class ASRPhase(Phase):
         blob_key = f"dramas/{drama_name}/asr/{ep_number}.wav"
 
         try:
-            # ── 第一步：跑 doubao ──
-            doubao_path = Path(ctx.workspace) / "asr-doubao.json"
-            if not force and doubao_path.exists() and doubao_path.stat().st_size > 0:
-                info("ASR: skip doubao (asr-doubao.json exists)")
-                doubao_result = None
+            actual_outputs: list = []
+            metrics: dict = {}
+            errors: dict = {}
+
+            # ── 第一步：跑 primary 模型 ──
+            primary_path = Path(ctx.workspace) / f"asr-{primary}.json"
+            if not force and primary_path.exists() and primary_path.stat().st_size > 0:
+                info(f"ASR: skip {primary} (asr-{primary}.json exists)")
             else:
-                info("ASR: running doubao")
-                tos = get_tos_store()
-                tos.write_file(audio_path, blob_key)
-                tos_url = tos.get_url(blob_key, expires=36000)
-                task_fn = _make_task("doubao", {"tos": tos_url}, audio_path, ctx.config, hotwords)
-                doubao_result = task_fn()
+                info(f"ASR: running {primary}")
+                urls = _upload_for_models([primary], audio_path, blob_key)
+                task_fn = _make_task(primary, urls, audio_path, ctx.config, hotwords)
+                result = task_fn()
+                _save_result(primary, result, outputs, ctx.workspace, actual_outputs, metrics)
 
-            # 保存 doubao 结果
-            actual_outputs = []
-            metrics = {}
-            errors = {}
-            if doubao_result is not None:
-                _save_result("doubao", doubao_result, outputs, ctx.workspace, actual_outputs, metrics)
-
-            # ── 第二步：检查空洞，决定是否跑补充模型 ──
-            extra_models = _check_gaps_and_get_extras(doubao_path)
-
-            if extra_models:
-                # 增量跳过已有结果的
-                if not force:
+            # ── 第二步：仅 doubao 主轴时检查空洞，决定是否跑 tencent/fish ──
+            if primary == "doubao":
+                extra_models = _check_gaps_and_get_extras(primary_path)
+                if extra_models and not force:
                     extra_models = [
                         m for m in extra_models
                         if not (Path(ctx.workspace) / f"asr-{m}.json").exists()
@@ -114,18 +113,7 @@ class ASRPhase(Phase):
 
                 if extra_models:
                     info(f"ASR: running extra models={extra_models}")
-                    # 按需上传
-                    stores_needed = {_MODEL_STORE.get(m, "tos") for m in extra_models}
-                    urls = {}
-                    if "tos" in stores_needed:
-                        tos = get_tos_store()
-                        tos.write_file(audio_path, blob_key)
-                        urls["tos"] = tos.get_url(blob_key, expires=36000)
-                    if "gcs" in stores_needed:
-                        gcs = get_gcs_store()
-                        gcs.write_file(audio_path, blob_key)
-                        urls["gcs"] = gcs.get_url(blob_key, expires=36000)
-
+                    urls = _upload_for_models(extra_models, audio_path, blob_key)
                     tasks = {m: _make_task(m, urls, audio_path, ctx.config, hotwords) for m in extra_models}
 
                     if len(tasks) == 1:
@@ -149,13 +137,11 @@ class ASRPhase(Phase):
                     for model, err in errors.items():
                         log_error(f"ASR {model} failed: {err}")
 
-            if not actual_outputs and not any(
-                (Path(ctx.workspace) / f"asr-{m}.json").exists() for m in ["doubao", "tencent", "fish"]
-            ):
-                msg = "; ".join(f"{m}: {e}" for m, e in errors.items())
+            if not primary_path.exists() or primary_path.stat().st_size == 0:
+                msg = "; ".join(f"{m}: {e}" for m, e in errors.items()) or f"primary={primary} not produced"
                 return PhaseResult(
                     status="failed",
-                    error=ErrorInfo(type="RuntimeError", message=f"All ASR models failed: {msg}"),
+                    error=ErrorInfo(type="RuntimeError", message=f"ASR primary failed: {msg}"),
                 )
 
             if errors:
@@ -172,6 +158,21 @@ class ASRPhase(Phase):
                 status="failed",
                 error=ErrorInfo(type=type(e).__name__, message=str(e)),
             )
+
+
+def _upload_for_models(models: list[str], audio_path: Path, blob_key: str) -> dict:
+    """按 model 列表所需的存储后端上传音频，返回签名 URL 字典。"""
+    stores_needed = {_MODEL_STORE.get(m, "tos") for m in models}
+    urls = {}
+    if "tos" in stores_needed:
+        tos = get_tos_store()
+        tos.write_file(audio_path, blob_key)
+        urls["tos"] = tos.get_url(blob_key, expires=36000)
+    if "gcs" in stores_needed:
+        gcs = get_gcs_store()
+        gcs.write_file(audio_path, blob_key)
+        urls["gcs"] = gcs.get_url(blob_key, expires=36000)
+    return urls
 
 
 _GAP_THRESHOLD_MS = 10000  # 空洞总时长超过 10s 才调补充模型

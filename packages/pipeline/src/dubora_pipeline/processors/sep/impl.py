@@ -59,13 +59,11 @@ def separate_vocals(input_path: str, output_dir: str, model: str = "htdemucs") -
     ]
     
     info(f"Separating vocals from {input_file.name} using Demucs ({model_name})...")
-    
-    # 运行 Demucs 命令
-    # 注意：需要 torchaudio==2.0.2（不使用 torchcodec）和 soundfile
+
     try:
         result = subprocess.run(
             cmd,
-            check=True,  # 必须成功
+            check=True,
             capture_output=True,
             text=True,
         )
@@ -80,15 +78,12 @@ def separate_vocals(input_path: str, output_dir: str, model: str = "htdemucs") -
         raise RuntimeError(
             f"Failed to separate vocals from {input_path}. "
             f"Demucs error (return code {e.returncode}). "
-            f"This is likely due to torchcodec dependency issues. "
-            f"Please downgrade torchaudio: pip install torchaudio==2.0.2"
+            f"If the error mentions 'torchcodec', install it: pip install torchcodec"
         ) from e
-    
-    # 验证输出文件
+
     if not vocals_cached.exists():
         raise RuntimeError(
-            f"Vocal separation failed: vocals.wav was not created in {demucs_output_dir}. "
-            f"Please ensure torchaudio==2.0.2 and soundfile are installed"
+            f"Vocal separation failed: vocals.wav was not created in {demucs_output_dir}"
         )
     
     if not accompaniment_cached.exists() and not no_vocals_cached.exists():

@@ -156,6 +156,7 @@ def get_azure_speech_region() -> str | None:
 class PipelineConfig:
     # ── ASR 配置 ──
     asr_use_vocals: bool = False  # True = 用分离后的 vocals 做 ASR
+    asr_primary: str = field(default_factory=lambda: os.getenv("ASR_PRIMARY", "doubao"))  # 主 ASR 模型: doubao(融合) / gemini(直通)
     asr_models: list = field(default_factory=lambda: [m.strip() for m in os.getenv("ASR_MODELS", "doubao,tencent,fish").split(",")])
     asr_gemini_model: str = field(default_factory=lambda: os.getenv("ASR_GEMINI_MODEL", "gemini-3.1-pro-preview"))
 
@@ -164,7 +165,7 @@ class PipelineConfig:
     openai_model: str = "gpt-4o-mini"
 
     # ── TTS 配置 ──
-    tts_engine: str = "volcengine"  # volcengine / azure
+    tts_engine: str = "volcengine"  # volcengine / fish
     tts_max_workers: int = 4  # 并发 worker 数
     tts_mute_original: bool = False  # 静音原声（默认 ducking）
     tts_volume: float = 1.4  # TTS 音量

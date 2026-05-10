@@ -962,9 +962,7 @@ class DbStore:
                 updates["text_cn"] = text_cn
             if text_en != (utt.get("text_en") or ""):
                 updates["text_en"] = text_en
-                updates["voice_hash"] = _compute_voice_hash(
-                    text_en, utt.get("speaker", ""), utt.get("emotion", "neutral"),
-                )
+                updates["voice_hash"] = ""  # invalidate to trigger TTS re-synthesis
             if updates:
                 updates["updated_at"] = now
                 set_clause = ", ".join(f"{k}=%s" for k in updates)

@@ -8,6 +8,7 @@ TTS Processor 模块（唯一公共入口）
 
 内部模块：
 - volcengine.py: VolcEngine TTS 实现
+- fish.py: Fish Audio TTS 实现（声音克隆）
 """
 from .processor import run_per_segment
 

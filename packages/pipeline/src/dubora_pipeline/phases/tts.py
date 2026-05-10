@@ -2,6 +2,7 @@
 TTS Phase: 语音合成（Timeline-First Architecture + 增量合成）
 
 支持增量模式：只合成 voice_hash 不匹配的 utterances。
+支持多引擎：通过 PipelineConfig.tts_engine 全局切换 volcengine / fish。
 
 输入: extract.audio (for duration probing), enriched utterances from DB
 输出:
@@ -43,10 +44,10 @@ def _probe_duration_ms(audio_path: str) -> int:
 
 
 class TTSPhase(Phase):
-    """语音合成 Phase（支持增量合成）。"""
+    """语音合成 Phase（支持增量合成 + 多引擎）。"""
 
     name = "tts"
-    version = "2.0.0"
+    version = "2.1.0"
 
     def requires(self) -> list[str]:
         """需要 extract.audio（用于 probe duration）。数据从 DB 读取。"""
@@ -91,6 +92,13 @@ class TTSPhase(Phase):
         # 获取配置
         phase_config = ctx.config.get("phases", {}).get("tts", {})
 
+        # 引擎选择: phase config > global config > default
+        tts_engine = (
+            phase_config.get("tts_engine") or
+            ctx.config.get("tts_engine", "volcengine")
+        )
+        info(f"TTS engine: {tts_engine}")
+
         # VolcEngine 配置
         volcengine_app_id = (
             phase_config.get("volcengine_app_id") or
@@ -110,14 +118,29 @@ class TTSPhase(Phase):
         max_workers = phase_config.get("max_workers", ctx.config.get("tts_max_workers", 4))
         language = phase_config.get("language", ctx.config.get("azure_tts_language", "en-US"))
 
-        if not volcengine_app_id or not volcengine_access_key:
+        # Fish Audio 配置
+        fish_api_key = (
+            phase_config.get("fish_api_key") or
+            ctx.config.get("fish_api_key") or
+            os.environ.get("FISH_API_KEY")
+        )
+
+        # 凭证校验
+        if tts_engine == "volcengine" and (not volcengine_app_id or not volcengine_access_key):
             return PhaseResult(
                 status="failed",
                 error=ErrorInfo(
                     type="ValueError",
-                    message="VolcEngine TTS credentials not set (volcengine_app_id and volcengine_access_key required). "
-                            "Set via env: DOUBAO_APPID and DOUBAO_ACCESS_TOKEN, "
-                            "or config: phases.tts.volcengine_app_id and phases.tts.volcengine_access_key",
+                    message="VolcEngine TTS credentials not set. "
+                            "Set env: DOUBAO_APPID and DOUBAO_ACCESS_TOKEN",
+                ),
+            )
+        if tts_engine == "fish" and not fish_api_key:
+            return PhaseResult(
+                status="failed",
+                error=ErrorInfo(
+                    type="ValueError",
+                    message="Fish Audio API key not set. Set env: FISH_API_KEY",
                 ),
             )
 
@@ -159,16 +182,18 @@ class TTSPhase(Phase):
             roles_map = store.get_roles_by_id(drama_id)       # {role_id_int: voice_type}
             role_names = store.get_role_name_map(drama_id)     # {role_id_int: name}
 
-            unassigned = self._check_voice_assignment(all_utts, roles_map, role_names)
-            if unassigned:
-                names = ", ".join(sorted(unassigned))
-                return PhaseResult(
-                    status="failed",
-                    error=ErrorInfo(
-                        type="VoiceAssignmentError",
-                        message=f"\u4ee5\u4e0b\u89d2\u8272\u672a\u5206\u914d\u97f3\u8272\uff0c\u8bf7\u5728 Voice Casting \u4e2d\u5b8c\u6210\u5206\u914d\u540e\u91cd\u8bd5: {names}",
-                    ),
-                )
+            # Fish 模式下不需要 voice_type，跳过声线分配检查
+            if tts_engine != "fish":
+                unassigned = self._check_voice_assignment(all_utts, roles_map, role_names)
+                if unassigned:
+                    names = ", ".join(sorted(unassigned))
+                    return PhaseResult(
+                        status="failed",
+                        error=ErrorInfo(
+                            type="VoiceAssignmentError",
+                            message=f"\u4ee5\u4e0b\u89d2\u8272\u672a\u5206\u914d\u97f3\u8272\uff0c\u8bf7\u5728 Voice Casting \u4e2d\u5b8c\u6210\u5206\u914d\u540e\u91cd\u8bd5: {names}",
+                        ),
+                    )
 
             # Ensure role sample audio exists for each role
             self._ensure_role_samples(
@@ -188,18 +213,27 @@ class TTSPhase(Phase):
 
             # Convert int-keyed roles_map to str-keyed for processor compatibility
             str_roles_map = {str(k): v for k, v in roles_map.items()}
+
+            # Build sample audio map for Fish mode
+            sample_audio_map = None
+            if tts_engine == "fish":
+                sample_audio_map = self._build_sample_audio_map(store, drama_id, workspace_path)
+
             result = tts_run_per_segment(
                 dub_manifest=dub_manifest,
                 segments_dir=str(segments_dir),
                 roles_map=str_roles_map,
+                tts_engine=tts_engine,
                 volcengine_app_id=volcengine_app_id,
                 volcengine_access_key=volcengine_access_key,
                 volcengine_resource_id=volcengine_resource_id,
                 volcengine_format=volcengine_format,
                 volcengine_sample_rate=volcengine_sample_rate,
+                fish_api_key=fish_api_key,
                 language=language,
                 max_workers=max_workers,
                 temp_dir=temp_dir,
+                sample_audio_map=sample_audio_map,
             )
 
             voice_assignment = result.data["voice_assignment"]
@@ -345,6 +379,40 @@ class TTSPhase(Phase):
             if not roles_map.get(spk_id):
                 unassigned.add(role_names.get(spk_id, str(spk_id)))
         return unassigned
+
+    def _build_sample_audio_map(
+        self, store: DbStore, drama_id: int, workspace_path: Path,
+    ) -> dict[str, str]:
+        """Build {role_id_str: local_audio_path} map for Fish voice cloning."""
+        roles = store.get_roles(drama_id)
+        result = {}
+        for role in roles:
+            gcs_key = role.get("sample_audio", "")
+            if not gcs_key:
+                continue
+            local_path = self._resolve_sample_audio(gcs_key, workspace_path)
+            if local_path:
+                result[str(role["id"])] = local_path
+        return result
+
+    def _resolve_sample_audio(self, gcs_key: str, workspace_path: Path) -> str:
+        """Resolve a GCS key for sample audio to a local file path."""
+        if not gcs_key:
+            return ""
+        # Check local roles dir first
+        roles_dir = workspace_path.parent / "roles"
+        local_name = Path(gcs_key).name
+        local_path = roles_dir / local_name
+        if local_path.exists():
+            return str(local_path)
+        # Fall back to GCS download
+        try:
+            from dubora_core.utils.file_store import get_gcs_store
+            gcs = get_gcs_store()
+            return str(gcs.get(gcs_key))
+        except Exception as e:
+            warning(f"Could not resolve sample audio {gcs_key}: {e}")
+            return ""
 
     def _ensure_role_samples(
         self,

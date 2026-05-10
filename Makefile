@@ -58,7 +58,7 @@ install-core:
 
 install-pipeline: install-core
 	@echo "Installing dubora-pipeline..."
-	@$(PIP) install -e packages/pipeline
+	@$(PIP) install -e 'packages/pipeline[dub]'
 
 install-web: install-core
 	@echo "Installing dubora-web..."
@@ -66,7 +66,7 @@ install-web: install-core
 
 install-all: install-core
 	@echo "Installing all packages..."
-	@$(PIP) install -e packages/pipeline -e packages/web
+	@$(PIP) install -e 'packages/pipeline[dub]' -e packages/web
 
 install-dev:
 	@echo "Installing dev tools..."

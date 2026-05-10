@@ -1,4 +1,4 @@
-
+[project]
 name = "dubora-pipeline"
 version = "2.0.0"
 description = "Dubora pipeline: heavy execution phases (extract, asr, tts, etc.)"
@@ -19,6 +19,7 @@ terms = ["pyyaml>=6.0"]
 dub = [
   "demucs>=4.0.0",
   "soundfile>=0.12.0",
+  "torchcodec>=0.9.0",
 ]
 
 [build-system]

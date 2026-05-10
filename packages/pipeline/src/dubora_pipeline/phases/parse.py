@@ -1,14 +1,11 @@
-"""Parse Phase: ASR 融合 → DB cues
+"""Parse Phase: ASR 结果 → DB cues
 
-输入：
-- asr.doubao（必需）
-- asr.tencent / asr.fish（可选，空洞 > 10s 时 asr phase 才会产出）
+支持两种主轴（由 ASR_PRIMARY 配置决定）：
 
-处理：
-1. split doubao utterances（标点 + 时间间隔拆分）
-2. 有 fish 时：LLM diff → fuse 三源融合；无 fish 时：只用 doubao
-3. emotion 回填 + end_ms 延长
-4. 构建 cue rows → 写文件 + 写 DB
+- doubao 主轴：三源融合（doubao 时间轴 + tencent 分段 + fish 文本 LLM 校准）
+- 其他主轴（gemini 等）：直通——直接用主模型输出做 emotion 回填 + end_ms 延长
+
+公共后处理：emotion 回填 + end_ms 延长 + 构建 cue rows → 写文件 + 写 DB
 """
 import json
 from pathlib import Path
@@ -22,13 +19,13 @@ from dubora_core.utils.logger import info
 
 
 class ParsePhase(Phase):
-    """三源融合 Phase。"""
+    """ASR 结果 → cue rows。"""
 
     name = "parse"
-    version = "4.0.0"
+    version = "4.1.0"
 
     def requires(self) -> list[str]:
-        return ["asr.doubao"]
+        return []  # 实际由 _LazyPhase 动态指定 [f"asr.{primary}"]
 
     def provides(self) -> list[str]:
         return []
@@ -38,6 +35,19 @@ class ParsePhase(Phase):
         ctx: RunContext,
         inputs: Dict[str, Artifact],
         outputs: ResolvedOutputs,
+    ) -> PhaseResult:
+        primary = ctx.config.get("asr_primary", "doubao")
+        info(f"Parse: primary={primary}")
+
+        if primary != "doubao":
+            return self._run_direct(primary, ctx, inputs)
+
+        return self._run_doubao_fusion(ctx, inputs)
+
+    def _run_doubao_fusion(
+        self,
+        ctx: RunContext,
+        inputs: Dict[str, Artifact],
     ) -> PhaseResult:
         doubao_path = Path(ctx.workspace) / inputs["asr.doubao"].relpath
         tencent_path = Path(ctx.workspace) / "asr-tencent.json"
@@ -144,51 +154,16 @@ class ParsePhase(Phase):
             fill_null_emotions(merged)
             merged = extend_end_ms(merged)
 
-            # 5. 构建 cue rows
-            _TRAILING_PUNC = "，。,.、；：;:"
-            cue_rows = []
-            for u in merged:
-                text = str(u.get("text", "")).strip().rstrip(_TRAILING_PUNC)
-                if not text:
-                    continue
-                cue_rows.append({
-                    "start_ms": int(u.get("start_ms", 0)),
-                    "end_ms": int(u.get("end_ms", 0)),
-                    "text": text,
-                    "speaker": str(u.get("speaker", "0")),
-                    "emotion": resolve_emotion(u.get("emotion") or "neutral"),
-                    "kind": u.get("type", "speech"),
-                    "gender": u.get("gender"),
-                })
-
             # 保存 LLM diff 中间结果（排查用，缓存命中时不覆盖）
             if not diff_path.exists():
                 with open(diff_path, "w", encoding="utf-8") as f:
                     json.dump(llm_result, f, indent=2, ensure_ascii=False)
 
-            # 写入本地文件
-            result_path = asr_dir / "asr-result.json"
-            with open(result_path, "w", encoding="utf-8") as f:
-                json.dump(cue_rows, f, indent=2, ensure_ascii=False)
-            info(f"Saved {len(cue_rows)} cues to {result_path.name}")
-
-            # 写入 SRC cues 到 DB
-            if ctx.store and ctx.episode_id:
-                ctx.store.delete_episode_utterances(ctx.episode_id)
-                ctx.store.delete_episode_cues(ctx.episode_id)
-                ctx.store.insert_cues(ctx.episode_id, cue_rows)
-                info(f"Wrote {len(cue_rows)} SRC cues to DB")
-
-            return PhaseResult(
-                status="succeeded",
-                outputs=[],
-                metrics={
-                    "segments_count": len(cue_rows),
-                    "doubao_count": len(doubao_utts),
-                    "filled_count": len(filled),
-                    "diff_count": len(llm_diff),
-                },
-            )
+            return _finalize_cues(merged, ctx, asr_dir, extra_metrics={
+                "doubao_count": len(doubao_utts),
+                "filled_count": len(filled),
+                "diff_count": len(llm_diff),
+            })
 
         except Exception as e:
             return PhaseResult(
@@ -198,3 +173,105 @@ class ParsePhase(Phase):
                     message=str(e),
                 ),
             )
+
+    def _run_direct(
+        self,
+        primary: str,
+        ctx: RunContext,
+        inputs: Dict[str, Artifact],
+    ) -> PhaseResult:
+        """非 doubao 主轴：直接用主模型输出生成 cues。"""
+        from dubora_pipeline.processors.asr.fusion import fill_null_emotions, extend_end_ms
+
+        artifact_key = f"asr.{primary}"
+        primary_path = Path(ctx.workspace) / inputs[artifact_key].relpath
+
+        try:
+            with open(primary_path, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+
+            segments = _extract_segments(primary, raw)
+            if not segments:
+                return PhaseResult(
+                    status="failed",
+                    error=ErrorInfo(type="ValueError", message=f"{primary} segments empty"),
+                )
+
+            info(f"Parse: loaded {len(segments)} segments from {primary_path.name}")
+
+            fill_null_emotions(segments)
+            segments = extend_end_ms(segments)
+
+            return _finalize_cues(segments, ctx, primary_path.parent, extra_metrics={
+                f"{primary}_count": len(segments),
+            })
+
+        except Exception as e:
+            return PhaseResult(
+                status="failed",
+                error=ErrorInfo(
+                    type=type(e).__name__,
+                    message=str(e),
+                ),
+            )
+
+
+def _extract_segments(primary: str, raw) -> list[dict]:
+    """从 asr-{primary}.json 取出统一格式的 segments。
+
+    输出字段：start_ms / end_ms / text / speaker / emotion / gender
+    """
+    if primary == "gemini":
+        return raw.get("utterances", []) if isinstance(raw, dict) else raw
+
+    raise ValueError(
+        f"Unsupported asr_primary={primary} for direct path. "
+        f"Add a normalizer in _extract_segments to map its output to the common cue shape."
+    )
+
+
+_TRAILING_PUNC = "，。,.、；：;:"
+
+
+def _finalize_cues(
+    segments: list[dict],
+    ctx: RunContext,
+    asr_dir: Path,
+    extra_metrics: dict | None = None,
+) -> PhaseResult:
+    """构建 cue rows + 写文件 + 写 DB。"""
+    cue_rows = []
+    for u in segments:
+        text = str(u.get("text", "")).strip().rstrip(_TRAILING_PUNC)
+        if not text:
+            continue
+        cue_rows.append({
+            "start_ms": int(u.get("start_ms", 0)),
+            "end_ms": int(u.get("end_ms", 0)),
+            "text": text,
+            "speaker": str(u.get("speaker", "0")),
+            "emotion": resolve_emotion(u.get("emotion") or "neutral"),
+            "kind": u.get("type", "speech"),
+            "gender": u.get("gender"),
+        })
+
+    result_path = asr_dir / "asr-result.json"
+    with open(result_path, "w", encoding="utf-8") as f:
+        json.dump(cue_rows, f, indent=2, ensure_ascii=False)
+    info(f"Saved {len(cue_rows)} cues to {result_path.name}")
+
+    if ctx.store and ctx.episode_id:
+        ctx.store.delete_episode_utterances(ctx.episode_id)
+        ctx.store.delete_episode_cues(ctx.episode_id)
+        ctx.store.insert_cues(ctx.episode_id, cue_rows)
+        info(f"Wrote {len(cue_rows)} SRC cues to DB")
+
+    metrics = {"segments_count": len(cue_rows)}
+    if extra_metrics:
+        metrics.update(extra_metrics)
+
+    return PhaseResult(
+        status="succeeded",
+        outputs=[],
+        metrics=metrics,
+    )

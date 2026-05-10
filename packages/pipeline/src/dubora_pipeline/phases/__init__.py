@@ -61,9 +61,12 @@ def build_phases(config=None) -> list:
 
     config-sensitive 的依赖：
     - asr_use_vocals: True → ASR 输入为 extract.vocals，False → extract.audio
+    - asr_primary: 主 ASR 模型，决定 asr/parse 的 artifact 边界
     """
     asr_use_vocals = getattr(config, "asr_use_vocals", False) if config else False
     asr_input = "extract.vocals" if asr_use_vocals else "extract.audio"
+    asr_primary = getattr(config, "asr_primary", "doubao") if config else "doubao"
+    primary_artifact = f"asr.{asr_primary}"
 
     return [
         _LazyPhase(
@@ -74,14 +77,14 @@ def build_phases(config=None) -> list:
         ),
         _LazyPhase(
             "dubora_pipeline.phases.asr", "ASRPhase",
-            name="asr", version="4.0.0",
-            requires=[asr_input], provides=["asr.doubao", "asr.tencent", "asr.fish"],
+            name="asr", version="4.1.0",
+            requires=[asr_input], provides=[primary_artifact],
             label="语音识别",
         ),
         _LazyPhase(
             "dubora_pipeline.phases.parse", "ParsePhase",
-            name="parse", version="4.0.0",
-            requires=["asr.doubao"], provides=[],
+            name="parse", version="4.1.0",
+            requires=[primary_artifact], provides=[],
             label="生成字幕",
         ),
         # ← Gate: source_review (校准)
