@@ -1,32 +1,39 @@
+# 本地单机调试用 docker-compose。
+# 生产部署 web 和 pipeline 各自跑在独立 GCP VM 上（deploy-web.sh / deploy-pipeline.sh），
+# 磁盘不共享，pipeline 通过 HTTP 调 web 的 /api/worker/* 访问 DB。
 version: "3.8"
 
 services:
+  # FastAPI web 服务（REST API + 前端静态文件 + Worker API）
   web:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.web
     ports:
-      - "8765:8765"
+      - "8765:8765"  # 宿主机:容器，浏览器访问 http://localhost:8765
     volumes:
+      # named volume：左 dubora-data 是卷名（底部 volumes 段声明），右 /data 是容器内挂载路径。Docker 自动建卷，不用宿主机 mkdir。
       - dubora-data:/data
     env_file:
-      - ../.env
+      - ../.env  # 加载根目录 .env（GEMINI_API_KEY / DOUBAO_* / GCS_* / DB_URL 等）
     restart: unless-stopped
 
+  # Pipeline worker：远程模式，通过 HTTP 调 web 的 /api/worker/* 端点访问 DB（不直连 DB）
   pipeline:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.pipeline
     volumes:
-      - dubora-data:/data
+      - dubora-data:/data  # 与 web 同卷，本地省事；生产是双 VM 各自磁盘，不共享
     env_file:
       - ../.env
     environment:
-      - API_URL=http://web:8765
+      - API_URL=http://web:8765  # compose 内部 DNS：服务名 "web" 解析到 web 容器
     command: ["vsd-pipeline", "worker", "--api-url", "http://web:8765"]
     restart: unless-stopped
     depends_on:
-      - web
+      - web  # 启动顺序保证（web 先起），不保证 web 已 ready；靠 restart: unless-stopped 兜底
 
+# 命名卷：Docker 管理生命周期。删除用 `docker-compose down -v`。
 volumes:
   dubora-data:
