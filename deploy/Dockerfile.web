@@ -21,6 +21,8 @@ RUN pip install --no-cache-dir ./packages/core ./packages/web
 # Copy frontend build output
 COPY --from=frontend /app/web/dist ./web/dist
 
+# 持久化数据目录：容器代码读 DATA_DIR 决定数据根路径；
+# VOLUME 声明 /data 为外置卷，部署时由 `docker run -v <host>:/data` 绑定到宿主机。
 VOLUME /data
 ENV DATA_DIR=/data
 
