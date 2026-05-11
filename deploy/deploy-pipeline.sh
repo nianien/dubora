@@ -13,9 +13,10 @@ REPO="dubora"
 IMAGE="dubora-pipeline"
 IMAGE_URL="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/${IMAGE}:latest"
 
-WEB_VM_NAME="dubora-web-sg"
+API_URL="https://dub.pikppo.com"   # web 域名（pipeline 通过它调 /api/worker/*）
+
 VM_NAME="dubora-pipeline-sg"
-VM_USER="nianien"
+VM_USER="${VM_USER:-$USER}"   # 默认用本地用户名（gcloud SSH 在 VM 上会建对应账户）
 CONTAINER_NAME="dubora-pipeline"
 DATA_DIR="/var/dubora/data"
 
@@ -23,10 +24,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # ── 工具 ──────────────────────────────────────────────────
+# 通过 IAP tunnel 走 Google 代理，避免出口 IP 被 sshd 拒绝
 log()  { echo "==> $*"; }
 fail() { echo "ERROR: $*" >&2; exit 1; }
-vm_ssh() { gcloud compute ssh "${VM_USER}@${VM_NAME}" --zone="$ZONE" --command="$1"; }
-vm_scp() { gcloud compute scp "$1" "${VM_USER}@${VM_NAME}:$2" --zone="$ZONE"; }
+vm_ssh() { gcloud compute ssh "${VM_USER}@${VM_NAME}" --zone="$ZONE" --tunnel-through-iap --command="$1"; }
+vm_scp() { gcloud compute scp "$1" "${VM_USER}@${VM_NAME}:$2" --zone="$ZONE" --tunnel-through-iap; }
 
 # ── 前置检查 ──────────────────────────────────────────────
 check_prerequisites() {
@@ -47,15 +49,6 @@ build_image() {
 }
 
 # ── 部署容器 ─────────────────────────────────────────────
-resolve_web_ip() {
-    log "Resolving web VM internal IP..."
-    WEB_IP=$(gcloud compute instances describe "$WEB_VM_NAME" \
-        --zone="$ZONE" --format="get(networkInterfaces[0].networkIP)")
-    [ -n "$WEB_IP" ] || fail "Cannot resolve web VM IP"
-    API_URL="http://${WEB_IP}:8765"
-    log "Web API: ${API_URL}"
-}
-
 deploy_to_vm() {
     log "Uploading .env..."
     vm_scp "$PROJECT_DIR/.env" "~/.env.dubora"
@@ -115,5 +108,4 @@ done
 
 check_prerequisites
 if $BUILD; then build_image; fi
-resolve_web_ip
 deploy_to_vm
