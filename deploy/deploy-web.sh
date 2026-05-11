@@ -65,7 +65,7 @@ build_image() {
 }
 
 # ── 部署容器 ─────────────────────────────────────────────
-2deploy_to_vm() {
+deploy_to_vm() {
     log "Uploading .env..."
     vm_scp "$PROJECT_DIR/.env" "~/.env.dubora"
 
