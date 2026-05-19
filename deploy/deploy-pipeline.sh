@@ -53,6 +53,16 @@ deploy_to_vm() {
     log "Uploading .env..."
     vm_scp "$PROJECT_DIR/.env" "~/.env.dubora"
 
+    log "Preparing data directories..."
+    vm_ssh "
+        sudo mkdir -p ${DATA_DIR}/.gcp
+        sudo chown -R \$(id -u):\$(id -g) ${DATA_DIR%/*}
+    "
+
+    log "Uploading GCP service account key..."
+    [ -f "$PROJECT_DIR/.gcp/pikppo-dubora.json" ] || fail ".gcp/pikppo-dubora.json not found"
+    vm_scp "$PROJECT_DIR/.gcp/pikppo-dubora.json" "${DATA_DIR}/.gcp/pikppo-dubora.json"
+
     log "Deploying container..."
     log "Authenticating Docker on VM..."
     local token
