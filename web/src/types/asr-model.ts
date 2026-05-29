@@ -74,6 +74,7 @@ export interface Episode {
   drama: string
   drama_id: number
   episode: number
+  name: string
   path: string
   status: EpisodeStatus
   updated_at: string | null

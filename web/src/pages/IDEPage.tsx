@@ -75,7 +75,7 @@ export function IDEPage() {
         </svg>
 
         <span className="text-xs font-medium text-gray-200">
-          {currentEp ? `第 ${currentEp.episode} 集` : '...'}
+          {currentEp ? (currentEp.name || `第 ${currentEp.episode} 集`) : '...'}
         </span>
 
         <div className="flex-1" />

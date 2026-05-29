@@ -113,6 +113,7 @@ class DbStore:
                 id          SERIAL PRIMARY KEY,
                 drama_id    INTEGER NOT NULL REFERENCES dramas(id),
                 number      INTEGER NOT NULL,
+                name        TEXT NOT NULL DEFAULT '',
                 path        TEXT NOT NULL DEFAULT '',
                 status      TEXT NOT NULL DEFAULT 'ready',
                 created_at  TEXT NOT NULL,
@@ -282,16 +283,17 @@ class DbStore:
         ).fetchone()
         return row["id"]
 
-    def ensure_episode(self, *, drama_id: int, number: int, path: str = "") -> int:
+    def ensure_episode(self, *, drama_id: int, number: int, path: str = "", name: str = "") -> int:
         """Insert or update an episode. Returns the episode id."""
         now = _now_iso()
         self._execute(
-            """INSERT INTO episodes (drama_id, number, path, created_at, updated_at)
-               VALUES (%s, %s, %s, %s, %s)
+            """INSERT INTO episodes (drama_id, number, name, path, created_at, updated_at)
+               VALUES (%s, %s, %s, %s, %s, %s)
                ON CONFLICT(drama_id, number) DO UPDATE SET
+                   name = CASE WHEN excluded.name != '' THEN excluded.name ELSE episodes.name END,
                    path = CASE WHEN excluded.path != '' THEN excluded.path ELSE episodes.path END,
                    updated_at=excluded.updated_at""",
-            (drama_id, number, path, now, now),
+            (drama_id, number, name, path, now, now),
         )
         # Keep total_episodes in sync
         self._execute(

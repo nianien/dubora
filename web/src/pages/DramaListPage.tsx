@@ -617,7 +617,7 @@ export function DramaListPage() {
                       </div>
                     </div>
                     <h3 className="text-sm font-medium mb-2 group-hover:text-white transition-colors">
-                      第 {ep.episode} 集
+                      {ep.name || `第 ${ep.episode} 集`}
                     </h3>
                     {ep.updated_at && (
                       <p className="text-[10px] text-gray-600">{timeAgo(ep.updated_at)}</p>

@@ -128,15 +128,12 @@ async def create_drama(request: Request, body: CreateDramaBody) -> dict:
     user_id = get_user_id(request)
     drama_id = store.ensure_drama(name=body.name, synopsis=body.synopsis, user_id=user_id)
 
-    # Set total_episodes
+    # Set declared total_episodes; actual episode rows are created on video upload.
     if body.total_episodes > 0:
         store._execute(
             "UPDATE dramas SET total_episodes=%s WHERE id=%s",
             (body.total_episodes, drama_id),
         )
-        # Batch-create episode records
-        for i in range(1, body.total_episodes + 1):
-            store.ensure_episode(drama_id=drama_id, number=i)
         store._conn.commit()
 
     return {"id": drama_id, "name": body.name}
@@ -222,8 +219,9 @@ _ALLOWED_VIDEO_EXTS = {".mp4", ".mkv", ".mov", ".avi", ".flv", ".wmv", ".webm"}
 async def upload_video(request: Request, drama_id: int, file: UploadFile) -> dict:
     """Upload a video file for a drama episode.
 
-    Episode number is extracted from filename (e.g. 4.mp4 → ep 4).
-    Associates with existing empty episode or creates a new one.
+    Episode number derivation:
+    - Numeric stem (e.g. 4.mp4, 014.mp4, 第14集.mp4) → use that number (drama mode).
+    - Other names (e.g. teaser.mp4, my-video.mp4) → auto-assign MAX(number)+1 (short-video mode).
     """
     import re
 
@@ -240,19 +238,22 @@ async def upload_video(request: Request, drama_id: int, file: UploadFile) -> dic
     if ext not in _ALLOWED_VIDEO_EXTS:
         raise HTTPException(status_code=400, detail=f"不支持的视频格式: {ext}")
 
-    # Extract episode number from filename
-    # Supported: 14.mp4, 014.mp4, 第14集.mp4
     stem = Path(filename).stem
+    if not stem or "/" in stem or "\\" in stem or ".." in stem:
+        raise HTTPException(status_code=400, detail="非法文件名")
+
     m = re.match(r"^0*(\d+)$", stem) or re.match(r"^第0*(\d+)集$", stem)
-    if not m:
-        raise HTTPException(
-            status_code=400,
-            detail="文件名格式不正确，请使用集号命名（如 1.mp4、02.mp4、第14集.mp4）",
-        )
-    ep_number = m.group(1)  # stripped leading zeros
+    if m:
+        ep_number: int | None = int(m.group(1))
+        ep_name = ""
+        key_name = f"{ep_number}{ext}"
+    else:
+        ep_number = None  # assigned atomically after GCS upload
+        ep_name = stem
+        key_name = f"{stem}{ext}"
 
     content = await file.read()
-    key = f"dramas/{drama_name}/videos/{ep_number}{ext}"
+    key = f"dramas/{drama_name}/videos/{key_name}"
 
     from dubora_core.utils.file_store import get_gcs_store
     gcs = get_gcs_store()
@@ -262,10 +263,19 @@ async def upload_video(request: Request, drama_id: int, file: UploadFile) -> dic
     except Exception:
         logger.warning("GCS upload skipped for video: %s", key)
 
-    # Ensure episode record (creates if not exists, updates path if exists)
-    ep_id = store.ensure_episode(drama_id=drama_id, number=int(ep_number), path=key)
+    # Tight critical section: advisory lock serializes per-drama MAX+1 assignment.
+    # Held only across SELECT MAX + INSERT; auto-released on ensure_episode's commit.
+    if ep_number is None:
+        store._execute("SELECT pg_advisory_xact_lock(%s)", (drama_id,))
+        row = store._execute(
+            "SELECT COALESCE(MAX(number), 0) AS m FROM episodes WHERE drama_id=%s",
+            (drama_id,),
+        ).fetchone()
+        ep_number = int(row["m"]) + 1
 
-    return {"id": ep_id, "episode": int(ep_number), "path": key}
+    ep_id = store.ensure_episode(drama_id=drama_id, number=ep_number, path=key, name=ep_name)
+
+    return {"id": ep_id, "episode": ep_number, "name": ep_name, "path": key}
 
 
 @router.get("/episodes")
@@ -293,7 +303,7 @@ async def list_episodes(request: Request) -> List[dict]:
 
     if user_id is not None:
         rows = store._execute(
-            """SELECT e.id, e.number, e.path, e.status, e.drama_id,
+            """SELECT e.id, e.number, e.name AS ep_name, e.path, e.status, e.drama_id,
                       e.updated_at,
                       d.name AS drama_name
                FROM episodes e
@@ -304,7 +314,7 @@ async def list_episodes(request: Request) -> List[dict]:
         ).fetchall()
     else:
         rows = store._execute(
-            """SELECT e.id, e.number, e.path, e.status, e.drama_id,
+            """SELECT e.id, e.number, e.name AS ep_name, e.path, e.status, e.drama_id,
                       e.updated_at,
                       d.name AS drama_name
                FROM episodes e
@@ -370,6 +380,7 @@ async def list_episodes(request: Request) -> List[dict]:
             "drama": r["drama_name"],
             "drama_id": r["drama_id"],
             "episode": r["number"],
+            "name": r["ep_name"] or "",
             "path": r["path"] or "",
             "status": r["status"],
             "updated_at": r["updated_at"],

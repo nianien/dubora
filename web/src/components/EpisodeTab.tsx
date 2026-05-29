@@ -53,7 +53,6 @@ export function EpisodeTab({ drama, episodes, onRefresh }: Props) {
           episode: m ? m[1] : '',
           progress: 0,
           status: 'pending' as const,
-          error: m ? undefined : '文件名格式不正确',
         }
       })
       .sort((a, b) => Number(a.episode || 0) - Number(b.episode || 0))
@@ -361,7 +360,7 @@ export function EpisodeTab({ drama, episodes, onRefresh }: Props) {
                 >
                   <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
                   <span className="font-medium text-sm truncate group-hover:text-white transition-colors">
-                    第 {ep.episode} 集
+                    {ep.name || `第 ${ep.episode} 集`}
                   </span>
                   {ep.dubbed_video && (
                     <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">
