@@ -118,8 +118,13 @@ export const useModelStore = create<ModelState>((set, get) => ({
       const data = await fetchJson<{ cues: Cue[] }>(
         `/episodes/${encodeURIComponent(drama)}/${encodeURIComponent(episode)}/cues`,
       )
+      // Stale-request guard: 切换 episode 后慢一拍返回的旧请求不应覆盖新 episode 的 cues
+      const cur = get()
+      if (cur.currentDrama !== drama || cur.currentEpisode !== episode) return
       set({ cues: data.cues ?? [], loaded: true })
     } catch {
+      const cur = get()
+      if (cur.currentDrama !== drama || cur.currentEpisode !== episode) return
       set({ cues: [], loaded: true })
     }
   },
@@ -145,8 +150,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
       const data = await fetchJson<{ utterances: Utterance[] }>(
         `/episodes/${encodeURIComponent(drama)}/${encodeURIComponent(episode)}/utterances`,
       )
+      const cur = get()
+      if (cur.currentDrama !== drama || cur.currentEpisode !== episode) return
       set({ utterances: data.utterances ?? [] })
     } catch {
+      const cur = get()
+      if (cur.currentDrama !== drama || cur.currentEpisode !== episode) return
       set({ utterances: [] })
     }
   },

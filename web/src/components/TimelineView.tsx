@@ -158,7 +158,7 @@ export function TimelineView() {
 
     // Draw cues — all on one track
     cues.forEach(cue => {
-      const spkIdx = speakers.indexOf(cue.speaker)
+      const spkIdx = speakers.indexOf(cue.role_id)
       const x1 = msToX(cue.start_ms)
       const x2 = msToX(cue.end_ms)
       const cueWidth = Math.max(2, x2 - x1)
@@ -389,7 +389,8 @@ export function TimelineView() {
             text: '',
             start_ms: newStart,
             end_ms: Math.max(newEnd, newStart + 100),
-            speaker: refCue?.speaker ?? 0,
+            speaker: '',
+            role_id: refCue?.role_id ?? null,
             emotion: 'neutral',
             kind: 'speech',
           }

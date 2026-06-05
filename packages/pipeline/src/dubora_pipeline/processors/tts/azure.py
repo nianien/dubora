@@ -7,7 +7,6 @@ Functions:
 """
 import hashlib
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -701,8 +700,7 @@ def _align_segment_to_window(
     
     # 计算需要的压缩比（ratio < 1 表示需要加速）
     ratio = budget_ms / real_ms if real_ms > 0 else 1.0
-    speedup = 1.0 / ratio if ratio > 0 else 1.0  # speedup > 1 表示加速
-    
+
     # Step 1: 如果 real_ms <= budget_ms → padding
     if real_ms <= budget_ms:
         pad_duration = budget_ms - real_ms

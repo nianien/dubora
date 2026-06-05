@@ -68,6 +68,16 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
 
+CREATE TABLE IF NOT EXISTS roles (
+    id            SERIAL PRIMARY KEY,
+    drama_id      INTEGER NOT NULL REFERENCES dramas(id),
+    name          TEXT NOT NULL,
+    voice_type    TEXT NOT NULL DEFAULT '',
+    role_type     TEXT NOT NULL DEFAULT 'extra',
+    sample_audio  TEXT NOT NULL DEFAULT '',
+    UNIQUE(drama_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS utterances (
     id              SERIAL PRIMARY KEY,
     episode_id      INTEGER NOT NULL REFERENCES episodes(id),
@@ -76,6 +86,7 @@ CREATE TABLE IF NOT EXISTS utterances (
     start_ms        INTEGER NOT NULL DEFAULT 0,
     end_ms          INTEGER NOT NULL DEFAULT 0,
     speaker         TEXT NOT NULL DEFAULT '',
+    role_id         INTEGER REFERENCES roles(id),
     emotion         TEXT NOT NULL DEFAULT 'neutral',
     gender          TEXT,
     kind            TEXT NOT NULL DEFAULT 'speech',
@@ -99,6 +110,7 @@ CREATE TABLE IF NOT EXISTS cues (
     start_ms     INTEGER NOT NULL,
     end_ms       INTEGER NOT NULL,
     speaker      TEXT NOT NULL DEFAULT '',
+    role_id      INTEGER REFERENCES roles(id),
     emotion      TEXT NOT NULL DEFAULT 'neutral',
     gender       TEXT,
     kind         TEXT NOT NULL DEFAULT 'speech',
@@ -111,16 +123,6 @@ CREATE TABLE IF NOT EXISTS utterance_cues (
     utterance_id INTEGER NOT NULL REFERENCES utterances(id),
     cue_id       INTEGER NOT NULL REFERENCES cues(id),
     PRIMARY KEY (utterance_id, cue_id)
-);
-
-CREATE TABLE IF NOT EXISTS roles (
-    id            SERIAL PRIMARY KEY,
-    drama_id      INTEGER NOT NULL REFERENCES dramas(id),
-    name          TEXT NOT NULL,
-    voice_type    TEXT NOT NULL DEFAULT '',
-    role_type     TEXT NOT NULL DEFAULT 'extra',
-    sample_audio  TEXT NOT NULL DEFAULT '',
-    UNIQUE(drama_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS glossary (

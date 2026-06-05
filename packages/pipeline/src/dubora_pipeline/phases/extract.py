@@ -153,7 +153,7 @@ class ExtractPhase(Phase):
         vocals_size = vocals_path.stat().st_size / 1024 / 1024
         accompaniment_size = accompaniment_path.stat().st_size / 1024 / 1024
 
-        info(f"Vocal separation succeeded:")
+        info("Vocal separation succeeded:")
         info(f"  Vocals: {vocals_path.name} (size: {vocals_size:.2f} MB)")
         info(f"  Accompaniment: {accompaniment_path.name} (size: {accompaniment_size:.2f} MB)")
 

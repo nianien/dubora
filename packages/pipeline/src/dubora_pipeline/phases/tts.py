@@ -23,7 +23,7 @@ from dubora_core.store import DbStore, _compute_voice_hash
 from dubora_core.manifest import resolve_artifact_path
 from dubora_pipeline.types import Artifact, ErrorInfo, PhaseResult, RunContext, ResolvedOutputs
 from dubora_pipeline.processors.tts import run_per_segment as tts_run_per_segment
-from dubora_pipeline.schema.dub_manifest import dub_manifest_from_utterances, DubManifest, DubUtterance, TTSPolicy
+from dubora_pipeline.schema.dub_manifest import dub_manifest_from_utterances
 from dubora_pipeline.schema.tts_report import tts_report_to_dict
 from dubora_core.utils.logger import info, warning
 
@@ -145,10 +145,39 @@ class TTSPhase(Phase):
             )
 
         try:
-            # Read all utterances from DB
+            # Episode + drama 元数据
+            ep = store.get_episode(episode_id)
+            drama_id = ep["drama_id"] if ep else 0
+            roles_map = store.get_roles_by_id(drama_id)        # {role_id_int: voice_type}
+            role_names = store.get_role_name_map(drama_id)     # {role_id_int: name}
+
+            # Read all utterances from DB. role_id / voice_type 必须显式分配，
+            # 不存在"默认 role"或"硬编码兜底音色"，未分配直接 fail-fast。
             all_utts = store.get_utterances(episode_id)
+
             full_manifest = dub_manifest_from_utterances(all_utts, audio_duration_ms)
             info(f"Loaded {len(all_utts)} utterances from DB, {len(full_manifest.utterances)} with translations, audio_duration_ms={full_manifest.audio_duration_ms}")
+
+            # Fail-fast: 任何 utterance 未分配 role 或对应 role 缺 voice_type 都报错
+            no_role_count, missing_voice_roles = self._check_voice_assignment(
+                all_utts, roles_map, role_names,
+            )
+            if no_role_count or missing_voice_roles:
+                parts: list[str] = []
+                if no_role_count:
+                    parts.append(
+                        f"存在 {no_role_count} 条字幕未指定角色，请在字幕编辑页为相应字幕指定角色"
+                    )
+                if missing_voice_roles:
+                    names = "、".join(f"【{n}】" for n in sorted(missing_voice_roles))
+                    parts.append(
+                        f"角色{names}未设置音色，请到「角色管理」页面完成设置"
+                    )
+                msg = "；".join(parts) + "。"
+                return PhaseResult(
+                    status="failed",
+                    error=ErrorInfo(type="VoiceAssignmentError", message=msg),
+                )
 
             # Find dirty utterances (voice_hash mismatch)
             dirty_utts = store.get_dirty_utterances_for_tts(episode_id)
@@ -176,33 +205,17 @@ class TTSPhase(Phase):
                     metrics={"total_segments": 0, "success_count": 0, "failed_count": 0, "incremental": True},
                 )
 
-            # Voice assignment check (DB-backed, id-keyed)
-            ep = store.get_episode(episode_id)
-            drama_id = ep["drama_id"] if ep else 0
-            roles_map = store.get_roles_by_id(drama_id)       # {role_id_int: voice_type}
-            role_names = store.get_role_name_map(drama_id)     # {role_id_int: name}
-
-            # Fish 模式下不需要 voice_type，跳过声线分配检查
-            if tts_engine != "fish":
-                unassigned = self._check_voice_assignment(all_utts, roles_map, role_names)
-                if unassigned:
-                    names = ", ".join(sorted(unassigned))
-                    return PhaseResult(
-                        status="failed",
-                        error=ErrorInfo(
-                            type="VoiceAssignmentError",
-                            message=f"\u4ee5\u4e0b\u89d2\u8272\u672a\u5206\u914d\u97f3\u8272\uff0c\u8bf7\u5728 Voice Casting \u4e2d\u5b8c\u6210\u5206\u914d\u540e\u91cd\u8bd5: {names}",
-                        ),
-                    )
-
-            # Ensure role sample audio exists for each role
-            self._ensure_role_samples(
-                store=store,
-                episode_id=episode_id,
-                drama_id=drama_id,
-                drama_name=ep["drama_name"],
-                workspace_path=workspace_path,
-            )
+            # Fish 克隆参考音频：per-episode + per-role 截取（sample 不跨集复用）
+            sample_audio_map = None
+            if tts_engine == "fish":
+                sample_audio_map = self._ensure_role_samples(
+                    store=store,
+                    episode_id=episode_id,
+                    drama_id=drama_id,
+                    drama_name=ep["drama_name"],
+                    ep_number=ep["number"],
+                    workspace_path=workspace_path,
+                )
 
             # TTS synthesis
             segments_dir = outputs.get("tts.segments_dir")
@@ -213,11 +226,6 @@ class TTSPhase(Phase):
 
             # Convert int-keyed roles_map to str-keyed for processor compatibility
             str_roles_map = {str(k): v for k, v in roles_map.items()}
-
-            # Build sample audio map for Fish mode
-            sample_audio_map = None
-            if tts_engine == "fish":
-                sample_audio_map = self._build_sample_audio_map(store, drama_id, workspace_path)
 
             result = tts_run_per_segment(
                 dub_manifest=dub_manifest,
@@ -253,7 +261,7 @@ class TTSPhase(Phase):
             report_path.parent.mkdir(parents=True, exist_ok=True)
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(tts_report_to_dict(tts_report), f, indent=2, ensure_ascii=False)
-            info(f"Debug: saved TTS report + voice assignment")
+            info("Debug: saved TTS report + voice assignment")
 
             # Generate segments.json index
             from dubora_pipeline.fingerprints import hash_file
@@ -262,10 +270,12 @@ class TTSPhase(Phase):
                 if seg.error:
                     continue
                 seg_file = segments_dir / seg.output_path
-                spk_info = voice_assignment.get("speakers", {}).get(
-                    next((u.speaker for u in dub_manifest.utterances if u.utt_id == seg.utt_id), ""),
-                    {},
+                role_key = next(
+                    (str(u.role_id) for u in dub_manifest.utterances
+                     if u.utt_id == seg.utt_id and u.role_id is not None),
+                    "",
                 )
+                spk_info = voice_assignment.get("speakers", {}).get(role_key, {})
                 segments_index[seg.utt_id] = {
                     "wav_path": seg.output_path,
                     "voice_id": spk_info.get("voice_type", ""),
@@ -305,7 +315,7 @@ class TTSPhase(Phase):
                         tts_error=None,
                         voice_hash=_compute_voice_hash(
                             db_utt.get("text_en", ""),
-                            db_utt.get("speaker", ""),
+                            db_utt.get("role_id"),
                             db_utt.get("emotion", ""),
                         ),
                     )
@@ -328,8 +338,12 @@ class TTSPhase(Phase):
                 if physical_ms > 0 and tts_ms > 0:
                     drift = tts_ms / physical_ms
                     if drift > 1.1:
-                        spk = role_names.get(int(utt.get("speaker", 0)), str(utt.get("speaker", "")))
-                        drift_warnings.append(f"utt {utt['id']} ({spk}): drift={drift:.2f}")
+                        rid = utt.get("role_id")
+                        role_name = role_names.get(rid, str(rid)) if rid is not None else ""
+                        drift_warnings.append(
+                            f"utt {utt['id']} (speaker={utt.get('speaker','')}, role={role_name}): "
+                            f"drift={drift:.2f}"
+                        )
             if drift_warnings:
                 for w in drift_warnings:
                     warning(f"Drift: {w}")
@@ -363,56 +377,28 @@ class TTSPhase(Phase):
         segments_dir.mkdir(parents=True, exist_ok=True)
 
     def _check_voice_assignment(
-        self, utts: list[dict], roles_map: dict[int, str], role_names: dict[int, str],
-    ) -> set[str]:
-        """检查所有 speaker(role_id) 是否已在 DB roles 中分配音色。返回未分配角色的名字。"""
-        speakers = set()
+        self,
+        utts: list[dict],
+        roles_map: dict[int, str],
+        role_names: dict[int, str],
+    ) -> tuple[int, set[str]]:
+        """检查每条 utt 是否显式分配了 role 且对应 role 有 voice_type。
+
+        Returns:
+            (no_role_count, missing_voice_role_names)
+            - no_role_count: utt.role_id 为 None 的条数
+            - missing_voice_role_names: role 存在但 voice_type 为空的角色展示名集合
+        """
+        no_role_count = 0
+        missing_voice_roles: set[str] = set()
         for u in utts:
-            spk = u.get("speaker")
-            if spk:
-                try:
-                    speakers.add(int(spk))
-                except (ValueError, TypeError):
-                    pass
-        unassigned = set()
-        for spk_id in speakers:
-            if not roles_map.get(spk_id):
-                unassigned.add(role_names.get(spk_id, str(spk_id)))
-        return unassigned
-
-    def _build_sample_audio_map(
-        self, store: DbStore, drama_id: int, workspace_path: Path,
-    ) -> dict[str, str]:
-        """Build {role_id_str: local_audio_path} map for Fish voice cloning."""
-        roles = store.get_roles(drama_id)
-        result = {}
-        for role in roles:
-            gcs_key = role.get("sample_audio", "")
-            if not gcs_key:
+            rid = u.get("role_id")
+            if rid is None:
+                no_role_count += 1
                 continue
-            local_path = self._resolve_sample_audio(gcs_key, workspace_path)
-            if local_path:
-                result[str(role["id"])] = local_path
-        return result
-
-    def _resolve_sample_audio(self, gcs_key: str, workspace_path: Path) -> str:
-        """Resolve a GCS key for sample audio to a local file path."""
-        if not gcs_key:
-            return ""
-        # Check local roles dir first
-        roles_dir = workspace_path.parent / "roles"
-        local_name = Path(gcs_key).name
-        local_path = roles_dir / local_name
-        if local_path.exists():
-            return str(local_path)
-        # Fall back to GCS download
-        try:
-            from dubora_core.utils.file_store import get_gcs_store
-            gcs = get_gcs_store()
-            return str(gcs.get(gcs_key))
-        except Exception as e:
-            warning(f"Could not resolve sample audio {gcs_key}: {e}")
-            return ""
+            if not roles_map.get(rid):
+                missing_voice_roles.add(role_names.get(rid, str(rid)))
+        return no_role_count, missing_voice_roles
 
     def _ensure_role_samples(
         self,
@@ -421,97 +407,162 @@ class TTSPhase(Phase):
         episode_id: int,
         drama_id: int,
         drama_name: str,
+        ep_number: int,
         workspace_path: Path,
-    ) -> None:
-        """为缺少样本音频的角色从 vocals 中提取参考音频片段。
+    ) -> dict[str, str]:
+        """为 drama 内每个 role 准备 sample 参考音频（drama 级，跨集复用）。
 
-        选择质量最优的 cue（speech、2-8秒、>=4字），从 vocals.wav 截取并上传 GCS。
+        设计原则（drama 级 + 跨集采样）:
+          - role 是 drama 级实体，sample 也是 drama 级，一旦截过就跨集复用
+          - sample 候选池：该 role 在 drama 内所有 episode 的 cue.role_id == role.id
+          - 已有 sample（本地或 GCS）→ 直接复用，不重新采
+          - 否则从候选 cue 中选最优一条（接近 5 秒），从对应 episode 的 vocals 截取
+          - 若候选 cue 所在 episode 的 vocals 本地不可用，则取次优
+
+        筛选条件：speech、2-8 秒、>=4 字。
+
+        路径约定（drama 级）：
+          local: data/pipeline/{drama}/roles/{role_id}_sample.wav
+          gcs:   dramas/{drama}/roles/{role_id}_sample.wav
+
+        Returns:
+            {role_id_str: local_path_str} 已就绪的 sample map
         """
+        from dubora_core.config.settings import get_drama_dir, get_workdir
+        from dubora_core.utils.file_store import get_gcs_store
+
+        # Drama 级 samples 目录
+        samples_dir = get_drama_dir(drama_name) / "roles"
+        samples_dir.mkdir(parents=True, exist_ok=True)
+
         roles = store.get_roles(drama_id)
-        roles_needing_sample = [r for r in roles if not r.get("sample_audio")]
-        if not roles_needing_sample:
-            info("All roles already have sample audio, skipping extraction")
-            return
+        role_names = store.get_role_name_map(drama_id)
+        gcs = get_gcs_store()
 
-        # Resolve vocals path
-        vocals_path = resolve_artifact_path("extract.vocals", workspace_path)
-        if not vocals_path.exists():
-            warning(f"Vocals file not found at {vocals_path}, skipping role sample extraction")
-            return
+        result: dict[str, str] = {}
 
-        # Probe vocals duration
-        try:
-            audio_duration_ms = _probe_duration_ms(str(vocals_path))
-        except RuntimeError as e:
-            warning(f"Could not probe vocals duration: {e}, skipping role sample extraction")
-            return
-
-        cues = store.get_cues(episode_id)
-
-        # Output directory for role samples (drama-level)
-        roles_dir = workspace_path.parent / "roles"
-        roles_dir.mkdir(parents=True, exist_ok=True)
-
-        PAD_MS = 100
-
-        for role in roles_needing_sample:
+        # Step 1: 收集已有 sample 的 role（本地优先，否则 GCS 拉）
+        roles_needing: list[dict] = []
+        for role in roles:
             role_id = role["id"]
-            role_name = role["name"]
+            local_path = samples_dir / f"{role_id}_sample.wav"
+            if local_path.exists():
+                result[str(role_id)] = str(local_path)
+                continue
+            # 本地不在 → 看 DB 记录的 GCS key，能拉就拉
+            gcs_key = role.get("sample_audio", "")
+            if gcs_key:
+                try:
+                    downloaded = gcs.get(gcs_key)
+                    if Path(downloaded).exists():
+                        result[str(role_id)] = str(downloaded)
+                        info(f"Reused sample for role {role_names.get(role_id, role_id)} from GCS: {gcs_key}")
+                        continue
+                except Exception as e:
+                    warning(f"GCS download failed for role {role_id} ({gcs_key}): {e}")
+            roles_needing.append(role)
 
-            # Filter cues for this role
-            role_cues = [
-                c for c in cues
-                if c.get("speaker") == role_id
-                and c.get("kind") == "speech"
+        if not roles_needing:
+            info("All roles already have samples, skipping extraction")
+            return result
+
+        # Step 2: 给缺 sample 的 role 跨集找 cue 候选
+        def _quality_filter(c: dict) -> bool:
+            return (
+                c.get("kind") == "speech"
                 and (c["end_ms"] - c["start_ms"]) >= 2000
                 and (c["end_ms"] - c["start_ms"]) <= 8000
                 and len(c.get("text") or "") >= 4
-            ]
+            )
 
-            if not role_cues:
-                warning(f"No suitable cue found for role {role_name} (id={role_id}), skipping sample extraction")
-                continue
+        PAD_MS = 100
+        # Vocals 路径缓存（每集只 probe 一次 duration）
+        vocals_cache: dict[int, tuple[Path, int]] = {}  # ep_number -> (vocals_path, duration_ms)
 
-            # Sort: prefer duration closest to 4-6 seconds (5000ms center)
-            role_cues.sort(key=lambda c: abs((c["end_ms"] - c["start_ms"]) - 5000))
-            best_cue = role_cues[0]
-
-            # Extract audio clip with padding
-            start_s = max(0, (best_cue["start_ms"] - PAD_MS)) / 1000.0
-            end_s = min(audio_duration_ms, (best_cue["end_ms"] + PAD_MS)) / 1000.0
-            duration_s = end_s - start_s
-
-            output_path = roles_dir / f"{role_id}_sample.wav"
-            cmd = [
-                "ffmpeg", "-y",
-                "-i", str(vocals_path),
-                "-ss", f"{start_s:.3f}",
-                "-t", f"{duration_s:.3f}",
-                "-ar", "24000", "-ac", "1",
-                str(output_path),
-            ]
-
+        def _resolve_vocals(ep_num: int) -> tuple[Path | None, int]:
+            if ep_num in vocals_cache:
+                return vocals_cache[ep_num]
+            if ep_num == ep_number:
+                vp = resolve_artifact_path("extract.vocals", workspace_path)
+            else:
+                other_workspace = get_workdir(drama_name, ep_num)
+                vp = resolve_artifact_path("extract.vocals", other_workspace)
+            if not vp.exists():
+                vocals_cache[ep_num] = (None, 0)
+                return None, 0
             try:
-                subprocess.run(cmd, check=True, capture_output=True, text=True)
-            except subprocess.CalledProcessError as e:
-                warning(f"FFmpeg failed extracting sample for role {role_name}: {e.stderr}")
+                dur = _probe_duration_ms(str(vp))
+            except RuntimeError as e:
+                warning(f"Could not probe vocals duration for ep {ep_num}: {e}")
+                vocals_cache[ep_num] = (None, 0)
+                return None, 0
+            vocals_cache[ep_num] = (vp, dur)
+            return vp, dur
+
+        for role in roles_needing:
+            role_id = role["id"]
+            role_name = role_names.get(role_id, str(role_id))
+
+            # 跨集候选 cue（含 episode_id / episode_number）
+            cue_pool = store.get_cues_for_role(drama_id, role_id)
+            cue_pool = [c for c in cue_pool if _quality_filter(c)]
+            if not cue_pool:
+                warning(f"No suitable cue across drama for role {role_name} (id={role_id})")
                 continue
 
-            if not output_path.exists():
-                warning(f"Sample file not created for role {role_name}")
-                continue
+            # 按"接近 5 秒"排序，逐条尝试（vocals 不可用则取次优）
+            cue_pool.sort(key=lambda c: abs((c["end_ms"] - c["start_ms"]) - 5000))
 
-            from dubora_core.utils.file_store import get_gcs_store
+            extracted = False
+            for best_cue in cue_pool:
+                ep_num = best_cue["episode_number"]
+                vocals_path, vocals_dur = _resolve_vocals(ep_num)
+                if vocals_path is None:
+                    continue  # 该集 vocals 不可用，试下一条候选
 
-            info(f"Extracted sample for role {role_name} (id={role_id}): "
-                 f"{best_cue['start_ms']}ms-{best_cue['end_ms']}ms -> {output_path.name}")
+                start_s = max(0, (best_cue["start_ms"] - PAD_MS)) / 1000.0
+                end_s = min(vocals_dur, (best_cue["end_ms"] + PAD_MS)) / 1000.0
+                duration_s = end_s - start_s
 
-            # Upload to GCS (best-effort, failure does not abort TTS)
-            gcs = get_gcs_store()
-            gcs_key = f"dramas/{drama_name}/roles/{role_id}_sample.wav"
-            try:
-                gcs.write_file(output_path, gcs_key)
-                info(f"Uploaded role sample to GCS: {gcs_key}")
-                store.update_role_sample_audio(role_id, gcs_key)
-            except Exception as e:
-                warning(f"GCS upload failed for role sample {role_name}: {e}")
+                output_path = samples_dir / f"{role_id}_sample.wav"
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(vocals_path),
+                    "-ss", f"{start_s:.3f}",
+                    "-t", f"{duration_s:.3f}",
+                    "-ar", "24000", "-ac", "1",
+                    str(output_path),
+                ]
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True, text=True)
+                except subprocess.CalledProcessError as e:
+                    warning(f"FFmpeg failed for role {role_id} from ep {ep_num}: {e.stderr}")
+                    continue
+                if not output_path.exists():
+                    continue
+
+                info(
+                    f"Extracted sample for role {role_name} (id={role_id}) "
+                    f"from ep {ep_num}: {best_cue['start_ms']}ms-{best_cue['end_ms']}ms"
+                )
+
+                # 上传 GCS（drama 级 key） + 写回 DB
+                gcs_key = f"dramas/{drama_name}/roles/{role_id}_sample.wav"
+                try:
+                    gcs.write_file(output_path, gcs_key)
+                    store.update_role_sample_audio(role_id, gcs_key)
+                    info(f"Uploaded sample to GCS + DB: {gcs_key}")
+                except Exception as e:
+                    warning(f"GCS upload / DB writeback failed for role {role_id}: {e}")
+
+                result[str(role_id)] = str(output_path)
+                extracted = True
+                break
+
+            if not extracted:
+                warning(
+                    f"Could not extract sample for role {role_name} (id={role_id}): "
+                    f"no candidate cue's episode has local vocals available"
+                )
+
+        return result

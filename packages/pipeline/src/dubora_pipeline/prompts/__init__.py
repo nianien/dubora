@@ -28,7 +28,6 @@ Prompt 模板加载器
     # 加载共享片段
     frag = load_shared("no_chinese_policy")
 """
-import re
 import string
 from pathlib import Path
 from typing import Any, Dict, Optional

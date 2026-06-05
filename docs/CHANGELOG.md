@@ -1,5 +1,115 @@
 # Changelog
 
+## 2026-06-03
+
+### ASR 方案统一：豆包 Seed-ASR 2.0 单源 + Gemini scene context
+
+**核心理念**：移除原 doubao + tencent + fish + gemini 多源融合方案，统一为单源豆包，配 Gemini 视频场景分析做上下文辅助。
+
+**为什么**：实测发现豆包 Seed-ASR 2.0 + Gemini 自动生成的业务场景上下文（注入 `corpus.context` dialog_ctx）能将短剧/广告/ASMR 等领域音频的识别准确率从 ~50% 拉到 ~92%。多源融合（doubao+tencent+fish+LLM对齐）的复杂度不再必要。
+
+**ASR phase（v5.0.0）**：
+
+- 删除 `_check_gaps_and_get_extras`、`extra_models` 并发调用、`_make_task` 多模型分支
+- 单源豆包，配 `_ensure_scene_description` 调 Gemini 听音频生成 200 字业务场景描述
+- 上下文缓存到 `workspace/asr-context.json`，幂等复用
+
+**parse phase（v5.0.0）**：
+
+- 删除 `_run_doubao_fusion`（含 LLM diff/align）、`_run_direct` 双分支
+- 直接读 `asr-doubao.json` → `get_doubao_utterances()` → emotion 回填 + end_ms 延长 → cues
+
+**关键修复**：
+
+- `doubao/presets.py` 删 `ssd_version="200"` —— 这是触发豆包服务端"对话结束检测" bug 的元凶，对快语速念清单类音频会在 ~32s 处提前终止
+- `CorpusConfig.from_scene()` —— 把业务场景作为 dialog_ctx 注入
+
+**删除的文件**：
+
+- `processors/asr/fusion.py`（三源融合 + LLM 对齐）
+- `processors/asr/tencent.py`、`processors/asr/openai.py`
+- `models/gemini/asr_client.py`（Gemini 不再做 ASR，只做 scene context）
+
+**新增的文件**：
+
+- `models/gemini/scene_context_client.py`：Gemini 听音频 → 业务场景描述
+- `processors/asr/postprocess.py`：从 fusion.py 抽离的 emotion 回填 + end_ms 延长 helper
+
+**配置清理**：
+
+- `settings.py` 删 `asr_primary` / `asr_models` / `asr_gemini_model`
+- `.env` 删 `ASR_PRIMARY` / `ASR_MODE` / `TENCENT_SECRET_*`
+- `manifest.py` artifact 只剩 `asr.doubao`
+
+**Doubao 模型层**：
+
+- `CorpusConfig.from_scene()` 业务场景上下文，dialog_ctx 格式
+- `get_preset(scene_description=...)` 透传支持
+
+## 2026-06-01
+
+### Speaker / Role 分离 + Fish 自动克隆
+
+**核心理念**：依据第一性原理重新划分"声源"和"语义角色"。决定音色的是 speaker（物理声源），role 是 speaker 的可选语义分组。两者关系不强制 1:1。
+
+**Schema 变更**：
+
+- `cues` 表新增 `role_id INTEGER REFERENCES roles(id)`，可空
+- `utterances` 表新增 `role_id INTEGER REFERENCES roles(id)`，可空（冗余缓存，从 group[0] 派生）
+- `cues.speaker` / `utterances.speaker` 字段语义恢复：始终是 ASR 原始 label（"0", "1"...），永不被覆写
+- `roles` 表无 schema 变更，但增加约定：每个 drama 自动维护 `name="默认"` 的 role 作为 TTS fallback
+
+**音色决策**：
+
+```
+effective_role_id = cue.role_id or default_role.id   # name='默认' 约定
+→ roles[effective_role_id].voice_type / sample_audio
+```
+
+**Utterance 合并规则**（`store.calculate_utterances`）：
+
+```
+都有 role_id → 看 role_id 一致性（speaker 可不同，支持修正 ASR 错分）
+都没 role_id → 看 speaker 一致性
+一有一无 → 不合并
+```
+
+**Parse phase 改动**：
+
+- 写 cue 时直接存 ASR speaker label，不映射到 role
+- 完成后 `ensure_role(drama_id, "默认")` 幂等创建 fallback role
+
+**TTS phase 改动**：
+
+- `_check_voice_assignment` 改为按 role_id 检查；fallback role 存在时不再 fail
+- Fish 模式 `_ensure_role_samples` 自动截取规则：普通 role 按 `cue.role_id == role.id` 找；默认 role 不限 role_id，从全集 vocals 选最优 cue
+- 引入 `TTS_ENGINE` 环境变量切换引擎（`volcengine` / `fish`），不再需要改源码
+
+**Dirty 判脏**：
+
+- `_compute_source_hash` 用 `role_id` 取代 `speaker`
+- `_compute_voice_hash` 用 `role_id` 取代 `speaker`
+- `_SOURCE_FIELDS` 用 `role_id` 取代 `speaker`
+
+**前端**：
+
+- `Cue.speaker: number → string`（恢复 ASR label 语义），新增 `Cue.role_id: number | null`
+- `SpeakerBadge` 显示格式：`{role_name or "未分配"}({speaker_label})`
+- 点 badge 改 `cue.role_id`（不再改 `cue.speaker`）；speaker label 只读
+- 着色按 role_id 分组（未分配统一灰色）
+- `useUndoableOps.changeSpeaker → changeRole`
+- 快捷键 1-9 选 role（按 roles 列表 index）
+
+**迁移**：
+
+- Schema：`ALTER TABLE` 加 `role_id` 列（默认 NULL）
+- 数据：历史上 `cue.speaker` 被前端改成 role.id 的剧集需要反向修复（`cue.role_id ← cue.speaker`，`cue.speaker` 设为 ""）；纯 ASR label 状态的剧集无需迁移数据
+
+**已知限制**：
+
+- 一个 role 关联多个 speaker 时，Fish 克隆只能用单一 sample，音色被统一（实用妥协）
+- 跨集 speaker 一致性未引入（per-episode label，将来按需聚合）
+
 ## 2026-03-13
 
 ### 用户系统 + 多账户隔离

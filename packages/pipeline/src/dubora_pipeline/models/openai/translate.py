@@ -140,8 +140,7 @@ def translate_segments(
     # 批量处理
     for batch_start in range(0, len(text_segments), batch_size):
         batch = text_segments[batch_start:batch_start + batch_size]
-        batch_indices = segment_indices[batch_start:batch_start + batch_size]
-        
+
         info(f"Translating batch {batch_start // batch_size + 1} ({len(batch)} segments)...")
         
         # 构建提示词

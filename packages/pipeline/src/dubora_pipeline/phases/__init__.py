@@ -4,15 +4,6 @@ Pipeline phases registration.
 使用延迟导入，避免未安装的可选依赖（如 torchaudio）阻塞整个 CLI。
 Phase 类在真正执行 run() 时才 import 对应模块。
 """
-from dubora_core.phase_registry import (
-    GATES,
-    GATE_AFTER,
-    PHASE_META,
-    PHASE_NAMES,
-    STAGES,
-)
-
-
 class _LazyPhase:
     """延迟加载的 Phase 代理。
 
@@ -56,17 +47,13 @@ class _LazyPhase:
 
 
 def build_phases(config=None) -> list:
-    """
-    根据 config 构建 phase 列表。
+    """根据 config 构建 phase 列表。
 
     config-sensitive 的依赖：
     - asr_use_vocals: True → ASR 输入为 extract.vocals，False → extract.audio
-    - asr_primary: 主 ASR 模型，决定 asr/parse 的 artifact 边界
     """
     asr_use_vocals = getattr(config, "asr_use_vocals", False) if config else False
     asr_input = "extract.vocals" if asr_use_vocals else "extract.audio"
-    asr_primary = getattr(config, "asr_primary", "doubao") if config else "doubao"
-    primary_artifact = f"asr.{asr_primary}"
 
     return [
         _LazyPhase(
@@ -77,14 +64,14 @@ def build_phases(config=None) -> list:
         ),
         _LazyPhase(
             "dubora_pipeline.phases.asr", "ASRPhase",
-            name="asr", version="4.1.0",
-            requires=[asr_input], provides=[primary_artifact],
+            name="asr", version="5.0.0",
+            requires=[asr_input], provides=["asr.doubao"],
             label="语音识别",
         ),
         _LazyPhase(
             "dubora_pipeline.phases.parse", "ParsePhase",
-            name="parse", version="4.1.0",
-            requires=[primary_artifact], provides=[],
+            name="parse", version="5.0.0",
+            requires=["asr.doubao"], provides=[],
             label="生成字幕",
         ),
         # ← Gate: source_review (校准)

@@ -152,7 +152,7 @@ def call_volcengine_tts(
 
             if code == 0 and "sentence" in data and data["sentence"]:
                 sentence_data = data.get("sentence")
-                print(f"  Received sentence data")
+                print("  Received sentence data")
 
             if code == 20000000:
                 if 'usage' in data:

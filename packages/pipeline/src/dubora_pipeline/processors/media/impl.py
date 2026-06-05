@@ -78,7 +78,7 @@ def extract_raw_audio(video_path: str, output_path: str) -> None:
         
         info(f"Audio extracted successfully: {output_file.name} (size: {output_size / 1024 / 1024:.2f} MB)")
     except subprocess.CalledProcessError as e:
-        error(f"FFmpeg extraction failed:")
+        error("FFmpeg extraction failed:")
         error(f"  Command: {' '.join(cmd)}")
         error(f"  Return code: {e.returncode}")
         if e.stderr:

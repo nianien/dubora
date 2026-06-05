@@ -16,19 +16,27 @@ from typing import Any, Callable, Dict, List, Optional
 from .request_types import RequestConfig, CorpusConfig
 
 
-def _corpus(hotwords: Optional[List[str]]) -> CorpusConfig:
+def _corpus(
+    hotwords: Optional[List[str]] = None,
+    scene_description: Optional[str] = None,
+) -> CorpusConfig:
+    """创建语料库配置。
+
+    优先级：
+    - 有 scene_description → dialog_ctx 格式（业务场景，对识别准确率提升显著）
+    - 否则 hotwords → hotwords 格式
+    - 都没 → 空 context
     """
-    创建语料库配置。
-    
-    Args:
-        hotwords: 热词列表（如果为 None 或空列表，则不设置热词）
-    """
-    # 如果 hotwords 为 None 或空列表，使用空列表（不设置热词）
-    # 热词的默认值应该在调用层（settings.py）设置
+    if scene_description:
+        return CorpusConfig.from_scene(scene_description, hotwords=hotwords)
     return CorpusConfig.from_hotwords(hotwords if hotwords else [])
 
 
-def _base_request_cfg(*, hotwords: Optional[List[str]] = None) -> RequestConfig:
+def _base_request_cfg(
+    *,
+    hotwords: Optional[List[str]] = None,
+    scene_description: Optional[str] = None,
+) -> RequestConfig:
     """
     统一基线：你不想每个 preset 都重复写的默认项都在这里。
     """
@@ -38,64 +46,37 @@ def _base_request_cfg(*, hotwords: Optional[List[str]] = None) -> RequestConfig:
         enable_punc=True,  # 自动标点（只影响文本）
         enable_ddc=False,  # 语义顺滑会吞短句，必须关
         enable_speaker_info=True,  # 启用说话人分离
-        # model_version="400",  # 已移除：API 返回 "invalid bigasr model version" 错误
-        ssd_version="200",  # 中文 speaker 最稳定版本
         enable_channel_split=False,  # 非物理双声道不要开
         show_utterances=True,  # 输出时间轴/分句/词（核心）
         enable_gender_detection=True,  # 性别信息（辅助 speaker）
         enable_emotion_detection=True,  # 情绪信息（辅助判断）
-        enable_lid=True,  # 启用语种识别，则会在additions信息中使用lid_lang标记，包含唱歌识别。
-        # show_speech_rate=True,  # 分句信息携带语速
-        # show_volume=True  # 分句信息携带音量
-        corpus=_corpus(hotwords)  # 热词/上下文（稳定人名称呼）
+        enable_lid=True,  # 启用语种识别，则会在 additions 使用 lid_lang 标记，包含唱歌识别
+        corpus=_corpus(hotwords=hotwords, scene_description=scene_description)
     )
 
 
-def asr_vad_spk(*, hotwords: Optional[List[str]] = None) -> RequestConfig:
-    """
-    创建 asr_vad_spk 预设（生产基线）。
-    
-    特点：
-    - VAD 分句，end_window_size=800ms（验证过稳定）
-    """
-    base = _base_request_cfg(hotwords=hotwords)
-    return replace(
-        base,
-        vad_segment=True,
-        end_window_size=800,
-    )
+def asr_vad_spk(
+    *, hotwords: Optional[List[str]] = None, scene_description: Optional[str] = None,
+) -> RequestConfig:
+    """asr_vad_spk 预设（生产基线）：VAD 分句，end_window_size=800ms。"""
+    base = _base_request_cfg(hotwords=hotwords, scene_description=scene_description)
+    return replace(base, vad_segment=True, end_window_size=800)
 
 
-def asr_vad_spk_smooth(*, hotwords: Optional[List[str]] = None) -> RequestConfig:
-    """
-    创建 asr_vad_spk_smooth 预设（稳态参考）。
-
-    特点：
-    - VAD 分句，end_window_size=5000ms（更少碎片，但可能吞掉换人边界）
-    """
-    base = _base_request_cfg(hotwords=hotwords)
-    return replace(
-        base,
-        vad_segment=True,
-        end_window_size=1000,
-    )
+def asr_vad_spk_smooth(
+    *, hotwords: Optional[List[str]] = None, scene_description: Optional[str] = None,
+) -> RequestConfig:
+    """asr_vad_spk_smooth 预设（稳态参考）：VAD 分句，end_window_size=1000ms。"""
+    base = _base_request_cfg(hotwords=hotwords, scene_description=scene_description)
+    return replace(base, vad_segment=True, end_window_size=1000)
 
 
-def asr_spk_semantic(*, hotwords: Optional[List[str]] = None) -> RequestConfig:
-    """
-    创建 asr_spk_semantic 预设（语义对照）。
-    
-    特点：
-    - 不走 VAD（完整性强，让模型语义切分）
-    - 开启 speaker 识别
-    """
-    base = _base_request_cfg(hotwords=hotwords)
-    return replace(
-        base,
-        vad_segment=False,
-        # vad_segment=False时，end_window_size必须为None
-        end_window_size=None,
-    )
+def asr_spk_semantic(
+    *, hotwords: Optional[List[str]] = None, scene_description: Optional[str] = None,
+) -> RequestConfig:
+    """asr_spk_semantic 预设：不走 VAD，让模型语义切分。"""
+    base = _base_request_cfg(hotwords=hotwords, scene_description=scene_description)
+    return replace(base, vad_segment=False, end_window_size=None)
 
 
 PRESETS: Dict[str, Callable[..., RequestConfig]] = {
@@ -105,17 +86,23 @@ PRESETS: Dict[str, Callable[..., RequestConfig]] = {
 }
 
 
-def get_preset(name: str, *, hotwords: Optional[List[str]] = None) -> RequestConfig:
-    """
-    获取预设配置。
-    
+def get_preset(
+    name: str,
+    *,
+    hotwords: Optional[List[str]] = None,
+    scene_description: Optional[str] = None,
+) -> RequestConfig:
+    """获取预设配置。
+
     Args:
         name: 预设名称
-        hotwords: 可选的热词列表（如果不提供，使用默认值）
-    
+        hotwords: 可选的热词列表
+        scene_description: 可选的业务场景描述（dialog_ctx），
+            优先于 hotwords —— 对识别准确率提升显著
+
     Returns:
         RequestConfig 实例
-    
+
     Raises:
         KeyError: 如果预设不存在
     """
@@ -126,7 +113,7 @@ def get_preset(name: str, *, hotwords: Optional[List[str]] = None) -> RequestCon
             f"推荐使用: asr_vad_spk（VAD + Speaker，默认）"
         )
     factory = PRESETS[name]
-    return factory(hotwords=hotwords)
+    return factory(hotwords=hotwords, scene_description=scene_description)
 
 
 def get_presets() -> Dict[str, Dict[str, Any]]:

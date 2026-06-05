@@ -1,8 +1,8 @@
 #!/bin/bash
 # 部署 pipeline 服务到 GCP COS VM
-# Usage: bash deploy/deploy-pipeline.sh [--build]
-#   --build  构建新镜像（不传则复用已有镜像）
-#   无参数    仅部署容器（拉取已有镜像 + 上传 .env + 重启）
+# Usage: bash deploy/deploy-pipeline.sh [--no-build]
+#   无参数      构建新镜像 + 部署（默认）
+#   --no-build  仅部署容器（复用已有镜像 + 上传 .env + 重启）
 set -euo pipefail
 
 # ── 配置 ──────────────────────────────────────────────────
@@ -90,29 +90,29 @@ usage() {
     cat <<EOF
 Usage: bash deploy/deploy-pipeline.sh [OPTIONS]
 
-Deploy dubora-pipeline (pipeline worker) to GCP VM (${VM_NAME})
-Connects to web API at ${WEB_VM_NAME} via internal IP.
+Deploy dubora-pipeline (pipeline worker) to GCP VM (${VM_NAME}).
+Connects to web API at ${API_URL}.
 
 Options:
-  --build   Build new Docker image via Cloud Build
-  --help    Show this help
+  --no-build  Skip image build; pull existing image + restart container
+  --help      Show this help
 
-Without options: pull existing image + upload .env + restart container.
+Without options: build new image via Cloud Build, then deploy.
 
 Examples:
-  bash deploy/deploy-pipeline.sh               # Deploy only
-  bash deploy/deploy-pipeline.sh --build       # Build + deploy
+  bash deploy/deploy-pipeline.sh               # Build + deploy (default)
+  bash deploy/deploy-pipeline.sh --no-build    # Deploy only (reuse last image)
 EOF
     exit 0
 }
 
 # ── 主流程 ────────────────────────────────────────────────
-BUILD=false
+BUILD=true
 for arg in "$@"; do
     case "$arg" in
-        --build) BUILD=true ;;
-        --help|-h) usage ;;
-        *)       fail "Unknown argument: $arg" ;;
+        --no-build) BUILD=false ;;
+        --help|-h)  usage ;;
+        *)          fail "Unknown argument: $arg" ;;
     esac
 done
 

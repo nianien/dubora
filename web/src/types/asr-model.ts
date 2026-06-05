@@ -10,10 +10,11 @@ export interface Cue {
   id: number
   episode_id: number
   text: string
-  text_en?: string      // MT fills this on SRC cues
+  text_en?: string         // MT fills this on SRC cues
   start_ms: number
   end_ms: number
-  speaker: number       // roles.id FK
+  speaker: string          // ASR 物理 label（"0", "1"...），只读展示
+  role_id: number | null   // 用户绑定的角色 FK，可空（未分配则走默认 role fallback）
   emotion: string
   gender?: string | null
   kind: 'speech' | 'sing'
@@ -27,7 +28,8 @@ export interface Utterance {
   text_en: string
   start_ms: number
   end_ms: number
-  speaker: number       // roles.id FK
+  speaker: string          // 冗余缓存：来自 group[0].speaker (ASR label)
+  role_id: number | null   // 冗余缓存：来自 group[0].role_id
   emotion: string
   gender?: string | null
   kind: string
@@ -43,9 +45,10 @@ export interface Utterance {
 /** Role: per-drama voice assignment entity */
 export interface Role {
   id: number
-  name: string
-  voice_type: string
-  role_type: string   // 'lead' | 'supporting' | 'extra' | 'narrator'
+  name: string             // "默认" 是约定 fallback 角色
+  voice_type: string       // volcengine 预设声线 / fish 平台 reference_id
+  sample_audio: string     // fish 克隆参考音频 GCS key
+  role_type: string        // 'lead' | 'supporting' | 'extra' | 'narrator'
 }
 
 /** Paginated API response envelope */

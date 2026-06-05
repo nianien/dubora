@@ -7,7 +7,6 @@ SSE endpoint only polls task status from DB.
 import asyncio
 import json
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -220,7 +219,8 @@ async def pipeline_stream(request: Request, drama: str, ep: str):
                 if ep_status == "failed":
                     latest = store.get_latest_task(episode_id)
                     if latest and latest.get("error"):
-                        data["error"] = f"Phase '{latest['type']}' failed: {latest['error']}"
+                        # task.error 已由 worker 拼好（含 phase 的友好消息或兜底 "Phase 'X' failed"），原样透传
+                        data["error"] = latest["error"]
                     else:
                         data["error"] = "Pipeline failed (unknown error)"
                 yield sse(f"pipeline_{ep_status}", data)

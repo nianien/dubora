@@ -30,10 +30,41 @@ export function useUndoableOps() {
     updateField(id, 'text', oldText, newText)
   }, [updateField])
 
-  /** Undoable speaker change */
-  const changeSpeaker = useCallback((id: number, oldSpeaker: number, newSpeaker: number) => {
-    updateField(id, 'speaker', oldSpeaker, newSpeaker)
+  /** Undoable role assignment change */
+  const changeRole = useCallback((id: number, oldRoleId: number | null, newRoleId: number | null) => {
+    updateField(id, 'role_id', oldRoleId, newRoleId)
   }, [updateField])
+
+  /** 批量分配 role：目标 cue + 同 ASR speaker（非空）且尚未分配 role 的其他 cue 一起改。
+   *  整体作为单个 undo 单元。 */
+  const assignRoleBatch = useCallback((triggerCueId: number, newRoleId: number) => {
+    const state = useModelStore.getState()
+    const cues = state.cues
+    const trigger = cues.find(c => c.id === triggerCueId)
+    if (!trigger) return
+    if (trigger.role_id === newRoleId) return  // 已经是目标 role，无变化
+
+    const speaker = trigger.speaker
+    // 选中目标：trigger 本身 + 同 speaker（非空）且 role_id 为空的其他 cue
+    const targetIds = new Set<number>([trigger.id])
+    if (speaker) {
+      for (const c of cues) {
+        if (c.id !== trigger.id && c.speaker === speaker && c.role_id === null) {
+          targetIds.add(c.id)
+        }
+      }
+    }
+
+    const oldCues = [...cues]
+    const newCues = cues.map(c => targetIds.has(c.id) ? { ...c, role_id: newRoleId } : c)
+
+    const cmd: Command = {
+      apply: () => useModelStore.getState().updateCues(newCues),
+      inverse: () => useModelStore.getState().updateCues(oldCues),
+      description: `Assign role ${newRoleId} to ${targetIds.size} cues (speaker=${speaker || '∅'})`,
+    }
+    execute(cmd)
+  }, [execute])
 
   /** Undoable emotion change */
   const changeEmotion = useCallback((id: number, oldEmotion: string, newEmotion: string) => {
@@ -163,5 +194,5 @@ export function useUndoableOps() {
     execute(cmd)
   }, [execute])
 
-  return { updateField, editText, changeSpeaker, changeEmotion, adjustTime, splitCue, mergeWithNext, insertCue, deleteCue }
+  return { updateField, editText, changeRole, assignRoleBatch, changeEmotion, adjustTime, splitCue, mergeWithNext, insertCue, deleteCue }
 }

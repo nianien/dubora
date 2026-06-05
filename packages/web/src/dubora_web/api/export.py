@@ -2,7 +2,6 @@
 Export API: 从 DB artifacts 表提供最终产物下载（本地优先，GCS 代理下载兜底）。
 """
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse

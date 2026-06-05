@@ -444,7 +444,7 @@ def mix_timeline(
     )
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             cmd,
             check=True,
             capture_output=True,

@@ -21,14 +21,20 @@ def _resolve_drama(store: DbStore, drama: str, user_id: int | None) -> dict:
 
 @router.get("/episodes/{drama}/roles")
 async def get_roles(drama: str, request: Request) -> dict:
-    """读取角色映射（从 DB），返回 {roles: [{id, name, voice_type}]}"""
+    """读取角色映射（从 DB），返回 {roles: [{id, name, voice_type, sample_audio, role_type}]}"""
     store = request.app.state.store
     user_id = get_user_id(request)
     drama_row = store.get_drama_by_name(drama, user_id=user_id)
     if not drama_row:
         return {"roles": []}
     roles = store.get_roles(drama_row["id"])
-    return {"roles": [{"id": r["id"], "name": r["name"], "voice_type": r["voice_type"], "role_type": r.get("role_type", "extra")} for r in roles]}
+    return {"roles": [{
+        "id": r["id"],
+        "name": r["name"],
+        "voice_type": r["voice_type"],
+        "sample_audio": r.get("sample_audio", ""),
+        "role_type": r.get("role_type", "extra"),
+    } for r in roles]}
 
 
 class RoleItem(BaseModel):
@@ -50,4 +56,10 @@ async def put_roles(drama: str, body: RolesBody, request: Request) -> dict:
     drama_row = _resolve_drama(store, drama, user_id)
     role_dicts = [r.model_dump() for r in body.roles]
     updated = store.set_roles_by_list(drama_row["id"], role_dicts)
-    return {"roles": [{"id": r["id"], "name": r["name"], "voice_type": r["voice_type"], "role_type": r.get("role_type", "extra")} for r in updated]}
+    return {"roles": [{
+        "id": r["id"],
+        "name": r["name"],
+        "voice_type": r["voice_type"],
+        "sample_audio": r.get("sample_audio", ""),
+        "role_type": r.get("role_type", "extra"),
+    } for r in updated]}

@@ -7,10 +7,10 @@ NameMap 补全器：使用 LLM 翻译缺失的人名（极简版）
 - 支持 Gemini 和 OpenAI 模型（统一使用同一模型）
 """
 import json
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Callable
 
 from dubora_pipeline.prompts import load_prompt
-from dubora_core.utils.logger import info, warning
+from dubora_core.utils.logger import warning
 
 
 def build_name_translation_prompt(

@@ -136,7 +136,7 @@ class DoubaoASRClient:
         # 添加日志输出
         from dubora_core.utils.logger import info
         
-        info(f"提交任务到豆包 API...")
+        info("提交任务到豆包 API...")
         req_id = self.submit(req, resource_id=resource_id)
         info(f"任务已提交，request_id: {req_id}")
         info(f"开始轮询查询结果（每 {poll_interval_s} 秒查询一次，最长等待 {max_wait_s} 秒）...")

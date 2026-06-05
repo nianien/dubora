@@ -5,7 +5,6 @@
 支持不同级别的日志输出，不包含 emoji。
 """
 import sys
-from typing import Optional
 
 
 class Logger:

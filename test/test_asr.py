@@ -175,9 +175,21 @@ def main():
     if args.output:
         out_path = Path(args.output)
     else:
+        # 文件名带具体模型/preset，便于多模型对比时区分
+        suffix_map = {
+            "doubao":  args.doubao_preset,
+            "gemini":  args.gemini_model,
+            "openai":  args.openai_model,
+            "qwen":    args.qwen_model,
+            "funasr":  args.funasr_model,
+        }
+        extra = suffix_map.get(args.model, "")
+        # 文件名安全（去掉斜杠等）
+        extra_safe = extra.replace("/", "-") if extra else ""
+        tail = f"{args.model}-{extra_safe}" if extra_safe else args.model
         out_dir = Path("test_out/asr")
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{stem}_{args.model}.json"
+        out_path = out_dir / f"{stem}_{tail}.json"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json_str, encoding="utf-8")

@@ -12,10 +12,10 @@
 - 时间窗：max_chars = floor(duration_sec * cps_limit)
 """
 import math
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List
 
 from dubora_pipeline.prompts import load_prompt
-from dubora_core.utils.logger import info, warning
+from dubora_core.utils.logger import warning
 
 
 def calculate_max_chars(

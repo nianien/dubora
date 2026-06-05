@@ -86,7 +86,7 @@ def find_available_model(client, preferred_models: List[str]) -> Optional[str]:
     return None
 
 
-def create_gemini_client(api_key: Optional[str] = None, model_name: str = "gemini-2.0-flash"):
+def create_gemini_client(api_key: Optional[str] = None, model_name: str = "gemini-3.5-flash"):
     """
     创建 Gemini 客户端（新 SDK）。
     
@@ -117,13 +117,13 @@ def create_gemini_client(api_key: Optional[str] = None, model_name: str = "gemin
         # 严格按照官方文档：client = genai.Client(api_key=api_key)
         client = genai.Client(api_key=api_key)
         
-        # 列出可用模型并验证
+        # 列出可用模型并验证；2.0/1.5 系列已被 Google 下线（2026-06-01）
+        # Fallback 链：当前模型 → 3.5/3 系列 → 2.5 系列（仍 stable）
         preferred_models = [
             model_name,
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
-            "gemini-pro",
+            "gemini-3.5-flash",
+            "gemini-3-flash",
+            "gemini-2.5-flash",
         ]
         
         actual_model = find_available_model(client, preferred_models)
@@ -172,8 +172,6 @@ def call_gemini_with_retry(
     
     for attempt in range(max_retries):
         try:
-            # 严格按照官方示例：只传 model 和 contents
-            # resp = client.models.generate_content(model="gemini-2.0-flash", contents="...")
             response = client.models.generate_content(
                 model=model_name,
                 contents=prompt,
@@ -208,15 +206,15 @@ def call_gemini_with_retry(
 
 def create_gemini_translate_fn(
     api_key: Optional[str] = None,
-    model_name: str = "gemini-2.0-flash",
+    model_name: str = "gemini-3.5-flash",
     temperature: float = 0.4,
 ) -> Optional[Callable[[str], str]]:
     """
     创建 Gemini 翻译函数（新 SDK）。
-    
+
     Args:
         api_key: Gemini API key
-        model_name: 模型名称（默认 gemini-2.0-flash）
+        model_name: 模型名称（默认 gemini-3.5-flash）
         temperature: 温度参数（新 SDK 可能不支持，暂时忽略）
     
     Returns:

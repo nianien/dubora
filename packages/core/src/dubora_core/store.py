@@ -27,21 +27,30 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+DEFAULT_ROLE_NAME = "默认"
+
+
 def _compute_source_hash(src_cues: list[dict]) -> str:
-    """子 cue 内容指纹 (text_cn + timing + speaker + emotion)。任一变化触发 MT 重跑。"""
+    """子 cue 翻译相关内容指纹 (text + timing + emotion)。任一变化触发 MT 重跑。
+
+    不含 role_id：role 是音色分配，仅影响 TTS（见 _compute_voice_hash）。
+    """
     parts: list[str] = []
     for c in src_cues:
         parts.append(c.get("text", ""))
         parts.append(str(c.get("start_ms", 0)))
         parts.append(str(c.get("end_ms", 0)))
-        parts.append(str(c.get("speaker", "")))
         parts.append(c.get("emotion", "neutral"))
     return sha256("|".join(parts).encode()).hexdigest()[:16]
 
 
-def _compute_voice_hash(text_en: str, speaker: str = "", emotion: str = "") -> str:
-    """utterance.text_en + speaker + emotion 的 hash。变了触发 TTS 重跑。"""
-    data = f"{text_en}|{speaker}|{emotion}"
+def _compute_voice_hash(text_en: str, role_id, emotion: str = "") -> str:
+    """utterance.text_en + role_id + emotion 的 hash。变了触发 TTS 重跑。
+
+    role_id 为 None 时用 sentinel "_default" 占位，保证 fallback 切换时也能触发重跑。
+    """
+    effective = str(role_id) if role_id is not None else "_default"
+    data = f"{text_en}|{effective}|{emotion}"
     return sha256(data.encode()).hexdigest()[:16]
 
 
@@ -143,6 +152,16 @@ class DbStore:
             );
             CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
 
+            CREATE TABLE IF NOT EXISTS roles (
+                id            SERIAL PRIMARY KEY,
+                drama_id      INTEGER NOT NULL REFERENCES dramas(id),
+                name          TEXT NOT NULL,
+                voice_type    TEXT NOT NULL DEFAULT '',
+                role_type     TEXT NOT NULL DEFAULT 'extra',
+                sample_audio  TEXT NOT NULL DEFAULT '',
+                UNIQUE(drama_id, name)
+            );
+
             CREATE TABLE IF NOT EXISTS utterances (
                 id              SERIAL PRIMARY KEY,
                 episode_id      INTEGER NOT NULL REFERENCES episodes(id),
@@ -151,6 +170,7 @@ class DbStore:
                 start_ms        INTEGER NOT NULL DEFAULT 0,
                 end_ms          INTEGER NOT NULL DEFAULT 0,
                 speaker         TEXT NOT NULL DEFAULT '',
+                role_id         INTEGER REFERENCES roles(id),
                 emotion         TEXT NOT NULL DEFAULT 'neutral',
                 gender          TEXT,
                 kind            TEXT NOT NULL DEFAULT 'speech',
@@ -174,6 +194,7 @@ class DbStore:
                 start_ms     INTEGER NOT NULL,
                 end_ms       INTEGER NOT NULL,
                 speaker      TEXT NOT NULL DEFAULT '',
+                role_id      INTEGER REFERENCES roles(id),
                 emotion      TEXT NOT NULL DEFAULT 'neutral',
                 gender       TEXT,
                 kind         TEXT NOT NULL DEFAULT 'speech',
@@ -186,16 +207,6 @@ class DbStore:
                 utterance_id INTEGER NOT NULL REFERENCES utterances(id),
                 cue_id       INTEGER NOT NULL REFERENCES cues(id),
                 PRIMARY KEY (utterance_id, cue_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS roles (
-                id            SERIAL PRIMARY KEY,
-                drama_id      INTEGER NOT NULL REFERENCES dramas(id),
-                name          TEXT NOT NULL,
-                voice_type    TEXT NOT NULL DEFAULT '',
-                role_type     TEXT NOT NULL DEFAULT 'extra',
-                sample_audio  TEXT NOT NULL DEFAULT '',
-                UNIQUE(drama_id, name)
             );
 
             CREATE TABLE IF NOT EXISTS glossary (
@@ -452,6 +463,35 @@ class DbStore:
         )
         self._conn.commit()
 
+    def reset_orphan_running_tasks(self, *, error: str = "orphaned: worker restarted") -> list[int]:
+        """Reset all tasks stuck in 'running' (no live worker owns them).
+
+        Called on worker startup. In local single-worker mode, any 'running' task
+        at boot time is by definition an orphan from a previous crashed/killed
+        worker — nobody is currently executing it.
+
+        Sets status='failed' + error message, derives episode_status for affected
+        episodes, and returns list of orphan task ids.
+        """
+        rows = self._execute(
+            "SELECT id, episode_id FROM tasks WHERE status='running'"
+        ).fetchall()
+        if not rows:
+            return []
+        ids = [r["id"] for r in rows]
+        episode_ids = {r["episode_id"] for r in rows}
+        placeholders = ",".join("%s" for _ in ids)
+        self._execute(
+            f"UPDATE tasks SET status='failed', finished_at=%s, error=%s "
+            f"WHERE id IN ({placeholders})",
+            [_now_iso(), error, *ids],
+        )
+        for eid in episode_ids:
+            status = self.derive_episode_status(eid)
+            self.update_episode_status(eid, status)
+        self._conn.commit()
+        return ids
+
     def pass_gate_task(self, episode_id: int, gate_key: str) -> Optional[int]:
         row = self._execute(
             """SELECT id FROM tasks
@@ -544,6 +584,48 @@ class DbStore:
         ).fetchone()
         return dict(row) if row else None
 
+    def reset_to_phase(self, episode_id: int, phase_name: str) -> None:
+        """Reset pipeline so that phase_name re-runs.
+
+        Only acts if the phase has a succeeded task; otherwise no-op (pipeline
+        progression will pick up new state naturally when it reaches this phase).
+        Deletes phase task + all downstream phase/gate tasks, then creates a
+        fresh pending phase task. Episode status is re-derived.
+
+        Used when user edits non-gate-affecting fields (e.g., role_id) after the
+        pipeline has progressed past the relevant phase.
+        """
+        existing = self._execute(
+            "SELECT id, status FROM tasks WHERE episode_id=%s AND type=%s "
+            "ORDER BY id DESC LIMIT 1",
+            (episode_id, phase_name),
+        ).fetchone()
+        if not existing or existing["status"] != "succeeded":
+            return
+
+        from dubora_core.phase_registry import PHASE_NAMES, GATES
+
+        gate_map = {g["after"]: g["key"] for g in GATES}
+        ordered: list[str] = []
+        for pname in PHASE_NAMES:
+            ordered.append(pname)
+            gk = gate_map.get(pname)
+            if gk:
+                ordered.append(gk)
+
+        if phase_name not in ordered:
+            return
+        idx = ordered.index(phase_name)
+        types_to_delete = ordered[idx:]
+        placeholders = ",".join("%s" for _ in types_to_delete)
+        self._execute(
+            f"DELETE FROM tasks WHERE episode_id=%s AND type IN ({placeholders})",
+            [episode_id, *types_to_delete],
+        )
+        self.create_task(episode_id, phase_name)
+        status = self.derive_episode_status(episode_id)
+        self.update_episode_status(episode_id, status)
+
     def reset_to_gate(self, episode_id: int, gate_key: str) -> None:
         """Reset pipeline back to a gate.
 
@@ -634,8 +716,8 @@ class DbStore:
             cur = self._execute(
                 """INSERT INTO cues
                    (episode_id, text, text_en, start_ms, end_ms,
-                    speaker, emotion, gender, kind, created_at, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    speaker, role_id, emotion, gender, kind, created_at, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                    RETURNING id""",
                 (
                     episode_id,
@@ -644,6 +726,7 @@ class DbStore:
                     row.get("start_ms", 0),
                     row.get("end_ms", 0),
                     row.get("speaker", ""),
+                    row.get("role_id"),
                     row.get("emotion", "neutral"),
                     row.get("gender"),
                     row.get("kind", "speech"),
@@ -654,24 +737,15 @@ class DbStore:
         self._conn.commit()
         return ids
 
-    @staticmethod
-    def _cast_speaker(d: dict) -> dict:
-        """Cast speaker field from TEXT to int (stored as TEXT, app layer uses int)."""
-        try:
-            d["speaker"] = int(d["speaker"])
-        except (ValueError, TypeError, KeyError):
-            pass
-        return d
-
     def get_cues(self, episode_id: int) -> list[dict]:
         """Get all cues for an episode, ordered by start_ms."""
         rows = self._execute(
             "SELECT * FROM cues WHERE episode_id=%s ORDER BY start_ms",
             (episode_id,),
         ).fetchall()
-        return [self._cast_speaker(dict(r)) for r in rows]
+        return [dict(r) for r in rows]
 
-    _CUE_WRITABLE = {"text", "text_en", "start_ms", "end_ms", "speaker", "emotion", "gender", "kind"}
+    _CUE_WRITABLE = {"text", "text_en", "start_ms", "end_ms", "role_id", "emotion", "gender", "kind"}
 
     def update_cue(self, cue_id: int, **fields) -> None:
         """Update specific fields of a cue."""
@@ -711,13 +785,33 @@ class DbStore:
         self._conn.commit()
         return cur.rowcount
 
-    def diff_and_save(self, episode_id: int, incoming: list[dict]) -> list[dict]:
-        """Diff incoming cues against DB, detect source vs translation changes.
+    def get_cues_for_role(self, drama_id: int, role_id: int) -> list[dict]:
+        """跨集查询某 role 关联的所有 cue（按 cue.start_ms 排序）。
 
-        Rules:
-        - Source fields changed (text/speaker/timing/emotion/kind) → reset to source_review
-        - Only text_en changed → reset to translation_review
-        - New/deleted rows → reset to source_review
+        用于 TTS 阶段为 role 选 sample 候选：role 是 drama 级实体，sample 候选池
+        覆盖该 drama 内所有 episode 的 cue.role_id == role.id。
+        每条 cue 含 episode_id 用于定位 vocals。
+        """
+        rows = self._execute(
+            """SELECT c.*, e.number AS episode_number
+               FROM cues c
+               JOIN episodes e ON c.episode_id = e.id
+               WHERE e.drama_id = %s AND c.role_id = %s
+               ORDER BY c.episode_id, c.start_ms""",
+            (drama_id, role_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def diff_and_save(self, episode_id: int, incoming: list[dict]) -> list[dict]:
+        """Diff incoming cues against DB, detect what changed.
+
+        Rules (gate / phase reset):
+        - Source 字段变 (text/timing/emotion/kind) 或 新增/删除 cue → reset_to_gate('source_review')
+        - 仅 text_en 变 → reset_to_gate('translation_review')
+        - 仅 role_id 变（音色分配）→ reset_to_phase('tts')，不动 gate
+        - 多类同时变：优先级 source > role > text_en
+
+        `speaker` 是 ASR 物理 label，前端不可修改，不参与 diff。
 
         Returns updated cue list.
         """
@@ -725,9 +819,10 @@ class DbStore:
         existing_by_id = {c["id"]: c for c in existing}
         incoming_ids = set()
 
-        _SOURCE_FIELDS = ("text", "speaker", "start_ms", "end_ms", "emotion", "kind")
+        _SOURCE_FIELDS = ("text", "start_ms", "end_ms", "emotion", "kind")
         has_source_change = False
         has_text_en_change = False
+        has_role_change = False
 
         for inc in incoming:
             cid = inc.get("id")
@@ -742,6 +837,13 @@ class DbStore:
                     if str(old_val) != str(new_val):
                         updates[f] = new_val
                         has_source_change = True
+
+                # role_id 改动：只影响 TTS 音色，不触发 gate 回退
+                old_role = old.get("role_id")
+                new_role = inc.get("role_id")
+                if str(old_role or "") != str(new_role or ""):
+                    updates["role_id"] = new_role
+                    has_role_change = True
 
                 old_en = old.get("text_en", "")
                 new_en = inc.get("text_en", "")
@@ -777,9 +879,12 @@ class DbStore:
         self.calculate_utterances(episode_id)
         self.sync_utterance_text_cache(episode_id)
 
-        # Reset to appropriate gate so downstream phases re-run
+        # Reset 优先级：source > role > text_en
         if has_source_change:
             self.reset_to_gate(episode_id, "source_review")
+        elif has_role_change:
+            # role_id 只影响 TTS 音色，跳过 gate 直接重跑 TTS（dirty utterance 机制保证只重合成变化的）
+            self.reset_to_phase(episode_id, "tts")
         elif has_text_en_change:
             self.reset_to_gate(episode_id, "translation_review")
 
@@ -796,7 +901,7 @@ class DbStore:
                ORDER BY c.start_ms""",
             (utterance_id,),
         ).fetchall()
-        return [self._cast_speaker(dict(r)) for r in rows]
+        return [dict(r) for r in rows]
 
     def get_utterances(self, episode_id: int) -> list[dict]:
         """Get all utterances for an episode.
@@ -839,7 +944,6 @@ class DbStore:
             d["start_ms"] = times[0][0] if times else 0
             d["end_ms"] = times[-1][1] if times else 0
 
-            self._cast_speaker(d)
             result.append(d)
 
         result.sort(key=lambda x: x.get("start_ms", 0))
@@ -872,7 +976,7 @@ class DbStore:
         return dirty
 
     def get_dirty_utterances_for_tts(self, episode_id: int) -> list[dict]:
-        """Get utterances needing TTS: voice_hash mismatch (text_en + speaker + emotion)."""
+        """Get utterances needing TTS: voice_hash mismatch (text_en + role_id + emotion)."""
         utts = self.get_utterances(episode_id)
         dirty = []
         for utt in utts:
@@ -882,17 +986,18 @@ class DbStore:
             if not text_en:
                 continue
             current_hash = _compute_voice_hash(
-                text_en, utt.get("speaker", ""), utt.get("emotion", "neutral"),
+                text_en, utt.get("role_id"), utt.get("emotion", "neutral"),
             )
             if utt.get("voice_hash") != current_hash:
                 dirty.append(utt)
         return dirty
 
     _UTT_WRITABLE = {
-        "text_cn", "text_en", "start_ms", "end_ms", "speaker", "emotion",
+        "text_cn", "text_en", "start_ms", "end_ms", "role_id", "emotion",
         "gender", "kind", "tts_policy", "source_hash", "voice_hash",
         "audio_path", "tts_duration_ms", "tts_rate", "tts_error",
     }
+    # 注：speaker 从 _UTT_WRITABLE 移除 — 由 calculate_utterances 从 group[0] 覆盖写入
 
     def update_utterance(self, utterance_id: int, **fields) -> None:
         """Update specific fields of an utterance."""
@@ -982,7 +1087,8 @@ class DbStore:
         """Greedy-merge SRC cues into utterances.
 
         Match by cue id set (not source_hash):
-        1. 读 SRC cues → greedy merge (same speaker+emotion, gap, duration)
+        1. 读 SRC cues → greedy merge (same_identity + same emotion, gap, duration)
+           same_identity: 都有 role_id 时按 role_id 一致；都无 role_id 时按 speaker 一致；一有一无不合并。
         2. 每组算 cue_id 集合，跟 DB 现有 utterance 对比
         3. 相同的保留（TTS 缓存复用），新的插入，多余的删除
         4. 每次都重建 utterance_cues 关联
@@ -1007,10 +1113,21 @@ class DbStore:
             prev = current_group[-1]
             gap = cue["start_ms"] - prev["end_ms"]
             group_duration = cue["end_ms"] - current_group[0]["start_ms"]
-            same_speaker = cue["speaker"] == current_group[0]["speaker"]
-            same_emotion = cue.get("emotion", "neutral") == current_group[0].get("emotion", "neutral")
+            head = current_group[0]
 
-            if same_speaker and same_emotion and gap <= max_gap_ms and group_duration <= max_duration_ms:
+            # 身份判定：role 优先于 speaker
+            head_role = head.get("role_id")
+            cue_role = cue.get("role_id")
+            if head_role is not None and cue_role is not None:
+                same_identity = head_role == cue_role
+            elif head_role is None and cue_role is None:
+                same_identity = cue["speaker"] == head["speaker"]
+            else:
+                same_identity = False
+
+            same_emotion = cue.get("emotion", "neutral") == head.get("emotion", "neutral")
+
+            if same_identity and same_emotion and gap <= max_gap_ms and group_duration <= max_duration_ms:
                 current_group.append(cue)
             else:
                 groups.append(current_group)
@@ -1057,8 +1174,9 @@ class DbStore:
             if matched_utt and matched_utt["id"] not in matched_utt_ids:
                 matched_utt_ids.add(matched_utt["id"])
 
-                # Always overwrite speaker/emotion/gender/kind from current cues
-                speaker = group[0]["speaker"]
+                # Always overwrite speaker/role_id/emotion/gender/kind from current cues (group[0])
+                speaker = group[0].get("speaker", "")
+                role_id = group[0].get("role_id")
                 emotion = group[0].get("emotion", "neutral")
                 gender = group[0].get("gender")
                 kind = group[0].get("kind", "speech")
@@ -1070,10 +1188,10 @@ class DbStore:
 
                 self._execute(
                     """UPDATE utterances
-                       SET text_cn=%s, speaker=%s, emotion=%s, gender=%s, kind=%s,
+                       SET text_cn=%s, speaker=%s, role_id=%s, emotion=%s, gender=%s, kind=%s,
                            source_hash=%s, updated_at=%s
                        WHERE id=%s""",
-                    (text_cn, speaker, emotion, gender, kind,
+                    (text_cn, speaker, role_id, emotion, gender, kind,
                      new_source_hash, now, matched_utt["id"]),
                 )
 
@@ -1091,14 +1209,15 @@ class DbStore:
                 # New utterance — source_hash=NULL (never translated)
                 cur = self._execute(
                     """INSERT INTO utterances
-                       (episode_id, text_cn, speaker, emotion, gender, kind,
+                       (episode_id, text_cn, speaker, role_id, emotion, gender, kind,
                         created_at, updated_at)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                        RETURNING id""",
                     (
                         episode_id,
                         text_cn,
-                        group[0]["speaker"],
+                        group[0].get("speaker", ""),
+                        group[0].get("role_id"),
                         group[0].get("emotion", "neutral"),
                         group[0].get("gender"),
                         group[0].get("kind", "speech"),
@@ -1153,6 +1272,18 @@ class DbStore:
         ).fetchone()
         return row["id"]
 
+    def get_default_role(self, drama_id: int) -> dict | None:
+        """Get the conventional fallback role (name == DEFAULT_ROLE_NAME) for a drama.
+
+        TTS uses this when a cue/utterance lacks role_id.
+        Returns None if not found — parse phase should ensure_role(DEFAULT_ROLE_NAME) so this is rare.
+        """
+        row = self._execute(
+            "SELECT * FROM roles WHERE drama_id=%s AND name=%s LIMIT 1",
+            (drama_id, DEFAULT_ROLE_NAME),
+        ).fetchone()
+        return dict(row) if row else None
+
     def update_role_sample_audio(self, role_id: int, sample_audio: str) -> None:
         """更新角色的样本音频 key（GCS key）。"""
         self._execute(
@@ -1206,27 +1337,31 @@ class DbStore:
                 ).fetchone()
                 if row:
                     seen_ids.add(row["id"])
-        # Delete roles not in the incoming list, but keep roles still referenced by cues
+        # Delete roles not in the incoming list, but:
+        #   - 保留 name="默认"（TTS fallback 必需）
+        #   - 保留仍被 cues.role_id 引用的 role
         if seen_ids:
             placeholders = ",".join("%s" for _ in seen_ids)
             self._execute(
                 f"""DELETE FROM roles WHERE drama_id=%s AND id NOT IN ({placeholders})
-                    AND CAST(id AS TEXT) NOT IN (
-                        SELECT DISTINCT c.speaker FROM cues c
+                    AND name <> %s
+                    AND id NOT IN (
+                        SELECT DISTINCT c.role_id FROM cues c
                         JOIN episodes e ON c.episode_id = e.id
-                        WHERE e.drama_id = %s
+                        WHERE e.drama_id = %s AND c.role_id IS NOT NULL
                     )""",
-                [drama_id, *seen_ids, drama_id],
+                [drama_id, *seen_ids, DEFAULT_ROLE_NAME, drama_id],
             )
         else:
             self._execute(
                 """DELETE FROM roles WHERE drama_id=%s
-                   AND CAST(id AS TEXT) NOT IN (
-                       SELECT DISTINCT c.speaker FROM cues c
+                   AND name <> %s
+                   AND id NOT IN (
+                       SELECT DISTINCT c.role_id FROM cues c
                        JOIN episodes e ON c.episode_id = e.id
-                       WHERE e.drama_id = %s
+                       WHERE e.drama_id = %s AND c.role_id IS NOT NULL
                    )""",
-                (drama_id, drama_id),
+                (drama_id, DEFAULT_ROLE_NAME, drama_id),
             )
         self._conn.commit()
         return self.get_roles(drama_id)

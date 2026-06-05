@@ -32,7 +32,7 @@ from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 
-from dubora_core.utils.logger import info as _log_info, warning as _log_warn
+from dubora_core.utils.logger import info as _log_info
 
 
 # ── Utilities ────────────────────────────────────────────────────────────────

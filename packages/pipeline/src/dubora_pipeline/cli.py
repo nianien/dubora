@@ -216,11 +216,25 @@ def _cmd_worker(*, api_url: str | None = None):
         from dubora_pipeline.remote_store import RemoteStore
         store = RemoteStore(api_url)
         worker = PipelineWorker(store, phases, GATE_AFTER, remote=True)
-        info(f"Worker started (remote: {api_url}), polling for tasks... (Ctrl+C to stop)")
+        info(f"Worker started (remote: {api_url}), polling for tasks... (Ctrl+C once = graceful, twice = force kill)")
     else:
         store = get_store()
         worker = PipelineWorker(store, phases, GATE_AFTER)
-        info("Worker started, polling for tasks... (Ctrl+C to stop)")
+        info("Worker started, polling for tasks... (Ctrl+C once = graceful, twice = force kill)")
+
+    # Two-stage Ctrl-C: 1st raises KeyboardInterrupt; 2nd hard-kills the process.
+    # Needed because phases block in SSL/network IO where Python can't deliver SIGINT
+    # until the syscall returns — without this, "Ctrl-C no response" is the norm.
+    import signal
+    _sig_count = {"n": 0}
+    def _on_sigint(signum, frame):
+        _sig_count["n"] += 1
+        if _sig_count["n"] >= 2:
+            print("\n[worker] force exit", flush=True)
+            os._exit(130)
+        print("\n[worker] stopping (press Ctrl-C again to force kill)...", flush=True)
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGINT, _on_sigint)
 
     try:
         worker.run_forever()

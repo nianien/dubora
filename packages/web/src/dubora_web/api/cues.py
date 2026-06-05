@@ -4,7 +4,6 @@ Also serves utterances endpoint.
 
 DB cues are the single source of truth.
 """
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 

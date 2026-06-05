@@ -1,7 +1,6 @@
 """
 Glossary API: query and manage translation glossary terms
 """
-from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Request

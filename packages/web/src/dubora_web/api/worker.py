@@ -5,7 +5,6 @@ All endpoints are under /worker/ prefix (mounted at /api by server.py).
 Worker calls these instead of direct SQLite access when running on a separate machine.
 """
 import logging
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request

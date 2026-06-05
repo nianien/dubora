@@ -5,11 +5,9 @@ Uses Fish Audio SDK for voice cloning via reference audio.
 Reuses audio alignment logic from azure.py (same as volcengine.py).
 """
 import hashlib
-import json
 import re
 import shutil
 import subprocess
-from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -162,7 +160,8 @@ def synthesize_tts_per_segment(
         utt_id = utt.utt_id
         text = utt.text_en.strip()
         budget_ms = utt.budget_ms
-        speaker = utt.speaker
+        speaker = utt.speaker  # ASR label, 仅用于日志展示
+        role_key = str(utt.role_id) if utt.role_id is not None else ""
         max_rate = utt.tts_policy.max_rate
         allow_extend_ms = utt.tts_policy.allow_extend_ms
 
@@ -185,11 +184,17 @@ def synthesize_tts_per_segment(
             )
             continue
 
-        voice_info = voice_assignment["speakers"].get(speaker, {})
+        voice_info = voice_assignment["speakers"].get(role_key, {})
         sample_audio = voice_info.get("sample_audio_local", "")
         reference_id = voice_info.get("voice_type", "")
 
-        if not sample_audio and not reference_id:
+        # Fish 模式优先级：sample_audio > reference_id。
+        # 原因：role.voice_type 可能是其他引擎（volcengine）的声线名，Fish 不认会报 400。
+        # sample_audio 是从 vocals 自动截的本地音频，可靠且引擎无关。
+        use_sample = bool(sample_audio)
+        use_ref_id = (not use_sample) and bool(reference_id)
+
+        if not use_sample and not use_ref_id:
             segment_reports.append(
                 TTSSegmentReport(
                     utt_id=utt_id,
@@ -200,13 +205,13 @@ def synthesize_tts_per_segment(
                     rate=1.0,
                     status=TTSSegmentStatus.FAILED,
                     output_path="",
-                    error=f"Fish TTS: no sample_audio or reference_id for speaker {speaker}",
+                    error=f"Fish TTS: no sample_audio or reference_id for role={role_key} (speaker={speaker})",
                 )
             )
             continue
 
-        # Cache key uses sample_audio path or reference_id as voice identifier
-        voice_key = reference_id or sample_audio
+        # Cache key uses the actually-used voice identifier
+        voice_key = sample_audio if use_sample else reference_id
         cache_key = _generate_cache_key(text, voice_key)
         cache_file = cache_dir / f"{cache_key}.wav"
 
@@ -218,8 +223,8 @@ def synthesize_tts_per_segment(
                 audio_bytes = _call_fish_tts(
                     text=text,
                     api_key=api_key,
-                    reference_id=reference_id if reference_id else None,
-                    reference_audio=sample_audio if sample_audio and not reference_id else None,
+                    reference_id=reference_id if use_ref_id else None,
+                    reference_audio=sample_audio if use_sample else None,
                 )
 
                 # Fish SDK returns audio stream (usually MP3/WAV)

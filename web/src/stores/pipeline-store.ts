@@ -98,37 +98,51 @@ let _pollTimer: ReturnType<typeof setInterval> | null = null
 const TTS_AND_AFTER = new Set(['tts', 'mix', 'burn'])
 
 /**
- * Pre-flight check: if pipeline will reach TTS, verify all speech speakers
- * have voice_type assigned. Returns error message or null.
+ * Pre-flight check: if pipeline will reach TTS, verify each cue's effective role
+ * (cue.role_id 或 默认 role) 有 voice_type 分配。返回错误消息或 null。
+ *
+ * 决策树：
+ *   effective = cue.role_id ?? default_role.id
+ *   if effective 缺音色 → 失败
+ *
+ * 默认 role 约定 name === "默认"。
  */
 function _checkVoiceAssignments(fromPhase?: string): string | null {
   const { cues, roles } = useModelStore.getState()
   if (!cues.length) return null
 
-  // If fromPhase is before TTS (extract/asr/parse/translate), skip check
+  // 后端引擎 fish 模式下 sample_audio 自动截，不在前端预检；
+  // 这里保持简单：volcengine 预设声线模型下检查 voice_type，fish 模式让后端兜底
   if (fromPhase && !TTS_AND_AFTER.has(fromPhase)) return null
 
-  // Build role voice map: role_id → voice_type
+  const defaultRole = roles.find(r => r.name === '默认') ?? null
+
   const voiceMap = new Map<number, string>()
   for (const r of roles) {
     voiceMap.set(r.id, r.voice_type || '')
   }
 
-  // Find speech speakers with no voice
-  const missing: string[] = []
-  const checked = new Set<number>()
+  const missing = new Set<string>()
+  let unassignedCount = 0
   for (const cue of cues) {
-    if (cue.kind !== 'speech' || checked.has(cue.speaker)) continue
-    checked.add(cue.speaker)
-    const vt = voiceMap.get(cue.speaker)
+    if (cue.kind !== 'speech') continue
+    const effective = cue.role_id ?? defaultRole?.id ?? null
+    if (effective == null) {
+      unassignedCount++
+      continue
+    }
+    const vt = voiceMap.get(effective)
     if (!vt) {
-      const role = roles.find(r => r.id === cue.speaker)
-      missing.push(role?.name ?? `Speaker #${cue.speaker}`)
+      const role = roles.find(r => r.id === effective)
+      missing.add(role?.name ?? `Role #${effective}`)
     }
   }
 
-  if (missing.length > 0) {
-    return `以下角色未分配音色，请先在音色面板中配置：${missing.join('、')}`
+  if (unassignedCount > 0) {
+    missing.add(`<未分配角色 x ${unassignedCount} 条>`)
+  }
+  if (missing.size > 0) {
+    return `以下角色未分配音色，请先在音色面板中配置：${Array.from(missing).join('、')}`
   }
   return null
 }
@@ -170,6 +184,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       const data = await fetchJson<PipelineStatusResponse>(
         `/episodes/${encodeURIComponent(drama)}/${encodeURIComponent(ep)}/pipeline/status`,
       )
+      // Stale-request guard: 切换 episode 后，慢一拍返回的旧请求不应覆盖新 episode 的状态
+      if (drama !== _currentDrama || ep !== _currentEp) return
       const gates = data.gates ?? []
       const stages = data.stages ?? []
       const action = deriveAction(data.phases, gates, data.episode_status)

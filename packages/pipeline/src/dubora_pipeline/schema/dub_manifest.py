@@ -52,7 +52,8 @@ class DubUtterance:
     Content fields:
     - text_zh: Original Chinese text
     - text_en: Translated English text (for TTS)
-    - speaker: Speaker identifier
+    - speaker: ASR physical label ("0", "1"...), 仅展示/诊断用，永不参与音色查找
+    - role_id: 语义角色 id（解析过 default fallback 之后的最终 id），TTS 音色索引键
 
     Optional fields:
     - tts_policy: Policy for handling duration overflow
@@ -66,6 +67,7 @@ class DubUtterance:
     text_zh: str
     text_en: str
     speaker: str
+    role_id: Optional[int] = None
     tts_policy: TTSPolicy = field(default_factory=TTSPolicy)
     emotion: Optional[str] = None
     gender: Optional[str] = None
@@ -143,6 +145,7 @@ def dub_manifest_from_utterances(utterances: list[dict], audio_duration_ms: int)
             text_zh=u.get("text_cn", ""),
             text_en=en_text,
             speaker=str(u.get("speaker", "")),
+            role_id=u.get("role_id"),
             tts_policy=TTSPolicy(
                 max_rate=policy_data.get("max_rate", 1.3),
                 allow_extend_ms=policy_data.get("allow_extend_ms", 0),

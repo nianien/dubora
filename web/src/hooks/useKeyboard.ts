@@ -157,7 +157,8 @@ export function useKeyboard() {
           text: '',
           start_ms: newStart,
           end_ms: Math.max(newEnd, newStart + 100),
-          speaker: refCue?.speaker ?? 0,
+          speaker: '',
+          role_id: refCue?.role_id ?? null,
           emotion: 'neutral',
           kind: 'speech',
         }
@@ -181,11 +182,11 @@ export function useKeyboard() {
         return
       }
 
-      // 1-9: quick speaker switch
+      // 1-9: quick role switch (按 cues 中出现的 role_id 顺序)
       if (/^[1-9]$/.test(e.key) && selectedCueId != null && selectedIdx >= 0) {
         const spkIdx = parseInt(e.key) - 1
         if (spkIdx < speakerList.length) {
-          updateField(selectedCueId, 'speaker', cues[selectedIdx].speaker, speakerList[spkIdx])
+          updateField(selectedCueId, 'role_id', cues[selectedIdx].role_id, speakerList[spkIdx])
         }
         return
       }

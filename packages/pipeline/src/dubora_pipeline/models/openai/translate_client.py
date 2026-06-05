@@ -2,7 +2,6 @@
 OpenAI 翻译客户端：SDK 初始化 + retry/backoff
 """
 import time
-from typing import Optional
 
 try:
     import openai

@@ -5,7 +5,6 @@
 - 使用 Demucs htdemucs 模型分离人声和背景
 - 输出 vocals.wav 和 accompaniment.wav
 """
-import os
 import subprocess
 from pathlib import Path
 from dubora_core.utils.logger import info, error
@@ -61,14 +60,14 @@ def separate_vocals(input_path: str, output_dir: str, model: str = "htdemucs") -
     info(f"Separating vocals from {input_file.name} using Demucs ({model_name})...")
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             cmd,
             check=True,
             capture_output=True,
             text=True,
         )
     except subprocess.CalledProcessError as e:
-        error(f"Demucs separation failed:")
+        error("Demucs separation failed:")
         error(f"  Command: {' '.join(cmd)}")
         error(f"  Return code: {e.returncode}")
         if e.stderr:
@@ -97,12 +96,12 @@ def separate_vocals(input_path: str, output_dir: str, model: str = "htdemucs") -
     accompaniment_size = accompaniment_path.stat().st_size
     
     if vocals_size == 0:
-        raise RuntimeError(f"Vocal separation failed: vocals.wav is empty")
+        raise RuntimeError("Vocal separation failed: vocals.wav is empty")
     
     if accompaniment_size == 0:
-        raise RuntimeError(f"Vocal separation failed: accompaniment.wav is empty")
+        raise RuntimeError("Vocal separation failed: accompaniment.wav is empty")
     
-    info(f"Vocal separation succeeded:")
+    info("Vocal separation succeeded:")
     info(f"  Vocals: {vocals_cached.name} (size: {vocals_size / 1024 / 1024:.2f} MB)")
     info(f"  Accompaniment: {accompaniment_path.name} (size: {accompaniment_size / 1024 / 1024:.2f} MB)")
     

@@ -21,8 +21,7 @@ from dubora_core.config.settings import PipelineConfig, get_workdir as _settings
 from dubora_core.events import EventEmitter, LogListener, PipelineEvent
 from dubora_pipeline.manifest import DbManifest
 from dubora_pipeline.runner import PhaseRunner
-from dubora_core.store import DbStore
-from dubora_core.submit import PipelineReactor, submit_pipeline
+from dubora_core.submit import PipelineReactor
 from dubora_pipeline.types import RunContext
 from dubora_core.utils.logger import info as log_info, error as log_error
 
@@ -189,7 +188,15 @@ class PipelineWorker:
         return True
 
     def run_forever(self, stop_event: Optional[threading.Event] = None) -> None:
-        """Poll DB and execute tasks until stopped."""
+        """Poll DB and execute tasks until stopped.
+
+        On startup (local mode only), reset any task stuck in 'running' — those
+        are orphans from a previously crashed/killed worker.
+        """
+        if not self.remote:
+            orphans = self.store.reset_orphan_running_tasks()
+            if orphans:
+                log_info(f"Reset {len(orphans)} orphan running task(s): {orphans}")
         while True:
             if stop_event and stop_event.is_set():
                 break

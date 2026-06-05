@@ -389,7 +389,7 @@ export function VoicePreview({ onBack, dramas, initialDrama, embedded }: Props) 
     const name = newRoleName.trim()
     if (!name) return
     if (roles.some(r => r.name === name)) return
-    const newRole: Role = { id: -Date.now(), name, voice_type: '', role_type: 'extra' }
+    const newRole: Role = { id: -Date.now(), name, voice_type: '', sample_audio: '', role_type: 'extra' }
     updateRoles([...roles, newRole])
     setNewRoleName('')
     setAddingRole(false)

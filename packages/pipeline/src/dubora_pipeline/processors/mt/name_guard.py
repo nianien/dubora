@@ -431,11 +431,9 @@ class NameGuard:
                     
                     # 检查是否带后缀，并提取名字部分
                     name_part = None
-                    suffix_part = None
                     for pattern in self.config.honorific_suffix_patterns:
                         if word.endswith(pattern):
                             name_part = word[:-len(pattern)]  # 名字部分（如"平安"、"王"）
-                            suffix_part = pattern  # 后缀部分（如"哥"、"师傅"）
                             break
                     
                     if not name_part:

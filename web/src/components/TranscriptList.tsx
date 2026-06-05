@@ -45,13 +45,13 @@ const SPEAKER_BADGE_COLORS = [
   'bg-fuchsia-600',
 ]
 
-function speakerColor(speaker: number, speakers: number[]): string {
-  const idx = speakers.indexOf(speaker)
+function speakerColor(roleId: number | null, roleIds: (number | null)[]): string {
+  const idx = roleIds.indexOf(roleId)
   return SPEAKER_COLORS[idx >= 0 ? idx % SPEAKER_COLORS.length : 0]
 }
 
-function speakerBadgeColor(speaker: number, speakers: number[]): string {
-  const idx = speakers.indexOf(speaker)
+function speakerBadgeColor(roleId: number | null, roleIds: (number | null)[]): string {
+  const idx = roleIds.indexOf(roleId)
   return SPEAKER_BADGE_COLORS[idx >= 0 ? idx % SPEAKER_BADGE_COLORS.length : 0]
 }
 
@@ -252,13 +252,14 @@ export function TranscriptList() {
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
 
   /** Helper: create a new empty cue */
-  const makeEmptyCue = useCallback((startMs: number, endMs: number, speaker: number): Cue => ({
+  const makeEmptyCue = useCallback((startMs: number, endMs: number, roleId: number | null): Cue => ({
     id: nextTempId(),
     episode_id: 0,
     text: '',
     start_ms: startMs,
     end_ms: Math.max(endMs, startMs + 100),
-    speaker,
+    speaker: '',           // 新插入的 cue 无 ASR label
+    role_id: roleId,
     emotion: 'neutral',
     kind: 'speech',
   }), [])
@@ -289,7 +290,7 @@ export function TranscriptList() {
         label: '在前方插入',
         onClick: () => {
           const newStart = prev ? prev.end_ms : Math.max(0, cue.start_ms - 1000)
-          const newCue = makeEmptyCue(newStart, cue.start_ms, cue.speaker)
+          const newCue = makeEmptyCue(newStart, cue.start_ms, cue.role_id)
           insertCue(idx, newCue)
           selectCue(newCue.id)
           setTimeout(() => handleDoubleClick(newCue, 'text'), 50)
@@ -299,7 +300,7 @@ export function TranscriptList() {
         label: '在后方插入',
         onClick: () => {
           const newEnd = next ? next.start_ms : cue.end_ms + 1000
-          const newCue = makeEmptyCue(cue.end_ms, newEnd, cue.speaker)
+          const newCue = makeEmptyCue(cue.end_ms, newEnd, cue.role_id)
           insertCue(idx + 1, newCue)
           selectCue(newCue.id)
           setTimeout(() => handleDoubleClick(newCue, 'text'), 50)
@@ -354,9 +355,10 @@ export function TranscriptList() {
           const isSelected = cue.id === selectedCueId
           const isPlayingNow = cue.id === playingCueId
           const isEditing = cue.id === editingId
-          const bgColor = speakerColor(cue.speaker, speakerList)
-          const isInvalidRole = roles.length > 0 && !roles.some(r => r.id === cue.speaker)
-          const badgeColor = isInvalidRole ? 'bg-gray-600' : speakerBadgeColor(cue.speaker, speakerList)
+          const bgColor = speakerColor(cue.role_id, speakerList)
+          // 未分配（role_id=null）不是"无效"——只是未分配，会走默认 role fallback
+          const isInvalidRole = cue.role_id !== null && roles.length > 0 && !roles.some(r => r.id === cue.role_id)
+          const badgeColor = isInvalidRole ? 'bg-gray-600' : speakerBadgeColor(cue.role_id, speakerList)
           const emoColor = emotionColor(cue.emotion)
 
           return (
@@ -516,17 +518,21 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
 }) {
   const anchorRef = useRef<HTMLDivElement>(null)
   const cues = useModelStore(s => s.cues)
-  const { updateField } = useUndoableOps()
+  const { assignRoleBatch } = useUndoableOps()
 
   const [filter, setFilter] = useState('')
   const [highlightIdx, setHighlightIdx] = useState(-1)
   const [tab, setTab] = useState<'recent' | 'all'>('recent')
 
-  /** Display name for the current speaker */
-  const speakerName = roles.find(r => r.id === cue.speaker)?.name ?? String(cue.speaker)
+  /** Display: {role_name or "未分配"}({speaker ASR label}) */
+  const currentRole = cue.role_id !== null ? roles.find(r => r.id === cue.role_id) : null
+  const roleName = currentRole?.name ?? '未分配'
+  const speakerLabel = cue.speaker || ''
+  const displayText = speakerLabel ? `${roleName}(${speakerLabel})` : roleName
 
   const handleRoleSelect = (roleId: number) => {
-    updateField(cue.id, 'speaker', cue.speaker, roleId)
+    // 批量：当前 cue + 同 ASR speaker 且尚未分配 role 的其他 cue 一起改
+    assignRoleBatch(cue.id, roleId)
     onClose()
     setFilter('')
     setHighlightIdx(-1)
@@ -536,33 +542,33 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
     const trimmed = name.trim()
     if (!trimmed) return
     const tempId = -Date.now()
-    const newRole: Role = { id: tempId, name: trimmed, voice_type: '', role_type: 'extra' }
+    const newRole: Role = { id: tempId, name: trimmed, voice_type: '', sample_audio: '', role_type: 'extra' }
     const currentRoles = useModelStore.getState().roles
     useModelStore.setState({ roles: [...currentRoles, newRole] })
     setFilter('')
     setHighlightIdx(-1)
     onClose()
-    const oldSpeaker = cue.speaker
     const doSave = async () => {
       await useModelStore.getState().saveRoles()
       const savedRoles = useModelStore.getState().roles
       const saved = savedRoles.find(r => r.name === trimmed)
       if (saved) {
-        updateField(cue.id, 'speaker', oldSpeaker, saved.id)
+        // 与 handleRoleSelect 一致：批量分配到同 speaker 未分配的其他 cue
+        assignRoleBatch(cue.id, saved.id)
       }
     }
     doSave()
   }
 
-  // Recent speakers: unique speaker IDs by cue position (reverse order)
+  // Recent roles: unique role IDs by cue position (reverse order)
   const recentRoles = useMemo(() => {
     const seen = new Set<number>()
     const result: Role[] = []
     for (let i = cues.length - 1; i >= 0; i--) {
-      const spk = cues[i].speaker
-      if (spk && !seen.has(spk)) {
-        seen.add(spk)
-        const role = roles.find(r => r.id === spk)
+      const rid = cues[i].role_id
+      if (rid !== null && !seen.has(rid)) {
+        seen.add(rid)
+        const role = roles.find(r => r.id === rid)
         if (role) result.push(role)
       }
     }
@@ -601,7 +607,7 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
         className={`text-xs px-1.5 py-0.5 rounded ${badgeColor} text-white min-w-[24px] text-center hover:brightness-125 flex items-center gap-1`}
         title="分配角色"
       >
-        {speakerName}
+        {displayText}
         <span className="text-[10px] opacity-60">▾</span>
       </button>
       {isOpen && (
@@ -663,7 +669,7 @@ function SpeakerBadge({ cue, badgeColor, roles, isOpen, onToggle, onClose }: {
               onMouseEnter={() => setHighlightIdx(i)}
               className={`block w-full text-left px-2 py-1 text-xs ${
                 i === highlightIdx ? 'bg-gray-600' : 'hover:bg-gray-700'
-              } ${cue.speaker === role.id ? 'text-blue-400' : 'text-gray-300'}`}
+              } ${cue.role_id === role.id ? 'text-blue-400' : 'text-gray-300'}`}
             >
               {role.name}
               {(isFiltering || tab === 'all') && (

@@ -71,6 +71,16 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
 
+CREATE TABLE IF NOT EXISTS roles (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    drama_id      INTEGER NOT NULL REFERENCES dramas(id),
+    name          TEXT NOT NULL,
+    voice_type    TEXT NOT NULL DEFAULT '',
+    role_type     TEXT NOT NULL DEFAULT 'extra',
+    sample_audio  TEXT NOT NULL DEFAULT '',
+    UNIQUE(drama_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS utterances (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     episode_id      INTEGER NOT NULL REFERENCES episodes(id),
@@ -78,7 +88,8 @@ CREATE TABLE IF NOT EXISTS utterances (
     text_en         TEXT NOT NULL DEFAULT '',
     start_ms        INTEGER NOT NULL DEFAULT 0,
     end_ms          INTEGER NOT NULL DEFAULT 0,
-    speaker         TEXT NOT NULL DEFAULT '',
+    speaker         TEXT NOT NULL DEFAULT '',                 -- 冗余缓存：ASR 原始 label
+    role_id         INTEGER REFERENCES roles(id),             -- 冗余缓存：来自 group[0].role_id
     emotion         TEXT NOT NULL DEFAULT 'neutral',
     gender          TEXT,
     kind            TEXT NOT NULL DEFAULT 'speech',
@@ -107,7 +118,8 @@ CREATE TABLE IF NOT EXISTS cues (
     text_en      TEXT NOT NULL DEFAULT '',
     start_ms     INTEGER NOT NULL,
     end_ms       INTEGER NOT NULL,
-    speaker      TEXT NOT NULL DEFAULT '',
+    speaker      TEXT NOT NULL DEFAULT '',                    -- ASR 原始 label，永不被覆写
+    role_id      INTEGER REFERENCES roles(id),                -- 用户人工指定的语义角色，可空
     emotion      TEXT NOT NULL DEFAULT 'neutral',
     gender       TEXT,
     kind         TEXT NOT NULL DEFAULT 'speech',
@@ -115,16 +127,6 @@ CREATE TABLE IF NOT EXISTS cues (
     updated_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_cues_episode ON cues(episode_id);
-
-CREATE TABLE IF NOT EXISTS roles (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    drama_id      INTEGER NOT NULL REFERENCES dramas(id),
-    name          TEXT NOT NULL,
-    voice_type    TEXT NOT NULL DEFAULT '',
-    role_type     TEXT NOT NULL DEFAULT 'extra',
-    sample_audio  TEXT NOT NULL DEFAULT '',
-    UNIQUE(drama_id, name)
-);
 
 CREATE TABLE IF NOT EXISTS glossary (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

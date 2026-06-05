@@ -19,13 +19,12 @@ from dubora_pipeline.prompts import load_shared
 from dubora_core.utils.logger import info, warning, error
 from .time_aware_translate import (
     translate_cues_time_aware,
-    calculate_max_chars,
 )
 
 
 def create_translate_fn(
     api_key: Optional[str] = None,
-    model: str = "gemini-1.5-pro",
+    model: str = "gemini-3.5-flash",
     temperature: float = 0.4,
     fallback_enabled: bool = False,
     fallback_api_key: Optional[str] = None,
@@ -40,7 +39,7 @@ def create_translate_fn(
     
     Args:
         api_key: 主引擎 API key（Gemini 或 OpenAI）
-        model: 主引擎模型名称（默认 gemini-1.5-pro）
+        model: 主引擎模型名称（默认 gemini-3.5-flash）
         temperature: 温度参数（Gemini 推荐 0.3-0.5，OpenAI 推荐 0.3）
         fallback_enabled: 是否启用 fallback（默认 False，推荐保持关闭）
         fallback_api_key: Fallback API key（仅在 fallback_enabled=True 时使用）

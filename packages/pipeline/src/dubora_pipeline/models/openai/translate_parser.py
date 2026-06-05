@@ -2,7 +2,7 @@
 OpenAI 翻译输出解析：强对齐（使用 tag 对齐）
 """
 import re
-from typing import List, Optional
+from typing import List
 
 from dubora_core.utils.logger import warning
 

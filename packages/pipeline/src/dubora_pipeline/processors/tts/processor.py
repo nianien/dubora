@@ -18,7 +18,6 @@ from typing import Any, Dict, Optional
 
 from .._types import ProcessorResult
 from dubora_pipeline.schema.dub_manifest import DubManifest
-from dubora_pipeline.schema.tts_report import TTSReport
 
 
 def run_per_segment(

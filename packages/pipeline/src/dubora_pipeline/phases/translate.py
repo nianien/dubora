@@ -280,7 +280,7 @@ class TranslatePhase(Phase):
         if is_gemini:
             from dubora_core.config.settings import get_gemini_key
             model = phase_config.get("model", ctx.config.get("mt_model",
-                    ctx.config.get("gemini_model", "gemini-2.0-flash")))
+                    ctx.config.get("gemini_model", "gemini-3.5-flash")))
             api_key = phase_config.get("api_key") or get_gemini_key()
             if not api_key:
                 raise RuntimeError("Gemini API key not found")
