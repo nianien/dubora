@@ -36,8 +36,8 @@ Gate:                        ↑              ↑
 | Phase | 职责 | 技术 |
 |-------|------|------|
 | extract | 提取音频 + 人声/伴奏分离 | FFmpeg + Demucs v4 |
-| asr | 双源 ASR：Doubao VAD (word-level) + Gemini (分段/说话人/情绪) | Doubao ASR + Gemini |
-| parse | Gemini 骨架 + Doubao 文本 → LLM 校准 → end_ms 延长 → DB cues | Gemini LLM |
+| asr | Doubao Seed-ASR 2.0 单源 + Gemini 多模态分析输出场景上下文（注入 corpus.context dialog_ctx） | Doubao ASR + Gemini scene context |
+| parse | Doubao utterances → emotion 回填 → end_ms 延长 → DB cues | — |
 | translate | 增量翻译 (utterance 级, per-cue 回填) | OpenAI / Gemini |
 | tts | 语音合成 (增量, voice_hash 判脏) + drift_score 检查 | VolcEngine seed-tts-1.0 |
 | mix | 混音 (adelay timeline placement) | FFmpeg |
@@ -275,21 +275,26 @@ CREATE TABLE cues (
 
 **第一性原理**：声音合成的物理依据是 speaker（声源），role 是 speaker 的可选语义分组（"男主"/"旁白"）。两者关系不是 1:1：一个 role 可关联多个 speaker（童年/成年男主），一个 speaker 也可能在不同 cue 上对应不同 role。
 
-**音色决策优先级（TTS 阶段）**：
+**音色决策（TTS 阶段，无 fallback）**：
 ```
-effective_role_id = cue.role_id or default_role.id   # default_role = roles WHERE name='默认'
-→ 用 roles[effective_role_id].voice_type / sample_audio
+直接用 utt.role_id 查 roles[utt.role_id].voice_type / sample_audio
+任何 utt.role_id 为 NULL 或 role.voice_type 为空 → TTS phase 入口 fail-fast
 ```
 
-`role_id` 不存在时通过约定的 "默认" role 兜底，详见 §3.5。
+`role_id` 必须由用户在字幕编辑页显式指定，详见 §3.5。
 
-**diff_and_save 机制：**
+**diff_and_save 机制（三类改动各自的 gate / phase 重排）：**
 ```
-用户编辑 cue → diff_and_save() → 对比 _SOURCE_FIELDS (text/role_id/timing/emotion/kind)
-  源字段变了 → 触发 calculate_utterances → 可能产生新 utterance (source_hash=NULL → 触发重翻)
-  text_en 变了 → 更新 voice_hash → TTS 判脏
-  role_id 变了 → 更新 voice_hash → TTS 判脏
+用户编辑 cue → diff_and_save() 分三类改动检测：
+  _SOURCE_FIELDS (text/start_ms/end_ms/emotion/kind) 或 新增/删除 cue
+    → reset_to_gate('source_review')  回到「校准」
+  role_id 变（只影响 TTS 音色）
+    → reset_to_phase('tts')  不动 gate，仅重排 TTS 及下游
+  text_en 变
+    → reset_to_gate('translation_review')  回到「审阅」
 ```
+
+`source_hash` 不含 role_id（翻译不参考音色）；`voice_hash` 含 role_id（音色决定 TTS）。改 role_id 不会触发重翻，只让 utt 进入 TTS dirty 集合，按 voice_hash 增量合成。
 
 注意：`speaker` 字段不在 `_SOURCE_FIELDS` 里（用户改不动它），`role_id` 取代了原来 `speaker` 在该列表的位置。
 
@@ -346,7 +351,7 @@ CREATE TABLE utterance_cues (
 CREATE TABLE roles (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     drama_id      INTEGER NOT NULL REFERENCES dramas(id),
-    name          TEXT NOT NULL,         -- 角色名（"默认" 是约定 fallback）
+    name          TEXT NOT NULL,         -- 角色名（由用户在「角色管理」创建/编辑）
     voice_type    TEXT NOT NULL DEFAULT '',     -- volcengine: 预设声线 ID; fish: 平台 reference_id
     sample_audio  TEXT NOT NULL DEFAULT '',     -- fish 克隆参考音频 (GCS key)
     role_type     TEXT NOT NULL DEFAULT 'extra', -- 'lead' / 'supporting' / 'extra' / 'narrator'
@@ -356,28 +361,25 @@ CREATE TABLE roles (
 
 **音色挂载位置**：voice_type / sample_audio 挂在 role 上（不挂在 speaker 上）。这是实用简化——同 role 多 speaker 时音色统一，符合典型短剧场景。
 
-**默认角色约定（无 schema）**：
+**无默认 fallback：未指定角色 / 未设置音色一律 fail-fast**
 
-- 每个 drama 自动维护一条 `name="默认"` 的 role 作为 fallback
-- parse phase 完成后调 `ensure_role(drama_id, "默认")`，幂等
-- TTS 阶段：cue.role_id 为空时回退到 "默认" role 的音色
-- 代码中通过常量 `DEFAULT_ROLE_NAME = "默认"` 集中维护，避免硬编码散落
+历史版本曾有"默认 role 兜底"逻辑（utt.role_id 为空回退到 `name="默认"` 的 role），2026-06 已彻底移除。当前 TTS phase 入口对未分配的 utterance 直接 fail-fast 报错，强制用户显式分配角色和音色，避免"悄悄用了别人的音色"这类隐式错误。
 
 **TTS 音色解析完整链路：**
 
 ```
 ASR 输出 speaker="0","1"
-→ parse phase: 仅写 cue.speaker = "0"/"1"（不分配 role_id）
-→ parse phase: ensure_role(drama_id, "默认") 确保 fallback role 存在
-→ 用户在 web 端选择性给 cue 标 role：cue.role_id = 10057 ("男主")
-→ TTS phase: 对每条 utt, effective_role_id = utt.role_id or default_role.id
-→ voice_assignment["speakers"][str(effective_role_id)] = {voice_type/sample_audio}
-→ volcengine.py / fish.py: speakers.get(str(effective_role_id)) → 命中音色
+→ parse phase: 写 cue.speaker = "0"/"1"，cue.role_id = NULL
+→ 用户在字幕编辑页选择性给 cue 标 role：cue.role_id = 10057 ("男主")
+→ 用户在「角色管理」给 role 设置 voice_type
+→ TTS phase 入口 fail-fast 检查：
+    任何 utt.role_id 为 NULL → 报错"存在 N 条字幕未指定角色…"
+    role.voice_type 为空     → 报错"角色【X】未设置音色…"
+→ 检查通过 → voice_assignment["speakers"][str(utt.role_id)] = {voice_type/sample_audio}
+→ volcengine.py / fish.py: speakers.get(str(utt.role_id)) → 命中音色
 ```
 
-**Fish 模式 sample_audio 自动截取（详见 §4.6）**：
-- 普通 role：从 `cue.role_id == role.id` 关联的 cue 里挑最优一条，从 vocals 截 ~5s
-- "默认" role：不限 role_id，从全集 vocals 选最优 cue（兜底）
+**Fish 模式 sample_audio 自动截取（详见 §4.6）**：从 `cue.role_id == role.id` 关联的 cue 里挑最优一条，从 vocals 截 ~5s。drama 级共享，跨集复用。
 
 ### 3.6 其他表
 
@@ -408,13 +410,13 @@ Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU），
 
 **分离为何不走 `demucs` 命令行**：demucs CLI 保存 wav 时调用 `torchaudio.save`，而 torchaudio 2.9 的 `save`/`load` 只能用 torchcodec 编解码（旧的 soundfile/sox backend 已移除）。torchcodec 在 macOS 上常因 rpath 找不到匹配版本的 ffmpeg 动态库（libavutil 等）而 dlopen 失败（torchcodec issue #570）。因此分离改为**进程内调用 demucs 的 Python API**（`get_model` + `apply_model`），输出用 `soundfile`（wheel 自带 libsndfile，不依赖系统 ffmpeg）写 wav，彻底绕开 torchcodec。读取输入仍用 demucs 的 `AudioFile`（走 ffmpeg 命令行）。模型按名 `lru_cache`，worker 串行处理多集时复用。实现见 `processors/sep/impl.py`。
 
-### 4.2 ASR（双源语音识别）
+### 4.2 ASR（单源语音识别 + 场景上下文）
 
 | | |
 |---|---|
 | **输入** | `extract.audio`（可配置为 `extract.vocals`） |
 | **输出** | `asr.doubao` (Doubao 原始响应), `asr-context.json` (Gemini 业务场景上下文) |
-| **服务** | Doubao Seed-ASR 2.0 + Gemini 多模态视频/音频分析 |
+| **服务** | Doubao Seed-ASR 2.0（唯一 ASR 引擎）+ Gemini 多模态场景分析（仅生成上下文，不参与识别） |
 | **预设** | Doubao: `asr_spk_semantic`；Gemini: `gemini_model`（默认 gemini-3.5-flash） |
 
 **单源 + 场景上下文增强**：
@@ -456,7 +458,7 @@ Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU），
 3. end_ms 延长（`extend_end_ms`）：保证字幕最小显示时长
 4. 清空旧 cues + utterances，全量写入新 cues（**`cue.speaker` 直接存 ASR 原始 label，`cue.role_id` 默认 NULL**）
 
-Parse 完成后进入 `source_review` 门控，等待人工在 IDE 中校准。校准时用户可选择性地给 cue 标 `role_id`；未标的 cue 走默认 role。
+Parse 完成后进入 `source_review` 门控，等待人工在 IDE 中校准。校准时用户必须给每条 cue 指定 `role_id`，否则后续 TTS phase 会 fail-fast 报错（无默认 role 兜底）。
 
 ### 4.4 calculate_utterances — Greedy Merge
 
@@ -533,64 +535,60 @@ Translate 完成后进入 `translation_review` 门控，等待人工审阅翻译
 | **输出** | `tts.segments_dir` (逐句 WAV 文件), DB utterances 更新 |
 | **引擎** | VolcEngine seed-tts-1.0（预设声线）/ Fish Audio（声音克隆）。通过 `TTS_ENGINE` 环境变量切换 |
 
-**音色决策树**：
+**音色决策树（fail-fast，无默认 fallback）**：
 
 ```
-对每条 utterance:
-  effective_role_id = utt.role_id or default_role.id   # default_role = roles WHERE name='默认'
+TTS phase 入口先做整体检查（dirty 集合之前）：
+  collect 未指定角色 / 缺音色:
+    no_role_count = count utt where utt.role_id is NULL
+    missing_voice_roles = { role.name for role in used_roles if not role.voice_type }
+  若有任何 → 返回 PhaseResult(failed, VoiceAssignmentError)，错误信息引导用户：
+    "存在 N 条字幕未指定角色，请在字幕编辑页为相应字幕指定角色；
+     角色【X】、【Y】未设置音色，请到「角色管理」页面完成设置。"
 
-  if effective_role_id is None:
-    fail（连默认 role 都不存在，parse 阶段应已自动建好，不该走到这里）
-
-  role = roles[effective_role_id]
-
-  if engine == "volcengine":
-    if role.voice_type is empty: fail
-    use role.voice_type
-
-  if engine == "fish":
-    if role.sample_audio is empty:
-      auto_extract_sample(role, ...)   # 见下方"自动截取规则"
-    use role.sample_audio（或 role.voice_type 作 Fish 平台 reference_id）
+检查通过之后:
+  对每条 utterance:
+    role = roles[utt.role_id]
+    if engine == "volcengine": use role.voice_type
+    if engine == "fish":
+      if role.sample_audio is empty:
+        auto_extract_sample(role, ...)   # 见下方"自动截取规则"
+      use role.sample_audio（或 role.voice_type 作 Fish 平台 reference_id）
 ```
 
 **Fish 模式自动截取 sample 规则**：
 
 ```python
 对 每个 role 缺 sample_audio 的:
-  if role.name == "默认":
-    # fallback role 不绑 speaker，从全集 vocals 选最优 cue（不限 role_id）
-    candidates = all cues WHERE kind='speech' AND duration in [2s, 8s] AND len(text) >= 4
-  else:
-    # 普通 role，按 role_id 关联的 cue 找
-    candidates = cues WHERE role_id == role.id AND kind='speech' AND duration in [2s, 8s] AND len(text) >= 4
-
+  candidates = cues WHERE role_id == role.id AND kind='speech'
+                     AND duration in [2s, 8s] AND len(text) >= 4
   best = sort by abs(duration - 5s)[0]
   ffmpeg 截 vocals.wav → data/pipeline/{drama}/roles/{role.id}_sample.wav (24kHz mono, ±100ms pad)
   → GCS upload dramas/{drama}/roles/{role.id}_sample.wav
   → 写回 role.sample_audio
 ```
+drama 级共享，跨集复用；没有"默认 role 不限 role_id 兜底"的特殊路径。
 
 **合成流程**：
-1. 读所有 utterances，构建 full DubManifest
-2. `get_dirty_utterances_for_tts()`: 找脏行 (voice_hash 不匹配)
-3. 无脏行 → no-op
-4. Fish 模式：先跑 `_ensure_role_samples()` 给缺样本的 role 自动截取
-5. 并行逐句合成（默认 4 workers）
-6. 静音裁剪 + 语速调整（超 budget 加速到 max_rate 1.3x）
-7. 更新 DB: audio_path, tts_duration_ms, tts_rate, voice_hash
-8. Drift score 检查: tts_duration_ms / physical_ms > 1.1 则警告
+1. 读所有 utterances，构建 full DubManifest（含 role_id 字段）
+2. 入口 fail-fast 检查未指定 role / 缺 voice_type 的角色
+3. `get_dirty_utterances_for_tts()`: 找脏行 (voice_hash 不匹配)
+4. 无脏行 → no-op
+5. Fish 模式：先跑 `_ensure_role_samples()` 给缺样本的 role 自动截取
+6. 并行逐句合成（默认 4 workers）
+7. 静音裁剪 + 语速调整（超 budget 加速到 max_rate 1.3x）
+8. 更新 DB: audio_path, tts_duration_ms, tts_rate, voice_hash
+9. Drift score 检查: tts_duration_ms / physical_ms > 1.1 则警告
 
-**voice_assignment 构建（按 effective_role_id 索引）：**
+**voice_assignment 构建（按 role_id 索引）：**
 ```python
 # 对每个 role 构建 entry
-voice_assignment["speakers"][str(role_id)] = {
+voice_assignment["speakers"][str(role.id)] = {
     "voice_type": role.voice_type,
     "sample_audio_local": resolve_local_path(role.sample_audio),
 }
-# 引擎层用 effective_role_id 查找:
-speaker_key = str(utt.role_id or default_role.id)
-voice_info = voice_assignment["speakers"].get(speaker_key, {})
+# 引擎层直接用 utt.role_id 查找（fail-fast 已保证非空）:
+voice_info = voice_assignment["speakers"].get(str(utt.role_id), {})
 ```
 
 ### 4.7 Mix（混音）
@@ -662,22 +660,25 @@ def _compute_voice_hash(text_en: str, role_id: int | None, emotion: str = "") ->
 - `voice_hash != _compute_voice_hash(当前 text_en, role_id, emotion)`
 - 即 text_en、role_id、emotion 任一变化 → 重新合成
 
-注：决定音色的是 role（或 fallback 默认 role），所以 voice_hash 用 role_id 而非 speaker。
+注：决定音色的是 role（无 fallback），所以 voice_hash 用 role_id 而非 speaker。
 
 **voice_hash 写入时机：** TTS phase 合成成功后。
 
 ### 5.3 diff_and_save — 前端编辑判脏
 
 ```python
-_SOURCE_FIELDS = ("text", "role_id", "start_ms", "end_ms", "emotion", "kind")
-# diff_and_save: 对比上述字段
-# 源字段变化 → reset to source_review → calculate_utterances → 可能产生新 utterance
-# text_en 变化 → reset to translation_review → sync_utterance_text_cache → voice_hash 更新
+_SOURCE_FIELDS = ("text", "start_ms", "end_ms", "emotion", "kind")
+# diff_and_save 三类改动各自的重排策略：
+#  1) source 字段变 / 新增 / 删除 cue → reset_to_gate('source_review')   回到「校准」
+#  2) role_id 变（只影响 TTS 音色） → reset_to_phase('tts')              不动 gate
+#  3) text_en 变                   → reset_to_gate('translation_review') 回到「审阅」
+# 优先级 source > role > text_en（多类同时变取靠前的）
 ```
 
-注：`speaker` 字段（ASR label）不在 `_SOURCE_FIELDS` 里——前端不能修改它。改 `role_id` 才会触发判脏。
-
-源字段变化 → `calculate_utterances()` 可能生成新 utterance → source_hash=NULL → 触发翻译。
+注：
+- `speaker` 字段（ASR label）不在 `_SOURCE_FIELDS` 也不在任何改动集合里——前端不能修改它
+- `role_id` **不在** `_SOURCE_FIELDS`：翻译不参考 role，只触发 TTS 重排（`reset_to_phase('tts')` 删 tts/mix/burn 已 succeeded 任务并新建 tts pending）
+- source 字段变 → `calculate_utterances()` 可能生成新 utterance → source_hash=NULL → 触发重翻
 
 ### 5.4 sync_utterance_text_cache
 
@@ -729,7 +730,6 @@ PUT  /episodes/{drama}/roles  → body: {"roles": [{id?, name, voice_type, role_
      有 id → 更新, 无 id → 新建, 缺失 → 删除
 ```
 
-注：删除 `name="默认"` 的 role 被禁止（后端校验），它是 TTS fallback 的必要条件。
 
 ### 6.4 快捷键 (useKeyboard)
 

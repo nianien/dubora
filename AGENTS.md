@@ -110,8 +110,10 @@ Gate:                        ↑              ↑
 辅助表：**user_auths** (三方登录), **roles** (角色声线), **glossary** (术语表), **utterance_cues** (junction), **events** (审计日志)
 
 - `dramas.user_id` NOT NULL，实现多账户数据隔离（子表通过 FK 链关联，无需冗余 user_id）
-- `cues.speaker` 和 `utterances.speaker` 存 `roles.id` 整数（TEXT 列存整数字符串，应用层 `_cast_speaker()` 转 int）
-- Dirty 判脏：`source_hash` (翻译) + `voice_hash` (TTS)
+- `cues.speaker` / `utterances.speaker` (TEXT) 始终是 ASR 物理 label（"0", "1"...），永不被覆写
+- `cues.role_id` / `utterances.role_id` (INT, nullable) 是用户人工指定的语义角色，决定 TTS 音色
+- 音色决策：直接用 `utt.role_id` 查 role.voice_type；**无默认 fallback**，未指定 role_id 或 role 缺 voice_type 时 TTS phase 入口 fail-fast 报错
+- Dirty 判脏：`source_hash` (翻译) + `voice_hash` (TTS)。`source_hash` 不含 role_id（翻译不参考音色），`voice_hash` 含 role_id（音色决定 TTS）。改 role_id 触发 `reset_to_phase('tts')`，不回退 gate
 
 ### Phase/Processor Separation Pattern
 
@@ -174,7 +176,7 @@ data/                                   # DATA_DIR (get_data_root())
 │   ├── {ep}-vocals.wav                 # extract.vocals
 │   ├── {ep}-accompaniment.wav          # extract.accompaniment
 │   ├── asr-doubao.json                 # asr.doubao (Doubao VAD 原始响应)
-│   ├── asr-gemini.json                 # asr.gemini (Gemini ASR 结果)
+│   ├── asr-context.json                # Gemini 业务场景上下文（豆包 corpus.context 用）
 │   ├── asr-calibrated.json             # LLM 校准中间结果（排查用）
 │   ├── asr-result.json                 # 最终 cue rows（parse 产出）
 │   ├── tts/segments/                   # tts.segments_dir (per-utterance WAV)
@@ -232,7 +234,6 @@ key = "dramas/家里家外/dub/5-dubbed.mp4"
 | `extract.vocals` | `{ep}-vocals.wav` |
 | `extract.accompaniment` | `{ep}-accompaniment.wav` |
 | `asr.doubao` | `asr-doubao.json` |
-| `asr.gemini` | `asr-gemini.json` |
 | `subs.zh_srt` | `output/{ep}-zh.srt` |
 | `subs.en_srt` | `output/{ep}-en.srt` |
 | `tts.segments_dir` | `tts/segments` |
