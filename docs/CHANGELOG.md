@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-06-07
+
+### extract 人声分离改为进程内调用
+
+- 分离从调用 `demucs` 命令行改为**进程内调用 demucs Python API**（`get_model` + `apply_model`），输出用 `soundfile` 写 wav
+- **原因**：demucs CLI 保存 wav 时走 `torchaudio.save`，torchaudio 2.9 的 save 只能用 torchcodec 编码（旧 backend 已移除），而 torchcodec 在 macOS 上常因 rpath 找不到匹配版本的 ffmpeg 动态库而 dlopen 失败（torchcodec issue #570）。进程内 + soundfile 彻底绕开 torchcodec，不再依赖系统 ffmpeg 动态库
+- 读取输入仍用 demucs `AudioFile`（走 ffmpeg 命令行，不受影响）
+- 模型按名 `lru_cache`，worker 串行处理多集时复用，省去重复反序列化开销
+- 模型下载用 certifi 兜底 `SSL_CERT_FILE`，避免 macOS 解释器缺 CA 根证书导致 `CERTIFICATE_VERIFY_FAILED`
+- `dub` 可选依赖新增 `certifi`
+- 设备保持 CPU 不变
+
 ## 2026-03-13
 
 ### 用户系统 + 多账户隔离

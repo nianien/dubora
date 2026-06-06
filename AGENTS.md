@@ -63,7 +63,7 @@ Gate:                        ↑              ↑
 
 | Phase | What it does | Technology |
 |-------|-------------|------------|
-| extract | Extract audio + separate vocals/accompaniment | FFmpeg + Demucs v4 |
+| extract | Extract audio + separate vocals/accompaniment | FFmpeg + Demucs v4 (in-process API, writes output via soundfile to bypass torchcodec/system ffmpeg dylibs) |
 | asr | Dual-source ASR: Doubao VAD (word-level) + Gemini (segmentation/speaker/emotion) | Doubao ASR + Gemini |
 | parse | Gemini 骨架 + Doubao 文本 → LLM 校准 → end_ms 延长 → DB cues | Gemini LLM |
 | translate | Incremental translation (utterance-level, per-cue writeback) | OpenAI / Gemini |
