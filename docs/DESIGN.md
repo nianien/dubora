@@ -402,9 +402,11 @@ ASR 输出 speaker="0","1"
 |---|---|
 | **输入** | 原视频 mp4 |
 | **输出** | `extract.audio` (WAV 16k mono), `extract.vocals` (人声), `extract.accompaniment` (伴奏) |
-| **实现** | FFmpeg（提取）+ Demucs htdemucs v4（分离） |
+| **实现** | FFmpeg（提取）+ Demucs htdemucs v4（分离，进程内 Python API） |
 
 Demucs 是 pipeline 中最慢的环节（2 分钟音频需 3-10 分钟 CPU），但显著提升 ASR 准确率和混音质量。
+
+**分离为何不走 `demucs` 命令行**：demucs CLI 保存 wav 时调用 `torchaudio.save`，而 torchaudio 2.9 的 `save`/`load` 只能用 torchcodec 编解码（旧的 soundfile/sox backend 已移除）。torchcodec 在 macOS 上常因 rpath 找不到匹配版本的 ffmpeg 动态库（libavutil 等）而 dlopen 失败（torchcodec issue #570）。因此分离改为**进程内调用 demucs 的 Python API**（`get_model` + `apply_model`），输出用 `soundfile`（wheel 自带 libsndfile，不依赖系统 ffmpeg）写 wav，彻底绕开 torchcodec。读取输入仍用 demucs 的 `AudioFile`（走 ffmpeg 命令行）。模型按名 `lru_cache`，worker 串行处理多集时复用。实现见 `processors/sep/impl.py`。
 
 ### 4.2 ASR（双源语音识别）
 
