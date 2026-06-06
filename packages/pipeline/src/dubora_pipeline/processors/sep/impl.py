@@ -29,18 +29,38 @@ def _ensure_ssl_cert() -> None:
         os.environ["SSL_CERT_FILE"] = certifi.where()
 
 
-@lru_cache(maxsize=2)
+def _pick_device() -> str:
+    """选择 Demucs 推理设备：cuda > mps (Apple Silicon) > cpu。
+
+    可通过 DEMUCS_DEVICE 环境变量强制指定（"cpu" / "cuda" / "mps"）。
+    Apple Silicon 上 mps 比 cpu 通常快 5-10×。
+    """
+    override = os.getenv("DEMUCS_DEVICE")
+    if override:
+        return override
+    import torch
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+@lru_cache(maxsize=1)
 def _load_model(name: str):
     """加载并缓存 Demucs 模型（eval 只读，可跨 episode 复用）。
 
     Worker 是长驻进程、串行处理多集，缓存可省去每集重复反序列化模型的开销。
+    模型搬运到 _pick_device() 选中的设备后保持常驻。
     """
     _ensure_ssl_cert()
     from demucs.pretrained import get_model
 
+    device = _pick_device()
     model = get_model(name)
-    model.cpu()
+    model.to(device)
     model.eval()
+    info(f"Demucs model loaded: {name} on {device}")
     return model
 
 
@@ -113,17 +133,19 @@ def separate_vocals(input_path: str, output_dir: str, model: str = "htdemucs") -
     ref = wav.mean(0)
     wav = (wav - ref.mean()) / ref.std()
 
+    device = _pick_device()
     with torch.no_grad():
         sources = apply_model(
             demucs_model,
-            wav[None],
-            device="cpu",
+            wav[None].to(device),
+            device=device,
             shifts=1,
             split=True,
             overlap=0.25,
             progress=False,
         )[0]
-    sources = sources * ref.std() + ref.mean()
+    # 拉回 CPU 后再反归一化：ref 是 CPU 张量；后续 split/sum/write 都在 CPU 上做。
+    sources = sources.cpu() * ref.std() + ref.mean()
 
     vocals_idx = source_names.index("vocals")
     vocals = sources[vocals_idx]
