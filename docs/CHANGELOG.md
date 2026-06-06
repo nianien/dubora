@@ -12,6 +12,19 @@
 - `dub` 可选依赖新增 `certifi`
 - 设备保持 CPU 不变
 
+### 翻译模型升级（Gemini 2.0 下线）
+
+- `gemini-2.0-flash` 已被 Google 关停（404 NOT_FOUND），翻译默认模型改为稳定版 `gemini-3.5-flash`
+- `gemini_model` 配置改为支持 `GEMINI_MODEL` 环境变量覆盖（与 `asr_gemini_model` 一致）
+- `translate_client.py` 的 fallback 模型链更新为在线模型（`gemini-3.5-flash` / `gemini-2.5-flash` / `gemini-3.1-flash-lite`），移除已下线的 1.5/2.0/gemini-pro
+- 清理 `time_aware_impl.py` 等处残留的 `gemini-1.5-pro` / `gemini-2.0-flash` 默认值与示例
+
+### burn 字幕烧录兼容 ffmpeg 7+ 新解析器
+
+- ffmpeg 7.0 引入的新 filtergraph 解析器解析 `subtitles=<绝对路径>` 时报 `No option name`（ffmpeg 8.1.1 复现）
+- 改为 `subprocess` 设 `cwd` 到 srt 所在目录、只传相对文件名（`{ep}-en.srt`，无特殊字符），并用显式 `filename=` 键
+- 同时规避 Windows 盘符冒号、剧名含特殊字符的转义隐患；移除不再需要的 `os` 导入和手写转义
+
 ## 2026-03-13
 
 ### 用户系统 + 多账户隔离

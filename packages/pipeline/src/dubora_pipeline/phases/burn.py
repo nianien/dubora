@@ -2,7 +2,6 @@
 Burn Phase: 生成 SRT 字幕 + 烧录字幕到视频 + 上传 GCS + 写 artifacts 表
 """
 import logging
-import os
 import subprocess
 from pathlib import Path
 from typing import Dict
@@ -130,14 +129,19 @@ class BurnPhase(Phase):
         output_video_path = outputs.get("burn.video")
 
         try:
-            # 转义路径（Windows 兼容）
-            escaped_srt = os.path.abspath(en_srt_path).replace("\\", "\\\\").replace(":", "\\:")
+            # subtitles 滤镜对路径转义极其敏感：ffmpeg 7+ 的新 filtergraph 解析器
+            # 解析 `subtitles=<绝对路径>` 时会报 "No option name"。改为 chdir 到
+            # srt 所在目录、只传相对文件名（{ep}-en.srt 不含特殊字符），并用显式
+            # filename= 键，任何 ffmpeg 版本都能稳定解析，同时规避 Windows 盘符冒号
+            # 和剧名含特殊字符的隐患。其余输入/输出均为绝对路径，不受 cwd 影响。
+            srt_name = en_srt_path.name
+            srt_escaped = srt_name.replace("\\", "\\\\").replace("'", "\\'")
 
             cmd = [
                 "ffmpeg",
                 "-i", str(video_path),
                 "-i", str(mix_path),
-                "-vf", f"subtitles={escaped_srt}",
+                "-vf", f"subtitles=filename='{srt_escaped}'",
                 "-c:v", "libx264",
                 "-c:a", "aac",
                 "-map", "0:v:0",
@@ -153,6 +157,7 @@ class BurnPhase(Phase):
                 check=True,
                 capture_output=True,
                 text=True,
+                cwd=str(output_dir),
             )
 
             if not output_video_path.exists():
