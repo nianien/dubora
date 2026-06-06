@@ -47,11 +47,13 @@ def _pick_device() -> str:
 
 
 @lru_cache(maxsize=1)
-def _load_model(name: str):
+def _load_model(name: str) -> tuple[object, str]:
     """加载并缓存 Demucs 模型（eval 只读，可跨 episode 复用）。
 
     Worker 是长驻进程、串行处理多集，缓存可省去每集重复反序列化模型的开销。
-    模型搬运到 _pick_device() 选中的设备后保持常驻。
+    返回 (model, device)：模型已在 device 上，调用方必须用同一 device 喂输入，
+    避免运行期 DEMUCS_DEVICE 中途切换导致缓存模型设备 ≠ 当前 _pick_device() 设备
+    的不一致问题（env 改了要重启 worker 才生效，这是合理预期）。
     """
     _ensure_ssl_cert()
     from demucs.pretrained import get_model
@@ -61,7 +63,7 @@ def _load_model(name: str):
     model.to(device)
     model.eval()
     info(f"Demucs model loaded: {name} on {device}")
-    return model
+    return model, device
 
 
 def _write_wav(tensor, path: Path, samplerate: int) -> None:
@@ -114,7 +116,7 @@ def separate_vocals(input_path: str, output_dir: str, model: str = "htdemucs") -
 
     info(f"Separating vocals from {input_file.name} using Demucs ({model}) [in-process]...")
 
-    demucs_model = _load_model(model)
+    demucs_model, device = _load_model(model)
 
     source_names = list(demucs_model.sources)
     if "vocals" not in source_names:
@@ -133,7 +135,6 @@ def separate_vocals(input_path: str, output_dir: str, model: str = "htdemucs") -
     ref = wav.mean(0)
     wav = (wav - ref.mean()) / ref.std()
 
-    device = _pick_device()
     with torch.no_grad():
         sources = apply_model(
             demucs_model,
