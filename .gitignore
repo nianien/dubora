@@ -41,6 +41,8 @@ logs/
 .env
 .env.*
 *.env
+# 模板文件入 repo 供新人参考（不含 secret）
+!.env.example
 
 # =========================
 # IDE / Editor
