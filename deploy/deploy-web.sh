@@ -68,16 +68,20 @@ build_image() {
 deploy_to_vm() {
     log "Uploading .env..."
     vm_scp "$PROJECT_DIR/.env" "~/.env.dubora"
+    # 容器走 metadata SA，本地 .env 里若残留 GOOGLE_APPLICATION_CREDENTIALS 指向
+    # 容器内不存在的 JSON 路径，会让 storage.Client.from_service_account_json 抛错。
+    # 上传后在 VM 侧剥掉这一行，保证容器进入 ADC 分支。
+    vm_ssh "sed -i '/^GOOGLE_APPLICATION_CREDENTIALS=/d' ~/.env.dubora"
 
-    log "Preparing data directories..."
+    log "Preparing data directory..."
     vm_ssh "
-        sudo mkdir -p ${DATA_DIR}/.gcp
+        sudo mkdir -p ${DATA_DIR}
         sudo chown -R \$(id -u):\$(id -g) ${DATA_DIR%/*}
     "
 
-    log "Uploading GCP service account key..."
-    [ -f "$PROJECT_DIR/.gcp/pikppo-dubora.json" ] || fail ".gcp/pikppo-dubora.json not found"
-    vm_scp "$PROJECT_DIR/.gcp/pikppo-dubora.json" "${DATA_DIR}/.gcp/pikppo-dubora.json"
+    # GCS 鉴权走 VM 关联的 service account（dubora@pikppo），应用通过 metadata
+    # 自动拿 token。不再上传 / 注入 JSON key，避免长期凭据外泄。
+    # 前提：VM 的 instance template 必须绑定了 dubora@pikppo SA 且 scopes=cloud-platform。
 
     log "Deploying container..."
     log "Authenticating Docker on VM..."
@@ -94,7 +98,6 @@ deploy_to_vm() {
             -p 80:${PORT} \
             -v ${DATA_DIR}:/data \
             --env-file ~/.env.dubora \
-            -e GOOGLE_APPLICATION_CREDENTIALS=/data/.gcp/pikppo-dubora.json \
             ${IMAGE_URL}
         docker ps --filter name=${CONTAINER_NAME}
     "
