@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-10
+
+### GCS 鉴权迁移到 metadata SA / ADC，废弃 JSON key
+
+- 移除所有 service account JSON key 文件依赖：
+  - `.gcp/pikppo-dubora.json` 删除（key 已在 GCP IAM 侧 revoke）
+  - `.gcp/google-oauth.json` 删除（代码未引用，OAuth 走 `.env` 的 `GOOGLE_CLIENT_*`）
+- 部署链路改造：
+  - 新 instance template `instance-template-cos-sg-v2` 绑定 `dubora@pikppo.iam.gserviceaccount.com`（scope `cloud-platform`），web MIG 切到该模板并 rolling-replace 现有实例
+  - `deploy-web.sh` 删除 SCP JSON key + 容器 `-e GOOGLE_APPLICATION_CREDENTIALS=...` 注入，新增上传后 `sed -i '/^GOOGLE_APPLICATION_CREDENTIALS=/d'` 防御本地 `.env` 误回退
+- 代码简化：
+  - `file_store.py::_gcs_bucket` 删除 `if creds_path: from_service_account_json(...)` 分支，统一走 `storage.Client()` ADC（Google 客户端库的 `google.auth.default()` 已经包含"`GOOGLE_APPLICATION_CREDENTIALS` 优先 → 用户 ADC → metadata server"的完整链路）
+- 本地开发约定：`gcloud auth application-default login` 一次写入 `~/.config/gcloud/application_default_credentials.json`，`.env` 不再设 `GOOGLE_APPLICATION_CREDENTIALS`
+- 文档：`docs/GCP-DEPLOY.md` §2.4 凭证段落整改为 ADC 视角，环境变量表删除 `GOOGLE_APPLICATION_CREDENTIALS`，故障排查"封面/视频不显示"改用 SA 与 metadata token 检查路径
+
+### pipeline 不再上 GCP（仅本地 / 自托管运行）
+
+- 删除 GCP 上 `dubora-pipeline-sg` VM 与 Artifact Registry 残留入口
+- 删除 `deploy/deploy-pipeline.sh`、`deploy/cloudbuild-pipeline.yaml`（保留 `deploy/Dockerfile.pipeline` 因 docker-compose 本地一体化测试仍用）
+- `deploy/docker-compose.yml` 顶部注释、`docs/GCP-DEPLOY.md` 架构图与运维章节同步重写
+
 ## 2026-06-07
 
 ### extract 人声分离改为进程内调用

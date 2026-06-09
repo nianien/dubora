@@ -89,16 +89,15 @@ cat .env
 # ...
 ```
 
-### 2.4 GCS 凭证
+### 2.4 GCS 鉴权（走 Application Default Credentials）
 
-GCS 服务账号 JSON 凭证需放在 web VM 的 `/var/dubora/data/.gcp/pikppo-dubora.json`。
+不再使用 JSON service account key 文件。所有环境统一走 ADC：
 
-```bash
-# 上传凭证到 web VM（deploy-web.sh 自动处理，这里仅供手动操作）
-gcloud compute scp .gcp/pikppo-dubora.json \
-  nianien@<dubora-web-sg-实例名>:/var/dubora/data/.gcp/pikppo-dubora.json \
-  --tunnel-through-iap
-```
+- **GCP VM**：instance template 绑定 service account（当前 `dubora@pikppo.iam.gserviceaccount.com`，scope `cloud-platform`），容器内 `storage.Client()` 自动通过 metadata server 拿 token。
+- **本地开发**：`gcloud auth application-default login` 一次，凭据写到 `~/.config/gcloud/application_default_credentials.json`，应用自动读。
+- **CI / 自托管**：推荐 [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation)；不得已用 SA key 文件时通过 `GOOGLE_APPLICATION_CREDENTIALS` 指向，注意定期轮换并存 secret manager。
+
+> Instance template `instance-template-cos-sg-v2` 已绑 `dubora@pikppo`，无需手动操作。`deploy-web.sh` 不再上传 JSON key 到 VM。
 
 ## 3. VM 配置
 
@@ -209,7 +208,7 @@ for r in store.conn.execute('SELECT id, drama_name, number, status FROM episodes
 |------|------|
 | `DB_URL` | PostgreSQL 连接串，如 `postgresql://user:pass@host:5432/dubora` |
 | `DATA_DIR` | 数据根目录，默认 `/data` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | GCS 凭证路径 |
+| `GCS_BUCKET` | GCS 桶名，默认 `dubora`。鉴权走 ADC（VM 关联 SA / 本地 gcloud login），**不再使用 JSON key 文件** |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID（空则 dev 模式，无需登录） |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
 | `AUTH_SECRET_KEY` | Cookie 签名密钥（生产环境必须设置强随机值） |
@@ -235,9 +234,12 @@ for r in store.conn.execute('SELECT id, drama_name, number, status FROM episodes
 
 ### 封面/视频不显示
 
-1. 检查 GCS 凭证是否正确挂载: `ls /data/.gcp/`
-2. 检查环境变量: `docker exec dubora-web env | grep GOOGLE`
-3. 查看 media API 日志中的 GCS 错误
+1. 检查 VM 关联的 SA：`gcloud compute instances describe <vm> --zone=<zone> --format="value(serviceAccounts[0].email)"`，应是 `dubora@pikppo.iam.gserviceaccount.com`
+2. 容器内验证 metadata token 能拿到：
+   ```
+   docker exec dubora-web python -c "from google.cloud import storage; print(storage.Client().bucket('dubora').exists())"
+   ```
+3. 查看 media API 日志中的 GCS 错误（401 / 403 通常是 SA 权限问题）
 
 ### Pipeline Worker 无法连接 Web
 

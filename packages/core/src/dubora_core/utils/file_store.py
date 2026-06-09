@@ -84,16 +84,17 @@ class StorageBackend(ABC):
 
 @lru_cache(maxsize=1)
 def _gcs_bucket():
-    """Lazy-init GCS bucket client (singleton)."""
-    from google.cloud import storage
-    from dubora_core.config.settings import resolve_relative_path
+    """Lazy-init GCS bucket client (singleton).
 
-    creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
-    if creds_path:
-        resolved = str(resolve_relative_path(creds_path))
-        client = storage.Client.from_service_account_json(resolved)
-    else:
-        client = storage.Client()
+    走 Application Default Credentials：google.auth.default() 会按顺序找
+      1. GOOGLE_APPLICATION_CREDENTIALS env 指向的 SA key 文件
+      2. ~/.config/gcloud/application_default_credentials.json (gcloud ADC)
+      3. metadata server (GCE/GKE/Cloud Run/Cloud Functions)
+    所有部署目标统一走这条路径，不再单独维护 from_service_account_json 分支。
+    """
+    from google.cloud import storage
+
+    client = storage.Client()
     bucket_name = os.getenv("GCS_BUCKET", "dubora")
     return client.bucket(bucket_name)
 
