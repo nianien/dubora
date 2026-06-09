@@ -1,6 +1,6 @@
 # 本地单机调试用 docker-compose。
-# 生产部署 web 和 pipeline 各自跑在独立 GCP VM 上（deploy-web.sh / deploy-pipeline.sh），
-# 磁盘不共享，pipeline 通过 HTTP 调 web 的 /api/worker/* 访问 DB。
+# 生产部署只有 web 上 GCP（deploy-web.sh），pipeline worker 仅本地/自托管运行，
+# 通过 HTTP 调 web 的 /api/worker/* 端点访问 DB（不直连 DB）。
 version: "3.8"
 
 services:
