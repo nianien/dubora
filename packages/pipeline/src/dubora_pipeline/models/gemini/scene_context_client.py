@@ -49,7 +49,7 @@ _PROMPT_USER = "请分析这段音频，输出业务场景描述。"
 
 
 def generate_scene_context(
-    audio_url: str,
+    audio_path,
     *,
     api_key: str,
     model_name: str = "gemini-3.5-flash",
@@ -57,8 +57,13 @@ def generate_scene_context(
 ) -> str:
     """让 Gemini 听一遍音频，输出业务场景描述。
 
+    用 inline bytes 喂给 Gemini，不走 from_uri：AI Studio API key 模式
+    下 Gemini 不能 fetch 任意 HTTPS URL（包括 GCS signed URL），gs:// URI
+    也只在 Vertex AI 鉴权下有效。Inline bytes 是唯一稳定的小文件路径。
+    适合 < 20MB 的音频；更大文件需要走 Gemini File API（client.files.upload）。
+
     Args:
-        audio_url: 音频文件签名 URL（GCS 或可公开访问的 URL）
+        audio_path: 本地音频文件路径
         api_key: Gemini API key
         model_name: Gemini 模型名称
         mime_type: 音频 MIME 类型（audio/wav / audio/mp3 等）
@@ -69,18 +74,21 @@ def generate_scene_context(
     Raises:
         RuntimeError: Gemini 调用失败或返回空
     """
+    from pathlib import Path
     from google import genai
     from google.genai import types
 
     if not api_key:
         raise RuntimeError("Gemini scene context 需要 api_key 参数")
 
+    audio_bytes = Path(audio_path).read_bytes()
+
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model=model_name,
         contents=[
             types.Content(parts=[
-                types.Part.from_uri(file_uri=audio_url, mime_type=mime_type),
+                types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
                 types.Part.from_text(text=_PROMPT_USER),
             ])
         ],

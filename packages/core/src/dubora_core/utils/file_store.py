@@ -110,9 +110,40 @@ class GCSBackend(StorageBackend):
         return _gcs_bucket().blob(key).exists()
 
     def get_url(self, key: str, expires: int = 3600) -> str:
-        return _gcs_bucket().blob(key).generate_signed_url(
-            expiration=timedelta(seconds=expires),
-        )
+        """生成 GCS object 的临时签名 URL。
+
+        ADC 切换后，凭据可能是 user credentials（本地 gcloud login）或 GCE
+        metadata token，都不含 RSA 私钥，原生 generate_signed_url 会抛
+        AttributeError。fallback 走 IAM signBlob API：让 IAM 服务代签。
+
+        前提：当前 ADC 主体必须对目标 service account 有
+        roles/iam.serviceAccountTokenCreator 权限。
+        """
+        blob = _gcs_bucket().blob(key)
+        try:
+            return blob.generate_signed_url(
+                expiration=timedelta(seconds=expires),
+                method="GET",
+                version="v4",
+            )
+        except AttributeError:
+            from google.auth import default
+            from google.auth.transport.requests import Request
+
+            creds, _ = default()
+            if not creds.valid:
+                creds.refresh(Request())
+            sa_email = os.getenv(
+                "GCS_SIGNER_SA",
+                "dubora@pikppo.iam.gserviceaccount.com",
+            )
+            return blob.generate_signed_url(
+                expiration=timedelta(seconds=expires),
+                method="GET",
+                version="v4",
+                service_account_email=sa_email,
+                access_token=creds.token,
+            )
 
 
 # ── TOS backend ──────────────────────────────────────────────────────────────

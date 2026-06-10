@@ -82,7 +82,7 @@ class ASRPhase(Phase):
             )
 
         # 2. 生成业务场景上下文（Gemini 听音频，结果缓存复用；失败降级到空 context）
-        scene_description = _ensure_scene_description(ctx, audio_path, blob_key)
+        scene_description = _ensure_scene_description(ctx, audio_path)
         if scene_description:
             info(f"ASR scene context: {scene_description[:100]}...")
 
@@ -118,14 +118,12 @@ class ASRPhase(Phase):
             )
 
 
-def _ensure_scene_description(ctx: RunContext, audio_path: Path, blob_key: str) -> str:
+def _ensure_scene_description(ctx: RunContext, audio_path: Path) -> str:
     """返回业务场景上下文文本（用于豆包 corpus.context dialog_ctx）。
 
     缓存：workspace/asr-context.json
-    生成：调 Gemini 音频分析。失败返回 ""（豆包仍可单跑，只是准确率下降）。
-
-    Args:
-        blob_key: GCS 对象 key，必须与豆包 TOS 上传一致，避免 vocals/audio 串台。
+    生成：本地 wav inline bytes 喂 Gemini 音频分析。失败返回 ""
+    （豆包仍可单跑，只是准确率下降）。
     """
     cache_path = Path(ctx.workspace) / "asr-context.json"
     if cache_path.exists() and cache_path.stat().st_size > 0:
@@ -147,15 +145,14 @@ def _ensure_scene_description(ctx: RunContext, audio_path: Path, blob_key: str) 
         return ""
 
     model_name = ctx.config.get("gemini_model", "gemini-3.5-flash")
-    # GCS 上传 + 签名 URL + Gemini 调用都包在一个 try 里：任何一步失败都降级到空 context
-    # 不阻塞主 ASR 流程 —— 豆包可以无 scene_description 单跑（只是准确率下降）
+    # Gemini 调用任何步失败都降级到空 context，不阻塞主 ASR 流程 —— 豆包可以无
+    # scene_description 单跑（只是准确率下降）。改 inline bytes 喂 Gemini，不再
+    # 走 GCS 上传 + signed URL：AI Studio key 模式下 Gemini from_uri 不支持任意
+    # HTTPS URL 抓取，会报 INVALID_ARGUMENT "Cannot fetch content"。
     try:
-        gcs = get_gcs_store()
-        gcs.write_file(audio_path, blob_key)
-        audio_url = gcs.get_url(blob_key, expires=36000)
         info(f"ASR scene context: generating via Gemini ({model_name})...")
         text = generate_scene_context(
-            audio_url, api_key=api_key, model_name=model_name, mime_type="audio/wav",
+            audio_path, api_key=api_key, model_name=model_name, mime_type="audio/wav",
         )
     except Exception as e:
         log_error(f"ASR scene context generation failed: {e}")
