@@ -43,28 +43,31 @@ def load_env_file(env_path: str | Path | None = None) -> None:
 
 def resolve_relative_path(path: str | Path) -> Path:
     """
-    解析相对路径：如果是相对路径，则相对于 .env 文件所在目录。
-    如果是绝对路径，直接返回。
+    解析相对路径：相对于"项目根"（含 .env 的目录），与运行进程的 cwd 无关。
 
-    Args:
-        path: 路径字符串或 Path 对象
+    解析顺序：
+      1. 绝对路径直接返回
+      2. 已设 _env_file_dir → 相对于它
+      3. 否则自动调一次 load_env_file()，从 settings.py 向上找 .env 设
+      4. 极端情况找不到 .env → 从 settings.py 反推项目根（比 cwd 稳定）
 
-    Returns:
-        解析后的绝对路径
+    历史上这里曾 fallback 到 `Path(path).resolve()` 用 cwd 解析，
+    导致 cwd 切到子目录时（如前端开发服务器 / IDE 测试运行器从 web/ 下跑
+    Python）会创建错位的数据缓存目录（如 web/data/gcs/...）。已移除。
     """
     path = Path(path)
-
-    # 如果是绝对路径，直接返回
     if path.is_absolute():
         return path
 
-    # 如果是相对路径，相对于 .env 文件所在目录
     global _env_file_dir
-    if _env_file_dir:
+    if _env_file_dir is None:
+        load_env_file()  # 幂等：load_dotenv override=False，已加载 env 不受影响
+
+    if _env_file_dir is not None:
         return (_env_file_dir / path).resolve()
 
-    # 如果找不到 .env 目录，相对于当前工作目录（向后兼容）
-    return Path(path).resolve()
+    # 兜底：settings.py 在 packages/core/src/dubora_core/config/，向上 5 层到项目根
+    return (Path(__file__).resolve().parents[5] / path).resolve()
 
 
 @lru_cache(maxsize=1)
