@@ -213,7 +213,7 @@ vsd-pipeline worker
 
 - 按 **Cmd/Ctrl+S** 或点击顶部 Save 按钮（修改后 2 秒也会自动保存）
 - 保存时调用 `diff_and_save()` 写入 DB，cv 自动递增，服务端自动检测重叠
-- 数据保存到 SQLite DB (cues 表)
+- 数据保存到 Postgres DB (cues 表)
 
 ### 4.13 导出
 
@@ -483,7 +483,7 @@ Voice Casting 是独立于 ASR 校准的全屏视图，用于管理 DB roles 表
 | `en.srt` | `output/` | burn 阶段从 DB cues.text_en 生成 |
 
 **注意**：
-- DB (`data/db/dubora.db`) 是所有元数据的 SSOT
+- DB（生产 Neon Postgres，本地任意 Postgres，通过 `DB_URL` 连接）是所有元数据的 SSOT
 - 编辑 cue 后自动保存到 DB，cv (content version) 自动递增
 - 原始 `asr-result.json` 永远不会被修改
 
@@ -554,7 +554,7 @@ IDE 启动后日志输出在终端，包含请求日志和错误信息。
 
 ### 13.4 数据安全
 
-- SQLite 使用 WAL 模式，支持并发读取
+- Postgres 事务保证并发读写一致性，pg_dump / Neon Branching 提供历史回溯
 - 所有 cue 修改通过 `diff_and_save()` 原子写入 DB
 - 原始 `asr-result.json` 永远不会被修改
 - 流水线运行限制单集单实例并发（同一集不会重复启动）

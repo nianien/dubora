@@ -79,30 +79,20 @@ def get_data_root() -> Path:
     return data_root
 
 
-@lru_cache(maxsize=1)
-def get_db_dir() -> Path:
-    """DB_DIR, default DATA_DIR/db. Separate env var for independent DB storage."""
-    raw = os.getenv("DB_DIR", "")
-    if raw:
-        db_dir = resolve_relative_path(raw)
-    else:
-        db_dir = get_data_root() / "db"
-    db_dir.mkdir(parents=True, exist_ok=True)
-    return db_dir
-
-
 def get_drama_dir(drama_name: str) -> Path:
     d = get_data_root() / "pipeline" / drama_name
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
-def get_db_path() -> Path:
-    return get_db_dir() / "dubora.db"
-
-
 def get_database_url() -> str:
-    """DB_URL env var. Default: postgresql://localhost:5432/dubora."""
+    """DB_URL env var. Default: postgresql://localhost:5432/dubora.
+
+    生产连 Neon serverless Postgres（host ep-young-sea-a1b6u97h-pooler.
+    ap-southeast-1.aws.neon.tech，sslmode=require）；本地开发可连任意 Postgres。
+    早期曾用 SQLite 文件（data/db/dubora.db），2026-03 切换到 Postgres 后
+    get_db_dir / get_db_path 已删除。
+    """
     return os.getenv("DB_URL", "postgresql://localhost:5432/dubora")
 
 

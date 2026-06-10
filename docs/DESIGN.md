@@ -16,7 +16,7 @@
 - 效果优先：宁可慢，也要质量稳定
 - 在线服务为主：ASR/MT/TTS 全在线，仅人声分离在本地
 - 声线池模式：不做原演员克隆，用预定义声线池区分角色
-- DB-First：SQLite 是所有元数据的 SSOT，支持增量重跑和前端实时编辑
+- DB-First：PostgreSQL (生产 Neon serverless) 是所有元数据的 SSOT，支持增量重跑和前端实时编辑
 
 ---
 
@@ -31,7 +31,7 @@ Gate:                        ↑              ↑
                       source_review   translation_review
 ```
 
-7 个 Phase + 2 个 Gate，5 个 Stage。数据存储在 SQLite DB (`data/db/dubora.db`)，task 队列驱动异步执行。
+7 个 Phase + 2 个 Gate，5 个 Stage。数据存储在 PostgreSQL（生产 = Neon serverless Postgres `ep-young-sea-a1b6u97h-pooler.ap-southeast-1.aws.neon.tech`），通过 `DB_URL` 连接。task 队列驱动异步执行。
 
 | Phase | 职责 | 技术 |
 |-------|------|------|
@@ -61,20 +61,20 @@ burn    → output/en.srt (从 DB cues 生成) + output/dubbed.mp4 (成片)
 
 支持两种部署模式：
 
-**本地模式**（单机，web + worker 共享 SQLite）：
+**本地模式**（单机，web + worker 直连同一 Postgres）：
 ```
 submit_pipeline()  → 写第一个 task 到 DB，退出
 PipelineReactor    → 监听 task_succeeded 事件，创建下一个 task
 PipelineWorker     → 全局 worker，轮询 DB 取 pending task，执行
 ```
 
-**远程模式**（双机，task 通过 HTTP API 访问 DB）：
+**远程模式**（**当前生产形态**：web 上 GCP VM 直连 Neon Postgres；pipeline worker 在本地/自托管，通过 HTTPS 调 web 的 Worker API 间接访问 DB，不直连数据库）：
 ```
-task（GPU 机器）                       web（常驻机器）
+pipeline worker（本地）                web（GCP VM，dubora-web-sg）
 ┌──────────────────┐                 ┌──────────────────────┐
-│ PipelineWorker   │  ── HTTP ──→    │ Worker API (FastAPI)  │
+│ PipelineWorker   │  ── HTTPS ──→   │ Worker API (FastAPI)  │
 │   PhaseRunner    │                 │   PipelineReactor     │
-│   RemoteStore ───┤                 │   DbStore ────────────┤→ SQLite
+│   RemoteStore ───┤                 │   DbStore ────────────┤→ Neon Postgres
 └──────────────────┘                 └───────────────────────┘
 ```
 
@@ -118,7 +118,7 @@ dubora/
 │   └── web/         → dubora-web      (API 层)
 ├── web/             → React 前端
 ├── deploy/          → Dockerfile + docker-compose + deploy 脚本
-├── sql/             → schema.sql, seed.sql（参考）
+├── sql/             → schema_pg.sql, seed.sql（参考；运行时由 DbStore._init_schema 自动建表）
 ├── docs/            → 文档
 └── test/
 ```
@@ -162,13 +162,10 @@ vsd-web serve --port 8765                            # 启动 Web 服务器
 
 ### 2.6 文件布局
 
-所有数据由 `DATA_DIR`（默认 `data/`）统一管理，`DB_DIR` 可独立覆盖。
+所有本地数据由 `DATA_DIR`（默认 `data/`）统一管理。DB 走 `DB_URL` 连 Neon Postgres，跟本地目录解耦。
 
 ```
-data/                                    # 数据根 (env: DATA_DIR)
-+-- db/
-|   +-- dubora.db                       # SQLite DB (env: DB_DIR, 默认 DATA_DIR/db)
-|
+data/                                    # 本地缓存 + 工作区 (env: DATA_DIR)，元数据全在 Postgres
 +-- pipeline/{剧名}/{集号}/               # 集级 workspace (workdir)
 |   +-- {集号}.wav                      #   提取的音频
 |   +-- {集号}-vocals.wav               #   人声
@@ -823,30 +820,18 @@ vsd-pipeline worker --api-url http://web:8765
 
 ## 10. 技术债
 
-### 10.1 SQLite TEXT 列存 int 的类型不一致
-
-- `cues.speaker` 和 `utterances.speaker` 列类型为 TEXT，存储整数字符串
-- 应用层通过 `_cast_speaker()` 转 int，但 SQL 查询时仍为字符串比较
-- 当前方案可工作，`_cast_speaker()` 保证了应用层一致性
-
-### 10.2 DubManifest.speaker 类型
-
-- `DubUtterance.speaker` 声明为 `str`
-- `dub_manifest_from_utterances()` 中显式 `speaker=str(u.get("speaker", ""))` 转换
-- 因为 DB 读出的 speaker 经 `_cast_speaker()` 已是 int，必须显式 str() 才能匹配 voice_assignment 的 str key
-
-### 10.3 _probe_duration_ms 重复定义
+### 10.1 _probe_duration_ms 重复定义
 
 - `translate.py`, `tts.py`, `mix.py` 各有一份相同的 `_probe_duration_ms()` 函数
 - 应提取为公共 util
 
-### 10.4 utterances.start_ms / end_ms 不存储
+### 10.2 utterances.start_ms / end_ms 不存储
 
 - `get_utterances()` 每次从 junction + cues 实时计算 start_ms/end_ms
 - utterances 表无 start_ms/end_ms 列
 - 如果查询频繁可考虑冗余存储，但当前性能可接受
 
-### 10.5 RemoteStore 写入批量化
+### 10.3 RemoteStore 写入批量化
 
 - translate phase 通过 RemoteStore 约 910 次 HTTP 调用（300 cues 的翻译场景）
 - 可缓冲 `update_cue`/`update_utterance`，定期批量 flush 降到 ~10 次

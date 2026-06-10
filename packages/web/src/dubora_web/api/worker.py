@@ -2,7 +2,7 @@
 Worker API: HTTP endpoints for pipeline worker to access DB remotely.
 
 All endpoints are under /worker/ prefix (mounted at /api by server.py).
-Worker calls these instead of direct SQLite access when running on a separate machine.
+Worker calls these instead of direct DB access when running on a separate machine.
 """
 import logging
 from typing import Optional

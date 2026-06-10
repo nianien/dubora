@@ -18,12 +18,13 @@
 │  Volume: /var/dubora/data → /data    │
 └──────────────┬──────────────────────┘
                │
-               │ DB_URL
+               │ DB_URL（postgresql://...sslmode=require）
                ▼
-       ┌─────────────────────┐
-       │  Cloud SQL (PG)     │
-       │  PostgreSQL 实例     │
-       └─────────────────────┘
+       ┌──────────────────────────────────┐
+       │  Neon Serverless Postgres        │
+       │  ep-young-sea-a1b6u97h-pooler    │
+       │  .ap-southeast-1.aws.neon.tech   │
+       └──────────────────────────────────┘
 
        ┌─────────────────────────────────┐
        │ Pipeline worker（本地 / 自托管） │
@@ -37,7 +38,7 @@
             (web VM)
 ```
 
-- **web** 上 GCP（regional MIG，按 IAP/域名走流量），通过 `DB_URL` 连接 Cloud SQL
+- **web** 上 GCP（regional MIG，按 IAP/域名走流量），通过 `DB_URL` 连接 Neon serverless Postgres
 - **pipeline worker 不上云**，在本地（或自有机器）跑 `vsd-pipeline worker`，通过 HTTP 调 web 的 `/api/worker/*` 端点访问数据
 - 视频文件通过 GCS 存取，web VM 走 service account 鉴权
 
@@ -49,28 +50,22 @@
 - Web VM 区域: `asia-southeast1`（regional MIG，实例在 a/b/c zone 随机）
 - Artifact Registry 仓库: `asia-east1-docker.pkg.dev/pikppo/dubora/`
 
-### 2.2 Cloud SQL PostgreSQL
+### 2.2 数据库（Neon Serverless Postgres）
 
-创建 Cloud SQL 实例（如果还没有）：
+DB 用 [Neon](https://neon.tech)（serverless Postgres，免运维，按用量计费），不是 GCP Cloud SQL。
 
-```bash
-gcloud sql instances create dubora-pg \
-  --database-version=POSTGRES_15 \
-  --tier=db-f1-micro \
-  --region=asia-southeast1 \
-  --authorized-networks=0.0.0.0/0  # 生产环境应限制为 VM IP
+- Project: `pikppo`
+- Region: `ap-southeast-1`（AWS Singapore；跟 web VM 的 `asia-southeast1` 同地区，避开跨区延迟）
+- Host: `ep-young-sea-a1b6u97h-pooler.ap-southeast-1.aws.neon.tech`
+- Pooler endpoint：连接走 PgBouncer pooled connection，serverless cold-start 后第一次查询会重连一次（应用层 `_execute` 已含 `psycopg2.OperationalError` 自动重连兜底）
 
-# 创建数据库和用户
-gcloud sql databases create dubora --instance=dubora-pg
-gcloud sql users set-password postgres --instance=dubora-pg --password=<PASSWORD>
+在 `.env` 中设置：
 ```
-
-获取连接 IP 后，在 `.env` 中设置：
-```
-DB_URL=postgresql://postgres:<PASSWORD>@<CLOUD_SQL_IP>:5432/dubora
+DB_URL=postgresql://<user>:<password>@ep-young-sea-a1b6u97h-pooler.ap-southeast-1.aws.neon.tech/pikppo?sslmode=require&channel_binding=require
 ```
 
 > 应用启动时会自动执行 `CREATE TABLE IF NOT EXISTS`，无需手动建表。
+> Neon 后台一键开 branch、备份、扩 storage，运维比 Cloud SQL 轻量得多。
 
 ### 2.3 本地环境
 
@@ -120,7 +115,7 @@ bash deploy/deploy-web.sh --no-build
 bash deploy/deploy-web.sh --help
 ```
 
-Web 容器通过 `.env` 中的 `DB_URL` 连接 Cloud SQL，启动时自动建表。
+Web 容器通过 `.env` 中的 `DB_URL` 连接 Neon Postgres，启动时自动建表。
 
 ### 4.2 本地跑 Pipeline Worker
 
@@ -189,8 +184,10 @@ gcloud compute ssh nianien@$VM --zone=$ZONE --tunnel-through-iap \
 ### 6.4 查看 DB
 
 ```bash
-# 从本地连接 Cloud SQL（需要授权 IP 或 Cloud SQL Proxy）
+# 从本地直接连 Neon（DB_URL 内置 sslmode=require + 凭据，无需额外授权）
 psql "$DB_URL"
+
+# Neon Console: https://console.neon.tech/app/projects → 项目 pikppo
 
 # 或从 web 容器内连接
 gcloud compute ssh nianien@$VM --zone=$ZONE --tunnel-through-iap \
@@ -227,10 +224,10 @@ for r in store.conn.execute('SELECT id, drama_name, number, status FROM episodes
 
 ### DB 连接失败
 
-1. 确认 `.env` 中 `DB_URL` 格式正确: `postgresql://user:pass@host:5432/dbname`
-2. 检查 Cloud SQL 实例是否在运行: `gcloud sql instances describe dubora-pg`
-3. 检查 Cloud SQL 授权网络是否包含 web VM 的外网 IP
-4. 从 web 容器内测试连接: `docker exec dubora-web python -c "from dubora_core.store import DbStore; DbStore()"`
+1. 确认 `.env` 中 `DB_URL` 格式正确: `postgresql://user:pass@host/dbname?sslmode=require`
+2. 检查 Neon 项目状态：[Neon Console](https://console.neon.tech) → pikppo → 确认 endpoint 是 Active（serverless 闲置会自动 suspend，首次请求会 cold-start 几秒）
+3. 应用层 `DbStore._execute` 已自动重试 `OperationalError` / `InterfaceError`（含 Neon SSL EOF），偶发抖动会自愈
+4. 从 web 容器内测试连接: `docker exec dubora-web python -c "from dubora_core.store import DbStore; DbStore('${DB_URL}')"`
 
 ### 封面/视频不显示
 
